@@ -649,6 +649,8 @@ class ChatSendMessageRequest(BaseModel):
     message_type: str = "TEXT"
     content: str = ""
     payload: Dict[str, Any] = {}
+    anonymous: bool = False
+    alias: str | None = None
 
 
 class ChatSendMessageResponse(BaseModel):
@@ -664,6 +666,8 @@ async def chat_public_send(req: ChatSendMessageRequest) -> ChatSendMessageRespon
             message_type=req.message_type,
             content=req.content,
             payload=req.payload,
+            anonymous=bool(req.anonymous),
+            alias=req.alias,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -687,6 +691,8 @@ async def chat_pm_send(req: ChatSendPmMessageRequest) -> ChatSendMessageResponse
             message_type=req.message_type,
             content=req.content,
             payload=req.payload,
+            anonymous=bool(req.anonymous),
+            alias=req.alias,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -700,7 +706,8 @@ async def chat_pm_send(req: ChatSendPmMessageRequest) -> ChatSendMessageResponse
 class ChatMessageResponse(BaseModel):
     message_id: str
     thread_id: str
-    sender_id: str
+    sender_id: str | None
+    sender_display: str
     message_type: str
     content: str
     payload: Dict[str, Any]
@@ -714,13 +721,45 @@ class ChatListMessagesResponse(BaseModel):
 @router.get("/chat/public/messages")
 async def chat_public_messages(limit: int = 50, before: str | None = None) -> ChatListMessagesResponse:
     items = _chat_service.list_public_messages(limit=limit, before=before)
-    return ChatListMessagesResponse(items=[ChatMessageResponse(**m.__dict__) for m in items])
+    out: list[ChatMessageResponse] = []
+    for m in items:
+        anon = bool((m.payload or {}).get("anonymous"))
+        sender_display = str((m.payload or {}).get("sender_display") or (m.sender_id if not anon else "Anonymous"))
+        out.append(
+            ChatMessageResponse(
+                message_id=m.message_id,
+                thread_id=m.thread_id,
+                sender_id=None if anon else m.sender_id,
+                sender_display=sender_display,
+                message_type=m.message_type,
+                content=m.content,
+                payload=m.payload,
+                created_at=m.created_at,
+            )
+        )
+    return ChatListMessagesResponse(items=out)
 
 
 @router.get("/chat/pm/{thread_id}/messages")
 async def chat_pm_messages(thread_id: str, limit: int = 50, before: str | None = None) -> ChatListMessagesResponse:
     items = _chat_service.list_pm_messages(thread_id=thread_id, limit=limit, before=before)
-    return ChatListMessagesResponse(items=[ChatMessageResponse(**m.__dict__) for m in items])
+    out: list[ChatMessageResponse] = []
+    for m in items:
+        anon = bool((m.payload or {}).get("anonymous"))
+        sender_display = str((m.payload or {}).get("sender_display") or (m.sender_id if not anon else "Anonymous"))
+        out.append(
+            ChatMessageResponse(
+                message_id=m.message_id,
+                thread_id=m.thread_id,
+                sender_id=None if anon else m.sender_id,
+                sender_display=sender_display,
+                message_type=m.message_type,
+                content=m.content,
+                payload=m.payload,
+                created_at=m.created_at,
+            )
+        )
+    return ChatListMessagesResponse(items=out)
 
 
 class ChatThreadResponse(BaseModel):

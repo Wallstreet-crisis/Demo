@@ -192,6 +192,8 @@ class ChatService:
         message_type: str,
         content: str = "",
         payload: Optional[Dict[str, Any]] = None,
+        anonymous: bool = False,
+        alias: str | None = None,
     ) -> EventEnvelopeJson:
         thread_id = self._public_thread_id()
         create_thread_if_not_exists(
@@ -203,22 +205,27 @@ class ChatService:
         )
 
         message_id = str(uuid4())
+        sender_display = self._compute_sender_display(sender_id=sender_id, anonymous=anonymous, alias=alias)
+        stored_payload = dict(payload or {})
+        stored_payload["anonymous"] = bool(anonymous)
+        stored_payload["sender_display"] = sender_display
         insert_message(
             message_id=message_id,
             thread_id=thread_id,
             sender_id=sender_id,
             message_type=message_type,
             content=content,
-            payload=payload,
+            payload=stored_payload,
         )
 
         ev_payload = {
             "message_id": message_id,
             "thread_id": thread_id,
-            "sender_id": sender_id,
+            "sender_id": None if anonymous else sender_id,
+            "sender_display": sender_display,
             "message_type": message_type,
             "content": content,
-            "payload": payload or {},
+            "payload": stored_payload,
             "sent_at": datetime.now(timezone.utc),
         }
         env = EventEnvelope(
@@ -239,6 +246,8 @@ class ChatService:
         message_type: str,
         content: str = "",
         payload: Optional[Dict[str, Any]] = None,
+        anonymous: bool = False,
+        alias: str | None = None,
     ) -> EventEnvelopeJson:
         th = get_thread(thread_id)
         if th is None or th.kind != "PM":
@@ -248,22 +257,27 @@ class ChatService:
             raise ValueError("sender is not a participant of this thread")
 
         message_id = str(uuid4())
+        sender_display = self._compute_sender_display(sender_id=sender_id, anonymous=anonymous, alias=alias)
+        stored_payload = dict(payload or {})
+        stored_payload["anonymous"] = bool(anonymous)
+        stored_payload["sender_display"] = sender_display
         insert_message(
             message_id=message_id,
             thread_id=thread_id,
             sender_id=sender_id,
             message_type=message_type,
             content=content,
-            payload=payload,
+            payload=stored_payload,
         )
 
         ev_payload = {
             "message_id": message_id,
             "thread_id": thread_id,
-            "sender_id": sender_id,
+            "sender_id": None if anonymous else sender_id,
+            "sender_display": sender_display,
             "message_type": message_type,
             "content": content,
-            "payload": payload or {},
+            "payload": stored_payload,
             "sent_at": datetime.now(timezone.utc),
         }
         env = EventEnvelope(
@@ -326,6 +340,14 @@ class ChatService:
 
     def get_public_total_value(self, *, user_id: str) -> Optional[float]:
         return get_public_wealth(user_id)
+
+    @staticmethod
+    def _compute_sender_display(*, sender_id: str, anonymous: bool, alias: str | None) -> str:
+        if not anonymous:
+            return str(sender_id)
+        if alias:
+            return str(alias)
+        return f"Anonymous-{str(uuid4()).replace('-', '')[:6].upper()}"
 
 class _AnyPayload(RootModel[Dict[str, Any]]):
     pass

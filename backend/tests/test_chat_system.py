@@ -110,6 +110,33 @@ def test_public_messages_order_and_pagination() -> None:
     assert items2[0]["content"] == "m1"
 
 
+def test_public_message_anonymous_does_not_leak_sender_id() -> None:
+    _reset_chat_tables()
+
+    u = f"user:anon:{uuid4()}"
+    _set_cash(u, 100.0)
+
+    resp = client.post(
+        "/chat/public/send",
+        json={
+            "sender_id": u,
+            "message_type": "TEXT",
+            "content": "secret",
+            "payload": {},
+            "anonymous": True,
+            "alias": "路人甲",
+        },
+    )
+    assert resp.status_code == 200
+
+    resp2 = client.get("/chat/public/messages", params={"limit": 10})
+    assert resp2.status_code == 200
+    items = resp2.json()["items"]
+    assert items[0]["content"] == "secret"
+    assert items[0]["sender_id"] is None
+    assert items[0]["sender_display"] == "路人甲"
+
+
 def test_pm_messages_order_and_pagination() -> None:
     _reset_chat_tables()
 
@@ -143,3 +170,37 @@ def test_pm_messages_order_and_pagination() -> None:
     items2 = resp2.json()["items"]
     assert len(items2) == 1
     assert items2[0]["content"] == "p1"
+
+
+def test_pm_message_anonymous_does_not_leak_sender_id() -> None:
+    _reset_chat_tables()
+
+    a = f"user:pma:{uuid4()}"
+    b = f"user:pmb:{uuid4()}"
+
+    _set_cash(a, 10_000_000.0)
+    _set_cash(b, 0.0)
+
+    open_resp = client.post("/chat/pm/open", json={"requester_id": a, "target_id": b})
+    assert open_resp.status_code == 200
+    thread_id = open_resp.json()["thread_id"]
+
+    resp = client.post(
+        "/chat/pm/send",
+        json={
+            "thread_id": thread_id,
+            "sender_id": a,
+            "message_type": "TEXT",
+            "content": "pm-secret",
+            "payload": {},
+            "anonymous": True,
+        },
+    )
+    assert resp.status_code == 200
+
+    resp2 = client.get(f"/chat/pm/{thread_id}/messages", params={"limit": 10})
+    assert resp2.status_code == 200
+    items = resp2.json()["items"]
+    assert items[0]["content"] == "pm-secret"
+    assert items[0]["sender_id"] is None
+    assert str(items[0]["sender_display"]).startswith("Anonymous-")
