@@ -19,6 +19,7 @@ from ifrontier.domain.events.types import EventType
 from ifrontier.infra.neo4j.event_store import Neo4jEventStore
 from ifrontier.infra.neo4j.driver import create_driver
 from ifrontier.infra.sqlite.ledger import apply_trade_executed
+from ifrontier.infra.sqlite.market import record_trade
 from ifrontier.infra.sqlite.orders import (
     fetch_best_opposite_orders,
     insert_limit_order,
@@ -96,6 +97,14 @@ def submit_limit_order(
             symbol=symbol,
             price=trade_price,
             quantity=trade_qty,
+            event_id=str(event_json.event_id),
+        )
+
+        record_trade(
+            symbol=symbol,
+            price=float(trade_price),
+            quantity=float(trade_qty),
+            occurred_at=event_json.occurred_at,
             event_id=str(event_json.event_id),
         )
 

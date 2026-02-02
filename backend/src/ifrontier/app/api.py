@@ -15,7 +15,10 @@ from ifrontier.infra.neo4j.event_store import Neo4jEventStore
 from ifrontier.services.commonbot import run_commonbot_for_earnings
 from ifrontier.services.commonbot_emergency import CommonBotEmergencyRunner
 from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account, get_snapshot
+from ifrontier.infra.sqlite.market import get_candles, get_last_price, get_price_series, record_trade
 from ifrontier.services.matching import submit_limit_order, submit_market_order
+from ifrontier.services.market_analytics import get_quote
+from ifrontier.services.valuation import value_account
 from ifrontier.domain.players.caste import get_caste_config
 from ifrontier.infra.sqlite.db import get_connection
 from ifrontier.services.contracts import ContractService
@@ -221,11 +224,125 @@ async def debug_execute_trade(req: DebugExecuteTradeRequest) -> DebugExecuteTrad
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    record_trade(
+        symbol=req.symbol,
+        price=float(req.price),
+        quantity=float(req.quantity),
+        occurred_at=now,
+        event_id=str(event_json.event_id),
+    )
+
     _event_store.append(event_json)
     await hub.broadcast_json("events", event_json.model_dump())
     await hub.broadcast_json(str(EventType.TRADE_EXECUTED), event_json.model_dump())
 
     return DebugExecuteTradeResponse(event_id=event_json.event_id, correlation_id=correlation_id)
+
+
+class MarketQuoteResponse(BaseModel):
+    symbol: str
+    last_price: float | None
+    prev_price: float | None
+    change_pct: float | None
+    ma_5: float | None
+    ma_20: float | None
+    vol_20: float | None
+
+
+@router.get("/market/quote/{symbol}")
+async def market_quote(symbol: str) -> MarketQuoteResponse:
+    q = get_quote(symbol)
+    return MarketQuoteResponse(
+        symbol=q.symbol,
+        last_price=q.last_price,
+        prev_price=q.prev_price,
+        change_pct=q.change_pct,
+        ma_5=q.ma_5,
+        ma_20=q.ma_20,
+        vol_20=q.vol_20,
+    )
+
+
+class MarketSeriesResponse(BaseModel):
+    symbol: str
+    prices: list[float]
+
+
+@router.get("/market/series/{symbol}")
+async def market_series(symbol: str, limit: int = 200) -> MarketSeriesResponse:
+    prices = get_price_series(symbol=symbol, limit=limit)
+    return MarketSeriesResponse(symbol=symbol, prices=prices)
+
+
+class MarketCandleItem(BaseModel):
+    bucket_start: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+    vwap: float
+    trades: int
+
+
+class MarketCandlesResponse(BaseModel):
+    symbol: str
+    interval_seconds: int
+    candles: list[MarketCandleItem]
+
+
+@router.get("/market/candles/{symbol}")
+async def market_candles(
+    symbol: str, interval_seconds: int = 60, limit: int = 200
+) -> MarketCandlesResponse:
+    try:
+        candles = get_candles(symbol=symbol, interval_seconds=interval_seconds, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return MarketCandlesResponse(
+        symbol=symbol,
+        interval_seconds=int(interval_seconds),
+        candles=[
+            MarketCandleItem(
+                bucket_start=c.bucket_start,
+                open=c.open,
+                high=c.high,
+                low=c.low,
+                close=c.close,
+                volume=c.volume,
+                vwap=c.vwap,
+                trades=c.trades,
+            )
+            for c in candles
+        ],
+    )
+
+
+class AccountValuationResponse(BaseModel):
+    account_id: str
+    cash: float
+    positions: Dict[str, float]
+    equity_value: float
+    total_value: float
+    discount_factor: float
+    prices: Dict[str, float | None]
+
+
+@router.get("/accounts/{account_id}/valuation")
+async def account_valuation(account_id: str, discount_factor: float = 1.0) -> AccountValuationResponse:
+    try:
+        v = value_account(account_id=account_id, discount_factor=discount_factor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return AccountValuationResponse(
+        account_id=v.account_id,
+        cash=v.cash,
+        positions=v.positions,
+        equity_value=v.equity_value,
+        total_value=v.total_value,
+        discount_factor=v.discount_factor,
+        prices=v.prices,
+    )
 
 
 class DebugSubmitOrderRequest(BaseModel):
