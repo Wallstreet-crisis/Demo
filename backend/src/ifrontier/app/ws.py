@@ -34,6 +34,21 @@ class WsHub:
             except Exception:
                 await self.leave(channel, ws)
 
+    async def get_channel_size(self, channel: str) -> int:
+        async with self._lock:
+            return int(len(self._channels.get(channel, set())))
+
+    async def get_stats(self) -> Dict[str, int]:
+        async with self._lock:
+            all_sockets: Set[WebSocket] = set()
+            for ch_socks in self._channels.values():
+                all_sockets |= set(ch_socks)
+
+            stats: Dict[str, int] = {"total_connections": int(len(all_sockets))}
+            for ch, ch_socks in self._channels.items():
+                stats[f"channel:{ch}"] = int(len(ch_socks))
+            return stats
+
 
 hub = WsHub()
 

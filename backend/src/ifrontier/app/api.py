@@ -29,6 +29,10 @@ from ifrontier.services.news import NewsService
 from ifrontier.services.news_tick import NewsTickEngine
 from ifrontier.services.game_time import load_game_time_config_from_env
 from ifrontier.services.market_session import get_market_session
+from ifrontier.infra.sqlite.hosting import get_hosting_state, upsert_hosting_state
+from ifrontier.services.hosting_scheduler import HostingScheduler
+from ifrontier.services.user_capabilities import UserCapabilityFacade
+
 router = APIRouter()
 
 _driver = create_driver()
@@ -39,6 +43,8 @@ _chat_service = ChatService(event_store=_event_store)
 _news_service = NewsService(_driver, _event_store)
 _news_tick_engine = NewsTickEngine(_driver, _event_store, _news_service)
 _commonbot_emergency_runner = CommonBotEmergencyRunner(news=_news_service, event_store=_event_store)
+
+_hosting_scheduler: HostingScheduler | None = None
 
 @router.get("/health")
 def health() -> Dict[str, str]:
@@ -52,11 +58,9 @@ class DebugEmitEventRequest(BaseModel):
     correlation_id: Optional[UUID] = None
     causation_id: Optional[UUID] = None
 
-
 class DebugEmitEventResponse(BaseModel):
     event_id: UUID
     correlation_id: Optional[UUID]
-
 
 @router.post("/debug/emit_event")
 async def debug_emit_event(req: DebugEmitEventRequest) -> DebugEmitEventResponse:
@@ -77,10 +81,140 @@ async def debug_emit_event(req: DebugEmitEventRequest) -> DebugEmitEventResponse
 
     return DebugEmitEventResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
 
-
 class _AnyPayload(RootModel[Dict[str, Any]]):
     pass
 
+class HostingStatusResponse(BaseModel):
+    user_id: str
+    enabled: bool
+    status: str
+    updated_at: str
+
+class HostingEnableResponse(BaseModel):
+    state: HostingStatusResponse
+    event_id: UUID
+    correlation_id: UUID | None
+
+class HostingDisableResponse(BaseModel):
+    state: HostingStatusResponse
+    event_id: UUID
+    correlation_id: UUID | None
+
+@router.post("/hosting/{user_id}/enable")
+async def hosting_enable(user_id: str) -> HostingEnableResponse:
+    st = upsert_hosting_state(user_id=user_id, enabled=True, status="ON_IDLE")
+    payload = _AnyPayload(
+        {
+            "as_user_id": str(user_id),
+            "enabled": True,
+            "status": st.status,
+            "changed_at": datetime.now(timezone.utc),
+        }
+    )
+    env = EventEnvelope(
+        event_type=EventType.AI_HOSTING_STATE_CHANGED,
+        correlation_id=uuid4(),
+        actor=EventActor(agent_id=f"hosting:{user_id}"),
+        payload=payload,
+    )
+    ev = EventEnvelopeJson.from_envelope(env)
+    _event_store.append(ev)
+    await hub.broadcast_json("events", ev.model_dump())
+    await hub.broadcast_json(str(EventType.AI_HOSTING_STATE_CHANGED), ev.model_dump())
+
+    return HostingEnableResponse(
+        state=HostingStatusResponse(
+            user_id=st.user_id,
+            enabled=bool(st.enabled),
+            status=str(st.status),
+            updated_at=str(st.updated_at),
+        ),
+        event_id=ev.event_id,
+        correlation_id=ev.correlation_id,
+    )
+
+@router.post("/hosting/{user_id}/disable")
+async def hosting_disable(user_id: str) -> HostingDisableResponse:
+    st = upsert_hosting_state(user_id=user_id, enabled=False, status="OFF")
+    payload = _AnyPayload(
+        {
+            "as_user_id": str(user_id),
+            "enabled": False,
+            "status": st.status,
+            "changed_at": datetime.now(timezone.utc),
+        }
+    )
+    env = EventEnvelope(
+        event_type=EventType.AI_HOSTING_STATE_CHANGED,
+        correlation_id=uuid4(),
+        actor=EventActor(agent_id=f"hosting:{user_id}"),
+        payload=payload,
+    )
+    ev = EventEnvelopeJson.from_envelope(env)
+    _event_store.append(ev)
+    await hub.broadcast_json("events", ev.model_dump())
+    await hub.broadcast_json(str(EventType.AI_HOSTING_STATE_CHANGED), ev.model_dump())
+
+    return HostingDisableResponse(
+        state=HostingStatusResponse(
+            user_id=st.user_id,
+            enabled=bool(st.enabled),
+            status=str(st.status),
+            updated_at=str(st.updated_at),
+        ),
+        event_id=ev.event_id,
+        correlation_id=ev.correlation_id,
+    )
+
+@router.get("/hosting/{user_id}/status")
+async def hosting_status(user_id: str) -> HostingStatusResponse:
+    st = get_hosting_state(user_id)
+    if st is None:
+        st = upsert_hosting_state(user_id=user_id, enabled=False, status="OFF")
+    return HostingStatusResponse(
+        user_id=st.user_id,
+        enabled=bool(st.enabled),
+        status=str(st.status),
+        updated_at=str(st.updated_at),
+    )
+
+class HostingDebugTickResponse(BaseModel):
+    ok: bool
+
+@router.post("/hosting/debug/tick_once")
+async def hosting_debug_tick_once() -> HostingDebugTickResponse:
+    sched = _hosting_scheduler
+    if sched is None:
+        # 测试环境中 TestClient 可能不会触发 lifespan，从而导致 scheduler 未启动。
+        # debug 接口允许临时构造 scheduler 并执行一次 tick。
+        sched = HostingScheduler(
+            min_players=8,
+            tick_interval_seconds=1.0,
+            max_per_tick=2,
+            channel_for_online_stats="events",
+            get_channel_size=hub.get_channel_size,
+            broadcaster=_make_broadcaster_for_events(),
+            make_facade=make_user_facade,
+        )
+    await sched.tick_once()
+    return HostingDebugTickResponse(ok=True)
+
+def _make_broadcaster_for_events():
+    async def _broadcast(ev: dict) -> None:
+        await hub.broadcast_json("events", ev)
+        ev_type = ev.get("event_type")
+        if ev_type:
+            await hub.broadcast_json(str(ev_type), ev)
+
+    return _broadcast
+
+def make_user_facade(user_id: str) -> UserCapabilityFacade:
+    return UserCapabilityFacade(
+        user_id=user_id,
+        contract_service=_contract_service,
+        contract_agent=_contract_agent,
+        chat_service=_chat_service,
+    )
 
 class DebugEarningsNewsRequest(BaseModel):
     symbol: str

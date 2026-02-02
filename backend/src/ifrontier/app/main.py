@@ -9,6 +9,7 @@ from ifrontier.infra.sqlite.schema import init_schema
 from ifrontier.services.rule_scheduler import ContractRuleScheduler
 from ifrontier.services.news_tick_scheduler import NewsTickScheduler
 from ifrontier.services.market_session_scheduler import MarketSessionScheduler
+from ifrontier.services.hosting_scheduler import HostingScheduler
  
  
 def create_app() -> FastAPI:
@@ -40,12 +41,27 @@ def create_app() -> FastAPI:
             tick_interval_seconds=1.0,
             broadcaster=_make_news_broadcaster(hub),
         )
+
+        hosting_scheduler = HostingScheduler(
+            min_players=8,
+            tick_interval_seconds=1.0,
+            max_per_tick=2,
+            channel_for_online_stats="events",
+            get_channel_size=hub.get_channel_size,
+            broadcaster=_make_news_broadcaster(hub),
+            make_facade=api_module.make_user_facade,
+        )
+
+        api_module._hosting_scheduler = hosting_scheduler
         scheduler.start()
         news_scheduler.start()
         market_session_scheduler.start()
+        hosting_scheduler.start()
         try:
             yield
         finally:
+            await hosting_scheduler.stop()
+            api_module._hosting_scheduler = None
             await market_session_scheduler.stop()
             await news_scheduler.stop()
             await scheduler.stop()
