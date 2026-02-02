@@ -173,3 +173,19 @@ class ContractProposalApprovedPayload(BaseModel):
     proposal_id: str
     approver: str
     approved_at: datetime
+
+
+class ContractSettledPayload(BaseModel):
+    contract_id: str
+    settlement_event_id: str
+    settled_at: datetime
+
+
+class ContractRuleExecutedPayload(BaseModel):
+    contract_id: str
+    rule_id: str
+    evaluated: bool
+    executed: bool
+    reason: str | None = None
+    settlement_event_id: str | None = None
+    executed_at: datetime

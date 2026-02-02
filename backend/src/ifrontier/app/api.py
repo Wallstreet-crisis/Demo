@@ -475,3 +475,27 @@ async def contract_proposal_approve(
         contract_status=str(result.get("contract_status")),
         proposal_type=str(result.get("proposal_type")),
     )
+
+
+class ContractSettleRequest(BaseModel):
+    actor_id: str
+
+
+@router.post("/contracts/{contract_id}/settle")
+async def contract_settle(contract_id: str, req: ContractSettleRequest) -> None:
+    try:
+        _contract_service.settle_contract(contract_id=contract_id, actor_id=req.actor_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class ContractRunRulesRequest(BaseModel):
+    actor_id: str
+
+
+@router.post("/contracts/{contract_id}/run_rules")
+async def contract_run_rules(contract_id: str, req: ContractRunRulesRequest) -> None:
+    try:
+        _contract_service.run_rules(contract_id=contract_id, actor_id=req.actor_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -15,11 +15,14 @@ from ifrontier.domain.events.payloads import (
     ContractCreatedPayload,
     ContractProposalApprovedPayload,
     ContractProposalCreatedPayload,
+    ContractSettledPayload,
     ContractSignedPayload,
+    ContractRuleExecutedPayload
 )
 from ifrontier.domain.events.types import EventType
 from ifrontier.infra.neo4j.event_store import Neo4jEventStore
-
+from ifrontier.infra.sqlite.ledger import ContractTransfer, apply_contract_transfers
+from ifrontier.services.contract_rules import eval_condition, parse_transfers, should_run
 
 class ContractService:
 
@@ -230,6 +233,196 @@ class ContractService:
         )
         self._event_store.append(EventEnvelopeJson.from_envelope(env))
 
+    def settle_contract(self, *, contract_id: str, actor_id: str) -> None:
+        now = datetime.now(timezone.utc)
+
+        with self._driver.session() as session:
+            record = session.execute_read(
+                self._load_contract_for_settle_tx,
+                {"contract_id": contract_id},
+            )
+
+        if record is None:
+            raise ValueError("contract not found")
+
+        status = str(record.get("status") or "")
+        if status != ContractStatus.ACTIVE.value:
+            raise ValueError("contract not active")
+
+        terms_json = str(record.get("terms_json") or "{}")
+        try:
+            terms = json.loads(terms_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError("invalid contract terms") from exc
+
+        transfers_raw = terms.get("transfers")
+        if not isinstance(transfers_raw, list) or not transfers_raw:
+            raise ValueError("contract transfers missing")
+
+        transfers: List[ContractTransfer] = []
+        for item in transfers_raw:
+            if not isinstance(item, dict):
+                raise ValueError("invalid transfer")
+            transfers.append(
+                ContractTransfer(
+                    from_account_id=str(item.get("from")),
+                    to_account_id=str(item.get("to")),
+                    asset_type=str(item.get("asset_type")),
+                    symbol=str(item.get("symbol")),
+                    quantity=float(item.get("quantity")),
+                )
+            )
+
+        settlement_event_id = str(uuid4())
+        apply_contract_transfers(transfers=transfers, event_id=settlement_event_id)
+
+        payload = ContractSettledPayload(
+            contract_id=contract_id,
+            settlement_event_id=settlement_event_id,
+            settled_at=now,
+        )
+        env = EventEnvelope(
+            event_type=EventType.CONTRACT_SETTLED,
+            correlation_id=uuid4(),
+            actor=EventActor(user_id=actor_id),
+            payload=payload,
+        )
+        self._event_store.append(EventEnvelopeJson.from_envelope(env))
+
+    def run_rules(self, *, contract_id: str, actor_id: str) -> None:
+        now = datetime.now(timezone.utc)
+
+        with self._driver.session() as session:
+            record = session.execute_read(
+                self._load_contract_for_rules_tx,
+                {"contract_id": contract_id},
+            )
+
+        if record is None:
+            raise ValueError("contract not found")
+
+        status = str(record.get("status") or "")
+        if status != ContractStatus.ACTIVE.value:
+            raise ValueError("contract not active")
+
+        terms_json = str(record.get("terms_json") or "{}")
+        try:
+            terms = json.loads(terms_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError("invalid contract terms") from exc
+
+        rules_raw = terms.get("rules")
+        if rules_raw is None:
+            raise ValueError("contract rules missing")
+        if not isinstance(rules_raw, list):
+            raise ValueError("contract rules invalid")
+
+        rule_state_json = str(record.get("rule_state_json") or "{}")
+        try:
+            rule_state = json.loads(rule_state_json) if rule_state_json else {}
+        except json.JSONDecodeError as exc:
+            raise ValueError("invalid contract rule_state") from exc
+        if not isinstance(rule_state, dict):
+            raise ValueError("invalid contract rule_state")
+
+        state_changed = False
+        for rule in rules_raw:
+            if not isinstance(rule, dict):
+                raise ValueError("invalid rule")
+            rule_id = str(rule.get("rule_id") or "")
+            if not rule_id:
+                raise ValueError("rule_id missing")
+
+            schedule = rule.get("schedule") or {"type": "once"}
+            if not isinstance(schedule, dict):
+                raise ValueError("invalid schedule")
+
+            st = rule_state.get(rule_id) or {}
+            if not isinstance(st, dict):
+                raise ValueError("invalid rule_state")
+
+            if not should_run(schedule, st):
+                payload = ContractRuleExecutedPayload(
+                    contract_id=contract_id,
+                    rule_id=rule_id,
+                    evaluated=False,
+                    executed=False,
+                    reason="schedule blocked",
+                    settlement_event_id=None,
+                    executed_at=now,
+                )
+                env = EventEnvelope(
+                    event_type=EventType.CONTRACT_RULE_EXECUTED,
+                    correlation_id=uuid4(),
+                    actor=EventActor(user_id=actor_id),
+                    payload=payload,
+                )
+                self._event_store.append(EventEnvelopeJson.from_envelope(env))
+                continue
+
+            condition = rule.get("condition", True)
+            cond_ok = bool(eval_condition(condition))
+            if not cond_ok:
+                payload = ContractRuleExecutedPayload(
+                    contract_id=contract_id,
+                    rule_id=rule_id,
+                    evaluated=True,
+                    executed=False,
+                    reason="condition false",
+                    settlement_event_id=None,
+                    executed_at=now,
+                )
+                env = EventEnvelope(
+                    event_type=EventType.CONTRACT_RULE_EXECUTED,
+                    correlation_id=uuid4(),
+                    actor=EventActor(user_id=actor_id),
+                    payload=payload,
+                )
+                self._event_store.append(EventEnvelopeJson.from_envelope(env))
+                continue
+
+            actions = rule.get("actions") or {}
+            if not isinstance(actions, dict):
+                raise ValueError("invalid actions")
+
+            transfers = parse_transfers(actions.get("transfers"))
+            settlement_event_id = str(uuid4())
+            apply_contract_transfers(transfers=transfers, event_id=settlement_event_id)
+
+            runs = int(st.get("runs") or 0) + 1
+            st["runs"] = runs
+            st["last_run_at"] = now.isoformat()
+            rule_state[rule_id] = st
+            state_changed = True
+
+            payload = ContractRuleExecutedPayload(
+                contract_id=contract_id,
+                rule_id=rule_id,
+                evaluated=True,
+                executed=True,
+                reason=None,
+                settlement_event_id=settlement_event_id,
+                executed_at=now,
+            )
+            env = EventEnvelope(
+                event_type=EventType.CONTRACT_RULE_EXECUTED,
+                correlation_id=uuid4(),
+                actor=EventActor(user_id=actor_id),
+                payload=payload,
+            )
+            self._event_store.append(EventEnvelopeJson.from_envelope(env))
+
+        if state_changed:
+            with self._driver.session() as session:
+                session.execute_write(
+                    self._save_contract_rule_state_tx,
+                    {
+                        "contract_id": contract_id,
+                        "rule_state_json": json.dumps(rule_state, ensure_ascii=False),
+                        "updated_at": now.isoformat(),
+                    },
+                )
+
     @staticmethod
     def _create_contract_tx(tx, params: Dict[str, Any]) -> None:
         tx.run(
@@ -360,3 +553,39 @@ class ContractService:
             **params,
         ).single()
         return record is not None
+
+    @staticmethod
+    def _load_contract_for_rules_tx(tx, params):
+        rec = tx.run(
+            """
+            MATCH (c:Contract {contract_id: $contract_id})
+            RETURN c.status AS status,
+                   c.terms_json AS terms_json,
+                   c.rule_state_json AS rule_state_json
+            """,
+            **params,
+        ).single()
+        return dict(rec) if rec else None
+
+    @staticmethod
+    def _load_contract_for_settle_tx(tx, params: Dict[str, Any]):
+        result = tx.run(
+            """
+            MATCH (c:Contract {contract_id: $contract_id})
+            RETURN c.status AS status, c.terms_json AS terms_json
+            """,
+            **params,
+        )
+        rec = result.single()
+        return dict(rec) if rec is not None else None
+
+    @staticmethod
+    def _save_contract_rule_state_tx(tx, params) -> None:
+        tx.run(
+            """
+            MATCH (c:Contract {contract_id: $contract_id})
+            SET c.rule_state_json = $rule_state_json,
+                c.updated_at = $updated_at
+            """,
+            **params,
+        )
