@@ -82,7 +82,19 @@ class GameTimeSnapshot:
 
 
 def game_time_now(*, cfg: GameTimeConfig, real_now_utc: datetime | None = None) -> GameTimeSnapshot:
-    now = real_now_utc or datetime.now(timezone.utc)
+    now = real_now_utc
+    if now is None:
+        override = os.getenv("IF_GAME_NOW_UTC")
+        if override:
+            try:
+                dt = datetime.fromisoformat(override)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                now = dt.astimezone(timezone.utc)
+            except Exception:
+                now = None
+
+    now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
     now = now.astimezone(timezone.utc)

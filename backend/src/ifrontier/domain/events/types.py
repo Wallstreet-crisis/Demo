@@ -28,6 +28,13 @@ class EventType(str, Enum):
     AI_PLAYER_AGENT_TASK_SUBMITTED = "ai.player_agent.task_submitted"
     AI_PLAYER_AGENT_TASK_COMPLETED = "ai.player_agent.task_completed"
 
+    CHAT_THREAD_OPENED = "chat.thread.opened"
+    CHAT_MESSAGE_SENT = "chat.message.sent"
+    CHAT_INTRO_FEE_QUOTED = "chat.intro_fee.quoted"
+    CHAT_INTRO_FEE_PAID = "chat.intro_fee.paid"
+
+    WEALTH_PUBLIC_REFRESHED = "wealth.public.refreshed"
+
     TRADE_INTENT_SUBMITTED = "trade.intent_submitted"
     TRADE_EXECUTED = "trade.executed"
 

@@ -24,6 +24,7 @@ from ifrontier.domain.players.caste import get_caste_config
 from ifrontier.infra.sqlite.db import get_connection
 from ifrontier.services.contracts import ContractService
 from ifrontier.services.contract_agent import ContractAgent
+from ifrontier.services.chat import ChatService
 from ifrontier.services.news import NewsService
 from ifrontier.services.news_tick import NewsTickEngine
 from ifrontier.services.game_time import load_game_time_config_from_env
@@ -34,6 +35,7 @@ _driver = create_driver()
 _event_store = Neo4jEventStore(_driver)
 _contract_service = ContractService(_driver, _event_store)
 _contract_agent = ContractAgent()
+_chat_service = ChatService(event_store=_event_store)
 _news_service = NewsService(_driver, _event_store)
 _news_tick_engine = NewsTickEngine(_driver, _event_store, _news_service)
 _commonbot_emergency_runner = CommonBotEmergencyRunner(news=_news_service, event_store=_event_store)
