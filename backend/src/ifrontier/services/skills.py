@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from pydantic import BaseModel
 
 from ifrontier.services.user_capabilities import UserCapabilityFacade
 
@@ -79,7 +81,30 @@ class SkillsRegistry:
         except Exception as exc:
             return {"ok": False, "error": str(exc), "skill": spec.name}
 
-        return {"ok": True, "skill": spec.name, "result": result}
+        return {"ok": True, "skill": spec.name, "result": _to_jsonable(result)}
+
+
+def _to_jsonable(obj: Any) -> Any:
+    if obj is None:
+        return None
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, dict):
+        return {str(k): _to_jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [_to_jsonable(x) for x in list(obj)]
+    if isinstance(obj, BaseModel):
+        return _to_jsonable(obj.model_dump(mode="json"))
+    if hasattr(obj, "model_dump") and callable(getattr(obj, "model_dump")):
+        try:
+            return _to_jsonable(obj.model_dump(mode="json"))
+        except TypeError:
+            return _to_jsonable(obj.model_dump())
+    if is_dataclass(obj):
+        return _to_jsonable(asdict(obj))
+    if hasattr(obj, "__dict__"):
+        return _to_jsonable(dict(obj.__dict__))
+    return str(obj)
 
 
 def default_skills_registry() -> SkillsRegistry:
