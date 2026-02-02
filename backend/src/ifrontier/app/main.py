@@ -8,6 +8,7 @@ from ifrontier.app.ws import router as ws_router
 from ifrontier.infra.sqlite.schema import init_schema
 from ifrontier.services.rule_scheduler import ContractRuleScheduler
 from ifrontier.services.news_tick_scheduler import NewsTickScheduler
+from ifrontier.services.market_session_scheduler import MarketSessionScheduler
  
  
 def create_app() -> FastAPI:
@@ -33,11 +34,19 @@ def create_app() -> FastAPI:
             batch_size=50,
             broadcaster=_make_news_broadcaster(hub),
         )
+
+        market_session_scheduler = MarketSessionScheduler(
+            runner=api_module._commonbot_emergency_runner,
+            tick_interval_seconds=1.0,
+            broadcaster=_make_news_broadcaster(hub),
+        )
         scheduler.start()
         news_scheduler.start()
+        market_session_scheduler.start()
         try:
             yield
         finally:
+            await market_session_scheduler.stop()
             await news_scheduler.stop()
             await scheduler.stop()
 

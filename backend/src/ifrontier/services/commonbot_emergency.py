@@ -31,6 +31,14 @@ class CommonBotCohortConfig:
     max_news_items: int = 10
 
 
+@dataclass(frozen=True)
+class _PendingMarketOpenReaction:
+    correlation_id: UUID
+    variant_id: str
+    news_text: str
+    symbols: List[str]
+
+
 class CommonBotEmergencyRunner:
     def __init__(
         self,
@@ -57,6 +65,7 @@ class CommonBotEmergencyRunner:
             ),
         ]
         self._market_data_provider = market_data_provider
+        self._pending_market_open: _PendingMarketOpenReaction | None = None
 
     def maybe_react(
         self,
@@ -106,7 +115,56 @@ class CommonBotEmergencyRunner:
                 emitted.append(decision_json)
 
                 if market_phase != MarketPhase.TRADING:
+                    # 休市期间仅产生可观测的决策事件，且记录“开市补决策”状态。
+                    self._pending_market_open = _PendingMarketOpenReaction(
+                        correlation_id=corr,
+                        variant_id=variant_id,
+                        news_text=variant_text,
+                        symbols=list(symbols),
+                    )
                     continue
+
+                if trade_json is not None:
+                    self._event_store.append(trade_json)
+                    emitted.append(trade_json)
+
+        return emitted
+
+    def maybe_react_on_market_open(self) -> List[EventEnvelopeJson]:
+        cfg = load_game_time_config_from_env()
+        session = get_market_session(cfg=cfg)
+        if session.phase != MarketPhase.TRADING:
+            return []
+
+        pending = self._pending_market_open
+        if pending is None:
+            return []
+        # 清除 pending，避免反复触发
+        self._pending_market_open = None
+
+        emitted: List[EventEnvelopeJson] = []
+        for cohort in self._cohorts:
+            ctx = self._build_shared_context(
+                cohort=cohort,
+                variant_id=pending.variant_id,
+                news_text=pending.news_text,
+                symbols=pending.symbols,
+            )
+            if ctx is None:
+                continue
+
+            for symbol in pending.symbols[:1]:
+                decision_json, trade_json = run_commonbot_for_earnings(
+                    symbol=symbol,
+                    visual_truth="UNKNOWN",
+                    price_series=ctx.trends.symbol_price_series.get(symbol, []),
+                    bot_id=cohort.bot_id,
+                    correlation_id=pending.correlation_id,
+                    news_text="\n".join(ctx.recent_news_texts),
+                    use_llm=cohort.use_llm,
+                )
+                self._event_store.append(decision_json)
+                emitted.append(decision_json)
 
                 if trade_json is not None:
                     self._event_store.append(trade_json)
