@@ -379,6 +379,59 @@ async def contract_create(req: ContractCreateRequest) -> ContractCreateResponse:
     return ContractCreateResponse(contract_id=contract_id)
 
 
+class ContractBatchItem(BaseModel):
+    kind: str
+    title: str
+    terms: Dict[str, Any]
+    parties: list[str]
+    required_signers: list[str]
+    participation_mode: str | None = None
+    invited_parties: list[str] | None = None
+
+
+class ContractBatchCreateRequest(BaseModel):
+    actor_id: str
+    contracts: list[ContractBatchItem]
+
+
+class ContractBatchCreateResponseItem(BaseModel):
+    index: int
+    contract_id: str
+
+
+class ContractBatchCreateResponse(BaseModel):
+    contracts: list[ContractBatchCreateResponseItem]
+
+
+@router.post("/contracts/batch_create")
+async def contract_batch_create(req: ContractBatchCreateRequest) -> ContractBatchCreateResponse:
+    try:
+        contract_dicts = [
+            {
+                "kind": c.kind,
+                "title": c.title,
+                "terms": c.terms,
+                "parties": c.parties,
+                "required_signers": c.required_signers,
+                "participation_mode": c.participation_mode,
+                "invited_parties": c.invited_parties,
+            }
+            for c in req.contracts
+        ]
+        ids = _contract_service.create_contracts_batch(
+            actor_id=req.actor_id,
+            contracts=contract_dicts,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    items: list[ContractBatchCreateResponseItem] = [
+        ContractBatchCreateResponseItem(index=idx, contract_id=cid)
+        for idx, cid in enumerate(ids)
+    ]
+    return ContractBatchCreateResponse(contracts=items)
+
+
 class ContractJoinRequest(BaseModel):
     joiner: str
 

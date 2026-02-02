@@ -149,6 +149,37 @@ def test_contract_proposal_suspend_requires_all_parties_approval() -> None:
     assert resp.json()["contract_status"] == "SUSPENDED"
 
 
+def test_contract_batch_create_returns_multiple_ids() -> None:
+    resp = client.post(
+        "/contracts/batch_create",
+        json={
+            "actor_id": "user:alice",
+            "contracts": [
+                {
+                    "kind": "KIND1",
+                    "title": "Batch A",
+                    "terms": {"v": 1},
+                    "parties": ["user:alice", "user:bob"],
+                    "required_signers": ["user:alice", "user:bob"],
+                },
+                {
+                    "kind": "KIND2",
+                    "title": "Batch B",
+                    "terms": {"v": 2},
+                    "parties": ["user:alice", "user:bob"],
+                    "required_signers": ["user:alice", "user:bob"],
+                },
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "contracts" in data
+    assert len(data["contracts"]) == 2
+    ids = {item["contract_id"] for item in data["contracts"]}
+    assert len(ids) == 2
+
+
 def test_contract_settle_transfers_assets_between_accounts() -> None:
     _reset_sqlite()
 

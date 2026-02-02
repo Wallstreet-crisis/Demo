@@ -89,6 +89,74 @@ class ContractService:
         self._event_store.append(EventEnvelopeJson.from_envelope(env))
         return contract_id
 
+    def create_contracts_batch(
+        self,
+        *,
+        actor_id: str,
+        contracts: List[Dict[str, Any]],
+    ) -> List[str]:
+        now = datetime.now(timezone.utc)
+
+        specs: List[Dict[str, Any]] = []
+        for c in contracts:
+            contract_id = str(uuid4())
+            kind = str(c["kind"])
+            title = str(c["title"])
+            terms = dict(c.get("terms") or {})
+            parties = list(c.get("parties") or [])
+            required_signers = list(c.get("required_signers") or [])
+            participation_mode = (c.get("participation_mode") or ParticipationMode.ALL_SIGNERS.value).upper()
+            invited_parties = list(c.get("invited_parties") or [])
+
+            has_rules = isinstance(terms.get("rules"), list) and len(terms.get("rules")) > 0
+
+            specs.append(
+                {
+                    "contract_id": contract_id,
+                    "kind": kind,
+                    "title": title,
+                    "terms": terms,
+                    "terms_json": json.dumps(terms, ensure_ascii=False),
+                    "status": ContractStatus.DRAFT.value,
+                    "has_rules": bool(has_rules),
+                    "parties": parties,
+                    "required_signers": required_signers,
+                    "signatures": [],
+                    "participation_mode": participation_mode,
+                    "invited_parties": invited_parties,
+                    "created_at": now.isoformat(),
+                    "updated_at": now.isoformat(),
+                }
+            )
+
+        # 单个 Neo4j 写事务内批量创建
+        with self._driver.session() as session:
+            session.execute_write(
+                self._create_contracts_batch_tx,
+                {"contracts": specs},
+            )
+
+        # 写事件（事件写入本身不要求与 Neo4j 在同一事务，否则会复杂很多）
+        for spec in specs:
+            payload = ContractCreatedPayload(
+                contract_id=spec["contract_id"],
+                kind=spec["kind"],
+                title=spec["title"],
+                terms=spec["terms"],
+                parties=spec["parties"],
+                required_signers=spec["required_signers"],
+                created_at=now,
+            )
+            env = EventEnvelope(
+                event_type=EventType.CONTRACT_CREATED,
+                correlation_id=uuid4(),
+                actor=EventActor(user_id=actor_id),
+                payload=payload,
+            )
+            self._event_store.append(EventEnvelopeJson.from_envelope(env))
+
+        return [spec["contract_id"] for spec in specs]
+
     def join_contract(self, *, contract_id: str, joiner: str) -> None:
         now = datetime.now(timezone.utc)
 
@@ -443,6 +511,28 @@ class ContractService:
                 c.invited_parties = $invited_parties,
                 c.created_at = $created_at,
                 c.updated_at = $updated_at
+            """,
+            **params,
+        )
+
+    @staticmethod
+    def _create_contracts_batch_tx(tx, params: Dict[str, Any]) -> None:
+        tx.run(
+            """
+            UNWIND $contracts AS c
+            MERGE (ct:Contract {contract_id: c.contract_id})
+            SET ct.kind = c.kind,
+                ct.title = c.title,
+                ct.terms_json = c.terms_json,
+                ct.status = c.status,
+                ct.has_rules = c.has_rules,
+                ct.parties = c.parties,
+                ct.required_signers = c.required_signers,
+                ct.signatures = c.signatures,
+                ct.participation_mode = c.participation_mode,
+                ct.invited_parties = c.invited_parties,
+                ct.created_at = c.created_at,
+                ct.updated_at = c.updated_at
             """,
             **params,
         )

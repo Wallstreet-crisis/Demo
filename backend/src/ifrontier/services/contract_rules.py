@@ -3,6 +3,10 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+import json
+from neo4j import Driver
+
+from ifrontier.infra.neo4j.driver import create_driver
 from ifrontier.infra.sqlite.ledger import ContractTransfer, get_snapshot
 
 
@@ -17,6 +21,16 @@ class RuleExecutionResult:
 MAX_RULE_RUNS_HARD_LIMIT = 10000
 
 
+_NEO4J_DRIVER: Driver | None = None
+
+
+def _get_neo4j_driver() -> Driver:
+    global _NEO4J_DRIVER
+    if _NEO4J_DRIVER is None:
+        _NEO4J_DRIVER = create_driver()
+    return _NEO4J_DRIVER
+
+
 def resolve_var(var: str) -> float:
     """Resolve variable in a safe whitelist way.
 
@@ -28,8 +42,45 @@ def resolve_var(var: str) -> float:
     if not isinstance(var, str) or ":" not in var:
         raise ValueError("invalid var")
 
+    # 特判 contract.* 变量（使用点号命名空间）：
+    # - contract.status:<contract_id>
+    # - contract.runs:<contract_id>:<rule_id>
+    if var.startswith("contract.status:"):
+        # status 本身在 eval_condition 中按字符串处理，这里返回 NaN 仅用于占位，防止被当作数值使用
+        # 真正的状态字符串由 _eval_contract_status 获取
+        return float("nan")
+
+    if var.startswith("contract.runs:"):
+        # var 形如 "contract.runs:<cid>:<rule_id>"
+        driver = _get_neo4j_driver()
+        try:
+            _prefix, cid, rule_id = var.split(":", 2)
+        except ValueError as exc:
+            raise ValueError("invalid contract.runs var") from exc
+
+        with driver.session() as session:
+            record = session.execute_read(
+                _load_contract_rule_state_tx,
+                {"contract_id": cid},
+            )
+        if record is None:
+            raise ValueError("contract not found")
+        state_json = str(record.get("rule_state_json") or "{}")
+        try:
+            state = json.loads(state_json) if state_json else {}
+        except json.JSONDecodeError as exc:
+            raise ValueError("invalid contract rule_state_json") from exc
+        if not isinstance(state, dict):
+            raise ValueError("invalid contract rule_state_json")
+        runs = 0
+        rule_state = state.get(rule_id)
+        if isinstance(rule_state, dict) and "runs" in rule_state:
+            runs = int(rule_state.get("runs") or 0)
+        return float(runs)
+
     kind, rest = var.split(":", 1)
     kind = kind.strip()
+
     if kind == "cash":
         account_id = rest
         snap = get_snapshot(account_id)
@@ -43,6 +94,16 @@ def resolve_var(var: str) -> float:
         _, account_id, symbol = parts
         snap = get_snapshot(account_id)
         return float(snap.positions.get(symbol, 0.0))
+
+    # 预留空间：价格/盘口/波动率/外部数据等，由上层数据网关实现
+    if kind == "price":
+        raise ValueError("price variables not implemented yet")
+    if kind == "book":
+        raise ValueError("order book variables not implemented yet")
+    if kind == "vol":
+        raise ValueError("volatility variables not implemented yet")
+    if kind == "ext":
+        raise ValueError("external data variables not implemented yet")
 
     raise ValueError("invalid var")
 
@@ -80,8 +141,22 @@ def eval_condition(expr: Any) -> bool:
         return not eval_condition(expr.get("arg"))
 
     if op in {"==", "!=", ">", ">=", "<", "<="}:
-        left = _eval_value(expr.get("left"))
-        right = _eval_value(expr.get("right"))
+        left_raw = expr.get("left")
+        right_raw = expr.get("right")
+
+        # 特判字符串比较（例如 contract.status）
+        if isinstance(left_raw, dict) and "var" in left_raw and str(left_raw["var"]).startswith("contract.status:"):
+            left_val = _eval_contract_status(str(left_raw["var"]))
+            right_val = right_raw
+        elif isinstance(right_raw, dict) and "var" in right_raw and str(right_raw["var"]).startswith("contract.status:"):
+            right_val = _eval_contract_status(str(right_raw["var"]))
+            left_val = left_raw
+        else:
+            left_val = _eval_value(left_raw)
+            right_val = _eval_value(right_raw)
+
+        left = left_val
+        right = right_val
         if op == "==":
             return left == right
         if op == "!=":
@@ -97,11 +172,66 @@ def eval_condition(expr: Any) -> bool:
     raise ValueError("unsupported op")
 
 
+def _eval_contract_status(var: str) -> str:
+    # var 形如 "contract.status:<contract_id>"
+    if ":" not in var:
+        raise ValueError("invalid contract.status var")
+    _, rest = var.split(":", 1)
+    if ":" not in rest:
+        contract_id = rest
+    else:
+        # 允许错误多写，截断为第一个 ':' 之前
+        contract_id = rest.split(":", 1)[0]
+
+    driver = _get_neo4j_driver()
+    with driver.session() as session:
+        record = session.execute_read(
+            _load_contract_status_tx,
+            {"contract_id": contract_id},
+        )
+    if record is None or record.get("status") is None:
+        raise ValueError("contract not found")
+    return str(record["status"])
+
+
 def _eval_value(v: Any) -> float:
     if isinstance(v, (int, float)):
         return float(v)
-    if isinstance(v, dict) and "var" in v:
-        return float(resolve_var(str(v["var"])))
+
+    if isinstance(v, dict):
+        # 变量引用
+        if "var" in v:
+            return float(resolve_var(str(v["var"])))
+
+        op = v.get("op")
+        if op in {"add", "sub", "mul", "div", "min", "max"}:
+            args = v.get("args")
+            if not isinstance(args, list) or not args:
+                raise ValueError("invalid args for op")
+            vals = [_eval_value(a) for a in args]
+
+            if op == "add":
+                return float(sum(vals))
+            if op == "sub":
+                if len(vals) != 2:
+                    raise ValueError("sub requires exactly 2 args")
+                return float(vals[0] - vals[1])
+            if op == "mul":
+                res = 1.0
+                for x in vals:
+                    res *= x
+                return float(res)
+            if op == "div":
+                if len(vals) != 2:
+                    raise ValueError("div requires exactly 2 args")
+                if vals[1] == 0:
+                    raise ValueError("division by zero")
+                return float(vals[0] / vals[1])
+            if op == "min":
+                return float(min(vals))
+            if op == "max":
+                return float(max(vals))
+
     raise ValueError("invalid value")
 
 
@@ -155,6 +285,28 @@ def should_run(schedule: Dict[str, Any], state: Dict[str, Any]) -> bool:
         return (now - last_dt).total_seconds() >= interval
 
     raise ValueError("unsupported schedule type")
+
+
+def _load_contract_status_tx(tx, params: Dict[str, Any]):
+    rec = tx.run(
+        """
+        MATCH (c:Contract {contract_id: $contract_id})
+        RETURN c.status AS status
+        """,
+        **params,
+    ).single()
+    return dict(rec) if rec is not None else None
+
+
+def _load_contract_rule_state_tx(tx, params: Dict[str, Any]):
+    rec = tx.run(
+        """
+        MATCH (c:Contract {contract_id: $contract_id})
+        RETURN c.rule_state_json AS rule_state_json
+        """,
+        **params,
+    ).single()
+    return dict(rec) if rec is not None else None
 
 
 def parse_transfers(raw: Any) -> List[ContractTransfer]:
