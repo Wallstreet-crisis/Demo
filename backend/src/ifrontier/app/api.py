@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import UUID, uuid4
@@ -22,6 +23,7 @@ from ifrontier.services.valuation import value_account
 from ifrontier.domain.players.caste import get_caste_config
 from ifrontier.infra.sqlite.db import get_connection
 from ifrontier.services.contracts import ContractService
+from ifrontier.services.contract_agent import ContractAgent
 from ifrontier.services.news import NewsService
 from ifrontier.services.news_tick import NewsTickEngine
 from ifrontier.services.game_time import load_game_time_config_from_env
@@ -31,6 +33,7 @@ router = APIRouter()
 _driver = create_driver()
 _event_store = Neo4jEventStore(_driver)
 _contract_service = ContractService(_driver, _event_store)
+_contract_agent = ContractAgent()
 _news_service = NewsService(_driver, _event_store)
 _news_tick_engine = NewsTickEngine(_driver, _event_store, _news_service)
 _commonbot_emergency_runner = CommonBotEmergencyRunner(news=_news_service, event_store=_event_store)
@@ -512,6 +515,74 @@ class ContractCreateRequest(BaseModel):
 
 class ContractCreateResponse(BaseModel):
     contract_id: str
+
+
+class ContractAgentDraftRequest(BaseModel):
+    actor_id: str
+    natural_language: str
+
+
+class ContractAgentDraftResponse(BaseModel):
+    draft_id: str
+    template_id: str
+    contract_create: Dict[str, Any]
+    explanation: str
+    questions: list[str]
+    risk_rating: str
+
+
+@router.post("/contract-agent/draft")
+async def contract_agent_draft(req: ContractAgentDraftRequest) -> ContractAgentDraftResponse:
+    try:
+        res = _contract_agent.draft(actor_id=req.actor_id, natural_language=req.natural_language)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    from ifrontier.domain.events.payloads import AiContractDraftedPayload
+
+    payload = AiContractDraftedPayload(
+        draft_id=str(res.draft_id),
+        requester_user_id=str(req.actor_id),
+        natural_language=str(req.natural_language),
+        python_preview=json.dumps(res.contract_create, ensure_ascii=False),
+        risk_rating=str(res.risk_rating),
+        drafted_at=datetime.now(timezone.utc),
+    )
+    env = EventEnvelope(
+        event_type=EventType.AI_CONTRACT_DRAFTED,
+        correlation_id=uuid4(),
+        actor=EventActor(user_id=req.actor_id),
+        payload=payload,
+    )
+    ev_json = EventEnvelopeJson.from_envelope(env)
+    _event_store.append(ev_json)
+    await hub.broadcast_json("events", ev_json.model_dump())
+    await hub.broadcast_json(str(EventType.AI_CONTRACT_DRAFTED), ev_json.model_dump())
+
+    return ContractAgentDraftResponse(
+        draft_id=str(res.draft_id),
+        template_id=str(res.template_id),
+        contract_create=dict(res.contract_create),
+        explanation=str(res.explanation),
+        questions=list(res.questions),
+        risk_rating=str(res.risk_rating),
+    )
+
+
+class ContractAgentContextResponse(BaseModel):
+    actor_id: str
+    context: Dict[str, Any]
+
+
+@router.get("/contract-agent/context/{actor_id}")
+async def contract_agent_get_context(actor_id: str) -> ContractAgentContextResponse:
+    ctx = _contract_agent.get_context(actor_id=actor_id)
+    return ContractAgentContextResponse(actor_id=actor_id, context=ctx)
+
+
+@router.post("/contract-agent/context/{actor_id}/clear")
+async def contract_agent_clear_context(actor_id: str) -> None:
+    _contract_agent.clear_context(actor_id=actor_id)
 
 
 @router.post("/contracts/create")
