@@ -1,7 +1,7 @@
-from enum import StrEnum
+from enum import Enum
 
 
-class EventType(StrEnum):
+class EventType(str, Enum):
     NEWS_CREATED = "news.created"
     NEWS_TEXT_MUTATED = "news.text_mutated"
     NEWS_PROPAGATED = "news.propagated"

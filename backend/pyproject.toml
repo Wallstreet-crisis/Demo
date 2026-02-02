@@ -19,3 +19,6 @@ line-length = 100
 
 [tool.pyright]
 typeCheckingMode = "basic"
+exclude = [
+  "requirements.txt",
+]

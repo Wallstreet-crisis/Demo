@@ -5,10 +5,14 @@
   - `pip install -r requirements.txt`
 
 - 启动：
-  - `uvicorn ifrontier.app.main:app --reload --port 8000`
+  - `uvicorn ifrontier.app.main:app --reload --port 8000 --app-dir src`
 
 ## WebSocket
 - `ws://localhost:8000/ws/{channel}`
 
 ## Neo4j
 - 初始化 Cypher：`backend/scripts/neo4j/init.cypher`
+
+## HTTP
+- `GET /health`
+- `POST /debug/emit_event`

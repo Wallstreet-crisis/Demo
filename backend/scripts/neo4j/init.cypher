@@ -30,9 +30,21 @@ CREATE CONSTRAINT ai_model_id_unique IF NOT EXISTS
 FOR (am:AiModel)
 REQUIRE am.model_id IS UNIQUE;
 
+CREATE CONSTRAINT event_id_unique IF NOT EXISTS
+FOR (e:Event)
+REQUIRE e.event_id IS UNIQUE;
+
 CREATE INDEX event_type_idx IF NOT EXISTS
 FOR ()-[e:EMITTED_EVENT]-()
 ON (e.event_type);
+
+CREATE INDEX event_correlation_id_idx IF NOT EXISTS
+FOR (e:Event)
+ON (e.correlation_id);
+
+CREATE INDEX event_occurred_at_idx IF NOT EXISTS
+FOR (e:Event)
+ON (e.occurred_at);
 
 CREATE INDEX propagated_at_idx IF NOT EXISTS
 FOR ()-[r:PROPAGATED]->()
