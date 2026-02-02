@@ -102,6 +102,21 @@ def get_last_price(symbol: str) -> Optional[float]:
     return float(row["price"])
 
 
+def get_last_price_before(*, symbol: str, before_utc: datetime) -> Optional[float]:
+    if before_utc.tzinfo is None:
+        before_utc = before_utc.replace(tzinfo=timezone.utc)
+    before_utc = before_utc.astimezone(timezone.utc)
+
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT price FROM market_trades WHERE symbol = ? AND occurred_at < ? ORDER BY occurred_at DESC, trade_id DESC LIMIT 1",
+        (symbol, before_utc.isoformat()),
+    ).fetchone()
+    if row is None:
+        return None
+    return float(row["price"])
+
+
 def get_price_series(*, symbol: str, limit: int = 200) -> List[float]:
     conn = get_connection()
     rows = conn.execute(

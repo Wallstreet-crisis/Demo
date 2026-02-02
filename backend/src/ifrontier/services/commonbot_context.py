@@ -11,6 +11,8 @@ from ifrontier.infra.sqlite.ledger import AccountSnapshot, get_snapshot
 class CommonBotMarketTrends:
     symbol_price_series: Dict[str, List[float]] = field(default_factory=dict)
     market_price_series: Dict[str, List[float]] = field(default_factory=dict)
+    market_quotes: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    market_phase: str | None = None
 
 
 @dataclass

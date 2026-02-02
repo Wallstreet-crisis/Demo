@@ -15,6 +15,10 @@ from ifrontier.services.commonbot_context import (
     build_context_from_account_snapshot,
     load_account_snapshot,
 )
+from ifrontier.services.market_analytics import get_quote
+from ifrontier.services.game_time import load_game_time_config_from_env
+from ifrontier.services.market_session import MarketPhase, get_market_session
+from ifrontier.infra.sqlite.market import get_price_series
 from ifrontier.services.news import NewsService
 
 
@@ -79,6 +83,10 @@ class CommonBotEmergencyRunner:
         emitted: List[EventEnvelopeJson] = []
         corr = broadcast_event.correlation_id or uuid4()
 
+        cfg = load_game_time_config_from_env()
+        session = get_market_session(cfg=cfg)
+        market_phase = session.phase
+
         for cohort in self._cohorts:
             ctx = self._build_shared_context(cohort=cohort, variant_id=variant_id, news_text=variant_text, symbols=symbols)
             if ctx is None:
@@ -96,6 +104,9 @@ class CommonBotEmergencyRunner:
 
                 self._event_store.append(decision_json)
                 emitted.append(decision_json)
+
+                if market_phase != MarketPhase.TRADING:
+                    continue
 
                 if trade_json is not None:
                     self._event_store.append(trade_json)
@@ -122,6 +133,22 @@ class CommonBotEmergencyRunner:
         trends = CommonBotMarketTrends()
         if self._market_data_provider is not None:
             trends = self._market_data_provider(symbols)
+        else:
+            cfg = load_game_time_config_from_env()
+            session = get_market_session(cfg=cfg)
+            trends.market_phase = session.phase.value
+            for s in symbols:
+                q = get_quote(s)
+                trends.market_quotes[s] = {
+                    "symbol": q.symbol,
+                    "last_price": q.last_price,
+                    "prev_price": q.prev_price,
+                    "change_pct": q.change_pct,
+                    "ma_5": q.ma_5,
+                    "ma_20": q.ma_20,
+                    "vol_20": q.vol_20,
+                }
+                trends.symbol_price_series[s] = get_price_series(symbol=s, limit=200)
 
         return build_context_from_account_snapshot(
             cohort_id=cohort.cohort_id,
@@ -142,7 +169,8 @@ class CommonBotEmergencyRunner:
 
     @staticmethod
     def _is_news_broadcasted(event_type: str) -> bool:
-        return event_type in {
+        et = getattr(event_type, "value", event_type)
+        return str(et) in {
             str(EventType.NEWS_BROADCASTED),
             EventType.NEWS_BROADCASTED.value,
         }
