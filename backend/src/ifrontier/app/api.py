@@ -14,6 +14,7 @@ from ifrontier.infra.neo4j.driver import create_driver
 from ifrontier.infra.neo4j.event_store import Neo4jEventStore
 from ifrontier.services.commonbot import run_commonbot_for_earnings
 from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account
+from ifrontier.services.matching import submit_limit_order
 
 router = APIRouter()
 
@@ -125,6 +126,30 @@ async def debug_earnings_news(req: DebugEarningsNewsRequest) -> DebugEarningsNew
         await hub.broadcast_json(str(EventType.TRADE_INTENT_SUBMITTED), trade_json.model_dump())
         trade_event_id = trade_json.event_id
 
+    # Bot 真实下单：对于 BUY/SELL 决策，用 bot 账户提交限价单进入撮合
+    action = (decision_json.payload or {}).get("action")
+    confidence = float((decision_json.payload or {}).get("confidence") or 0.0)
+    if action in {"BUY", "SELL"} and req.price_series:
+        last_price = req.price_series[-1]
+        eps = 0.001
+        order_price = last_price * (1 + eps) if action == "BUY" else last_price * (1 - eps)
+
+        # 简单规则：高置信度用机构账户，低置信度用散户代表
+        bot_account = "bot:inst:1" if confidence >= 0.7 else "bot:ret:1"
+        qty = 50.0 if bot_account.startswith("bot:inst") else 5.0
+
+        try:
+            submit_limit_order(
+                account_id=bot_account,
+                symbol=req.symbol,
+                side=action,
+                price=float(order_price),
+                quantity=float(qty),
+            )
+        except ValueError:
+            # 资产不足（例如 SELL 无持仓）时忽略，不影响接口返回
+            pass
+
     return DebugEarningsNewsResponse(
         news_event_id=news_json.event_id,
         ai_decision_event_id=decision_json.event_id,
@@ -194,3 +219,29 @@ async def debug_execute_trade(req: DebugExecuteTradeRequest) -> DebugExecuteTrad
     await hub.broadcast_json(str(EventType.TRADE_EXECUTED), event_json.model_dump())
 
     return DebugExecuteTradeResponse(event_id=event_json.event_id, correlation_id=correlation_id)
+
+
+class DebugSubmitOrderRequest(BaseModel):
+    account_id: str
+    symbol: str
+    side: str
+    price: float
+    quantity: float
+
+
+class DebugSubmitOrderResponse(BaseModel):
+    order_id: str
+
+
+@router.post("/debug/submit_order")
+async def debug_submit_order(req: DebugSubmitOrderRequest) -> DebugSubmitOrderResponse:
+    # 这里只是限价单提交入口，实际撮合和记账由 MatchingEngine + SQLite 账本处理
+    order_id, _matches = submit_limit_order(
+        account_id=req.account_id,
+        symbol=req.symbol,
+        side=req.side,
+        price=req.price,
+        quantity=req.quantity,
+    )
+
+    return DebugSubmitOrderResponse(order_id=order_id)
