@@ -12,6 +12,7 @@ from ifrontier.domain.events.envelope import EventActor, EventEnvelope, EventEnv
 from ifrontier.domain.events.payloads import (
     NewsChainAbortedPayload,
     NewsChainStartedPayload,
+    NewsPropagationSuppressedPayload,
     NewsTruthRevealedPayload,
     NewsVariantEmittedPayload,
 )
@@ -149,6 +150,54 @@ class NewsTickEngine:
 
         return {"now": now.isoformat(), "chains": results}
 
+    def suppress_propagation(
+        self,
+        *,
+        actor_id: str,
+        chain_id: str,
+        spend_influence: float,
+        signal_class: str | None = None,
+        scope: str = "chain",
+        correlation_id: UUID | None = None,
+    ) -> EventEnvelopeJson:
+        if spend_influence <= 0:
+            raise ValueError("spend_influence must be > 0")
+
+        now = datetime.now(timezone.utc)
+        suppression_id = str(uuid4())
+
+        with self._driver.session() as session:
+            ok = session.execute_write(
+                self._add_suppression_tx,
+                {
+                    "chain_id": chain_id,
+                    "spend": float(spend_influence),
+                    "signal_class": signal_class,
+                },
+            )
+        if not ok:
+            raise ValueError("chain not found")
+
+        payload = NewsPropagationSuppressedPayload(
+            suppression_id=suppression_id,
+            actor_id=actor_id,
+            target_chain_id=chain_id,
+            target_card_id=None,
+            target_variant_id=None,
+            spend_influence=float(spend_influence),
+            scope=scope,
+            suppressed_at=now,
+        )
+        env = EventEnvelope[NewsPropagationSuppressedPayload](
+            event_type=EventType.NEWS_PROPAGATION_SUPPRESSED,
+            correlation_id=correlation_id or uuid4(),
+            actor=EventActor(user_id=actor_id),
+            payload=payload,
+        )
+        event_json = EventEnvelopeJson.from_envelope(env)
+        self._event_store.append(event_json)
+        return event_json
+
     def _tick_one_chain(self, *, now: datetime, chain: Dict[str, Any]) -> Dict[str, Any]:
         chain_id = str(chain["chain_id"])
         major_card_id = str(chain["major_card_id"])
@@ -170,13 +219,20 @@ class NewsTickEngine:
 
         # 1) Emit omen(s) up to now, but do not advance beyond T0
         if now >= next_omen_at and now < t0_at:
+            signal_class = rnd.choice(["DIPLOMACY", "MOBILIZATION", "LOGISTICS"])
+            suppressed, suppression_left = self._consume_suppression_budget(
+                chain_id=chain_id,
+                signal_class=signal_class,
+                requested=int(grant_count),
+            )
+            effective_grant_count = max(0, int(grant_count) - int(suppressed))
             omen_card_id, omen_card_event = self._news.create_card(
                 kind="OMEN",
                 image_anchor_id=None,
                 image_uri=None,
                 truth_payload={
                     "chain_id": chain_id,
-                    "signal_class": rnd.choice(["DIPLOMACY", "MOBILIZATION", "LOGISTICS"]),
+                    "signal_class": signal_class,
                     "signal_strength": int(rnd.randint(1, 3)),
                     "t_minus_seconds": int((t0_at - now).total_seconds()),
                 },
@@ -205,10 +261,10 @@ class NewsTickEngine:
             )
 
             delivered_to: List[str] = []
-            if grant_count > 0:
+            if effective_grant_count > 0:
                 users = self._news.list_users(limit=5000)
                 rnd.shuffle(users)
-                for u in users[: min(grant_count, len(users))]:
+                for u in users[: min(effective_grant_count, len(users))]:
                     to_player_id = str(u)
                     self._news.deliver_variant(
                         variant_id=omen_variant_id,
@@ -233,6 +289,8 @@ class NewsTickEngine:
                     "omen_card_id": omen_card_id,
                     "omen_variant_id": omen_variant_id,
                     "delivered_to": delivered_to,
+                    "suppressed": int(suppressed),
+                    "suppression_left": float(suppression_left),
                     "events": [
                         omen_card_event.model_dump(mode="json"),
                         omen_variant_event.model_dump(mode="json"),
@@ -351,6 +409,55 @@ class NewsTickEngine:
             """,
             **params,
         )
+
+    def _consume_suppression_budget(self, *, chain_id: str, signal_class: str, requested: int) -> tuple[int, float]:
+        if requested <= 0:
+            return 0, 0.0
+
+        with self._driver.session() as session:
+            rec = session.execute_write(
+                self._consume_suppression_tx,
+                {
+                    "chain_id": chain_id,
+                    "signal_class": signal_class,
+                    "requested": int(requested),
+                },
+            )
+
+        if rec is None:
+            return 0, 0.0
+        return int(rec.get("suppressed") or 0), float(rec.get("suppression_left") or 0.0)
+
+    @staticmethod
+    def _add_suppression_tx(tx, params: Dict[str, Any]) -> bool:
+        rec = tx.run(
+            """
+            MATCH (ch:NewsChain {chain_id: $chain_id})
+            WITH ch, CASE WHEN ch.suppression_budget_total IS NULL THEN 0.0 ELSE toFloat(ch.suppression_budget_total) END AS total
+            SET ch.suppression_budget_total = total + toFloat($spend)
+            RETURN true AS ok
+            """,
+            **params,
+        ).single()
+        return bool(rec and rec.get("ok"))
+
+    @staticmethod
+    def _consume_suppression_tx(tx, params: Dict[str, Any]) -> Dict[str, Any] | None:
+        # v0：只消费 total suppression_budget_total（不区分 signal_class），避免引入 APOC 依赖。
+        rec = tx.run(
+            """
+            MATCH (ch:NewsChain {chain_id: $chain_id})
+            WITH ch, CASE WHEN ch.suppression_budget_total IS NULL THEN 0.0 ELSE toFloat(ch.suppression_budget_total) END AS total
+            WITH ch, total,
+                 CASE WHEN total <= 0 THEN 0 ELSE
+                   CASE WHEN total >= toFloat($requested) THEN toInteger($requested) ELSE toInteger(total) END
+                 END AS suppressed
+            SET ch.suppression_budget_total = total - toFloat(suppressed)
+            RETURN suppressed AS suppressed, ch.suppression_budget_total AS suppression_left
+            """,
+            **params,
+        ).single()
+        return dict(rec) if rec is not None else None
 
     @staticmethod
     def _list_due_chains_tx(tx, params: Dict[str, Any]) -> List[Dict[str, Any]]:

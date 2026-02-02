@@ -864,3 +864,36 @@ async def news_tick(req: NewsTickRequest) -> NewsTickResponse:
                     if ev_type:
                         await hub.broadcast_json(str(ev_type), ev)
     return NewsTickResponse(now=str(result["now"]), chains=list(result["chains"]))
+
+
+class NewsSuppressRequest(BaseModel):
+    actor_id: str
+    chain_id: str
+    spend_influence: float
+    signal_class: str | None = None
+    scope: str = "chain"
+    correlation_id: UUID | None = None
+
+
+class NewsSuppressResponse(BaseModel):
+    event_id: UUID
+    correlation_id: UUID | None
+
+
+@router.post("/news/suppress")
+async def news_suppress(req: NewsSuppressRequest) -> NewsSuppressResponse:
+    try:
+        event_json = _news_tick_engine.suppress_propagation(
+            actor_id=req.actor_id,
+            chain_id=req.chain_id,
+            spend_influence=req.spend_influence,
+            signal_class=req.signal_class,
+            scope=req.scope,
+            correlation_id=req.correlation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await hub.broadcast_json("events", event_json.model_dump())
+    await hub.broadcast_json(str(EventType.NEWS_PROPAGATION_SUPPRESSED), event_json.model_dump())
+    return NewsSuppressResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
