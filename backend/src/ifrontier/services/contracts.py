@@ -45,6 +45,8 @@ class ContractService:
         now = datetime.now(timezone.utc)
         contract_id = str(uuid4())
 
+        has_rules = isinstance(terms.get("rules"), list) and len(terms.get("rules")) > 0
+
         mode = (participation_mode or ParticipationMode.ALL_SIGNERS.value).upper()
         invited = invited_parties or []
 
@@ -58,6 +60,7 @@ class ContractService:
                     "title": title,
                     "terms_json": json.dumps(terms, ensure_ascii=False),
                     "status": ContractStatus.DRAFT.value,
+                    "has_rules": bool(has_rules),
                     "parties": parties,
                     "required_signers": required_signers,
                     "signatures": [],
@@ -432,6 +435,7 @@ class ContractService:
                 c.title = $title,
                 c.terms_json = $terms_json,
                 c.status = $status,
+                c.has_rules = $has_rules,
                 c.parties = $parties,
                 c.required_signers = $required_signers,
                 c.signatures = $signatures,

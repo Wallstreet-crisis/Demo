@@ -14,6 +14,9 @@ class RuleExecutionResult:
     reason: str | None = None
 
 
+MAX_RULE_RUNS_HARD_LIMIT = 10000
+
+
 def resolve_var(var: str) -> float:
     """Resolve variable in a safe whitelist way.
 
@@ -116,9 +119,24 @@ def should_run(schedule: Dict[str, Any], state: Dict[str, Any]) -> bool:
     stype = str(schedule.get("type") or "once")
 
     runs = int(state.get("runs") or 0)
-    max_runs = schedule.get("max_runs")
-    if max_runs is not None and runs >= int(max_runs):
+
+    # 系统硬限制：任何规则最多执行 MAX_RULE_RUNS_HARD_LIMIT 次
+    if runs >= MAX_RULE_RUNS_HARD_LIMIT:
         return False
+
+    max_runs = schedule.get("max_runs")
+
+    if stype == "interval" and max_runs is None:
+        raise ValueError("max_runs required for interval schedule")
+
+    if max_runs is not None:
+        max_runs_i = int(max_runs)
+        if max_runs_i < 1:
+            raise ValueError("invalid max_runs")
+        if max_runs_i > MAX_RULE_RUNS_HARD_LIMIT:
+            raise ValueError("max_runs exceeds hard limit")
+        if runs >= max_runs_i:
+            return False
 
     if stype == "once":
         return runs == 0
