@@ -13,8 +13,10 @@ from ifrontier.domain.events.types import EventType
 from ifrontier.infra.neo4j.driver import create_driver
 from ifrontier.infra.neo4j.event_store import Neo4jEventStore
 from ifrontier.services.commonbot import run_commonbot_for_earnings
-from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account
-from ifrontier.services.matching import submit_limit_order
+from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account, get_snapshot
+from ifrontier.services.matching import submit_limit_order, submit_market_order
+from ifrontier.domain.players.caste import get_caste_config
+from ifrontier.infra.sqlite.db import get_connection
 
 router = APIRouter()
 
@@ -245,3 +247,100 @@ async def debug_submit_order(req: DebugSubmitOrderRequest) -> DebugSubmitOrderRe
     )
 
     return DebugSubmitOrderResponse(order_id=order_id)
+
+
+class CreatePlayerRequest(BaseModel):
+    player_id: str
+    initial_cash: float | None = None
+    caste_id: str | None = None
+
+
+class CreatePlayerResponse(BaseModel):
+    account_id: str
+    cash: float
+
+
+@router.post("/debug/create_player")
+async def create_player(req: CreatePlayerRequest) -> CreatePlayerResponse:
+    account_id = f"user:{req.player_id}"
+    # 如果提供 caste_id, 优先使用阶级配置; 否则回退到显式 initial_cash 或 0
+    initial_cash = 0.0
+    positions: Dict[str, float] = {}
+
+    if req.caste_id is not None:
+        cfg = get_caste_config(req.caste_id)
+        if cfg is not None:
+            initial_cash = cfg.initial_cash
+            positions = cfg.initial_positions
+    if req.initial_cash is not None:
+        initial_cash = req.initial_cash
+
+    create_account(account_id, owner_type="user", initial_cash=initial_cash)
+
+    if positions:
+        conn = get_connection()
+        with conn:
+            for symbol, qty in positions.items():
+                conn.execute(
+                    "INSERT INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?) "
+                    "ON CONFLICT(account_id, symbol) DO UPDATE SET quantity = quantity + excluded.quantity",
+                    (account_id, symbol, qty),
+                )
+    snap = get_snapshot(account_id)
+    return CreatePlayerResponse(account_id=snap.account_id, cash=snap.cash)
+
+
+class PlayerLimitOrderRequest(BaseModel):
+    player_id: str
+    symbol: str
+    side: str
+    price: float
+    quantity: float
+
+
+class PlayerOrderResponse(BaseModel):
+    order_id: str
+
+
+@router.post("/orders/limit")
+async def submit_player_limit_order(req: PlayerLimitOrderRequest) -> PlayerOrderResponse:
+    account_id = f"user:{req.player_id}"
+    order_id, _ = submit_limit_order(
+        account_id=account_id,
+        symbol=req.symbol,
+        side=req.side,
+        price=req.price,
+        quantity=req.quantity,
+    )
+    return PlayerOrderResponse(order_id=order_id)
+
+
+class PlayerMarketOrderRequest(BaseModel):
+    player_id: str
+    symbol: str
+    side: str
+    quantity: float
+
+
+@router.post("/orders/market")
+async def submit_player_market_order(req: PlayerMarketOrderRequest) -> None:
+    account_id = f"user:{req.player_id}"
+    submit_market_order(
+        account_id=account_id,
+        symbol=req.symbol,
+        side=req.side,
+        quantity=req.quantity,
+    )
+
+
+class PlayerAccountResponse(BaseModel):
+    account_id: str
+    cash: float
+    positions: Dict[str, float]
+
+
+@router.get("/players/{player_id}/account")
+async def get_player_account(player_id: str) -> PlayerAccountResponse:
+    account_id = f"user:{player_id}"
+    snap = get_snapshot(account_id)
+    return PlayerAccountResponse(account_id=snap.account_id, cash=snap.cash, positions=snap.positions)
