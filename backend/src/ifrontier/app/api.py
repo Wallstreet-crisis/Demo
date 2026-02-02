@@ -13,6 +13,7 @@ from ifrontier.domain.events.types import EventType
 from ifrontier.infra.neo4j.driver import create_driver
 from ifrontier.infra.neo4j.event_store import Neo4jEventStore
 from ifrontier.services.commonbot import run_commonbot_for_earnings
+from ifrontier.services.commonbot_emergency import CommonBotEmergencyRunner
 from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account, get_snapshot
 from ifrontier.services.matching import submit_limit_order, submit_market_order
 from ifrontier.domain.players.caste import get_caste_config
@@ -27,6 +28,7 @@ _event_store = Neo4jEventStore(_driver)
 _contract_service = ContractService(_driver, _event_store)
 _news_service = NewsService(_driver, _event_store)
 _news_tick_engine = NewsTickEngine(_driver, _event_store, _news_service)
+_commonbot_emergency_runner = CommonBotEmergencyRunner(news=_news_service, event_store=_event_store)
 
 @router.get("/health")
 def health() -> Dict[str, str]:
@@ -782,6 +784,11 @@ async def news_broadcast(req: NewsBroadcastRequest) -> NewsBroadcastResponse:
     await hub.broadcast_json("events", event_json.model_dump())
     await hub.broadcast_json(str(EventType.NEWS_BROADCASTED), event_json.model_dump())
 
+    emergency_events = _commonbot_emergency_runner.maybe_react(broadcast_event=event_json)
+    for ev in emergency_events:
+        await hub.broadcast_json("events", ev.model_dump())
+        await hub.broadcast_json(str(ev.event_type), ev.model_dump())
+
     return NewsBroadcastResponse(
         delivered=delivered,
         event_id=event_json.event_id,
@@ -856,6 +863,14 @@ async def news_tick(req: NewsTickRequest) -> NewsTickResponse:
     for chain in result.get("chains", []):
         for action in (chain or {}).get("actions", []):
             for ev in (action or {}).get("events", []) or []:
+                if not ev:
+                    continue
+                if isinstance(ev, dict):
+                    await hub.broadcast_json("events", ev)
+                    ev_type = ev.get("event_type")
+                    if ev_type:
+                        await hub.broadcast_json(str(ev_type), ev)
+            for ev in (action or {}).get("emergency_events", []) or []:
                 if not ev:
                     continue
                 if isinstance(ev, dict):

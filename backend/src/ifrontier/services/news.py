@@ -342,6 +342,14 @@ class NewsService:
 
         return [dict(r) for r in records]
 
+    def get_variant_context(self, *, variant_id: str) -> Dict[str, Any] | None:
+        with self._driver.session() as session:
+            rec = session.execute_read(
+                self._get_variant_context_tx,
+                {"variant_id": variant_id},
+            )
+        return dict(rec) if rec is not None else None
+
     def grant_ownership(
         self,
         *,
@@ -587,6 +595,18 @@ class NewsService:
             """
             MATCH (c:NewsCard)-[:HAS_VARIANT]->(v:NewsVariant {variant_id: $variant_id})
             RETURN c.card_id AS card_id
+            """,
+            **params,
+        ).single()
+        return dict(rec) if rec is not None else None
+
+    @staticmethod
+    def _get_variant_context_tx(tx, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        rec = tx.run(
+            """
+            MATCH (c:NewsCard)-[:HAS_VARIANT]->(v:NewsVariant {variant_id: $variant_id})
+            RETURN v.text AS text,
+                   c.symbols AS symbols
             """,
             **params,
         ).single()

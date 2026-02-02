@@ -18,6 +18,7 @@ from ifrontier.domain.events.payloads import (
 )
 from ifrontier.domain.events.types import EventType
 from ifrontier.infra.neo4j.event_store import Neo4jEventStore
+from ifrontier.services.commonbot_emergency import CommonBotEmergencyRunner
 from ifrontier.services.news import NewsService
 
 
@@ -41,6 +42,7 @@ class NewsTickEngine:
         self._driver = driver
         self._event_store = event_store
         self._news = news_service
+        self._commonbot_emergency_runner = CommonBotEmergencyRunner(news=self._news, event_store=self._event_store)
 
     def start_chain(
         self,
@@ -363,6 +365,7 @@ class NewsTickEngine:
 
             broadcasted = 0
             broadcast_event: EventEnvelopeJson | None = None
+            emergency_events: List[EventEnvelopeJson] = []
             # v0：重大事件在 T0 强制全局广播（内容一致）
             if kind in {"MAJOR_EVENT", "EARNINGS", "DISCLOSURE"}:
                 broadcasted, broadcast_event = self._news.broadcast_variant(
@@ -373,6 +376,11 @@ class NewsTickEngine:
                     limit_users=5000,
                     correlation_id=None,
                 )
+                if broadcast_event is not None:
+                    emergency_events = self._commonbot_emergency_runner.maybe_react(
+                        broadcast_event=broadcast_event,
+                        force=True,
+                    )
 
             out["actions"].append(
                 {
@@ -386,6 +394,7 @@ class NewsTickEngine:
                         aborted_event_json.model_dump(mode="json") if aborted_event_json else None,
                         broadcast_event.model_dump(mode="json") if broadcast_event else None,
                     ],
+                    "emergency_events": [e.model_dump(mode="json") for e in emergency_events],
                 }
             )
 
