@@ -22,6 +22,13 @@ class EventType(str, Enum):
     CONTRACT_SIGNED = "contract.signed"
     CONTRACT_ACTIVATED = "contract.activated"
 
+    CONTRACT_JOINED = "contract.joined"
+    CONTRACT_PROPOSAL_CREATED = "contract.proposal_created"
+    CONTRACT_PROPOSAL_APPROVED = "contract.proposal_approved"
+    CONTRACT_SUSPENDED = "contract.suspended"
+    CONTRACT_AMENDED = "contract.amended"
+    CONTRACT_TERMINATED = "contract.terminated"
+
     DISCLOSURE_EMITTED = "disclosure.emitted"
 
     SETTLEMENT_TICK_OPENED = "settlement.tick_opened"

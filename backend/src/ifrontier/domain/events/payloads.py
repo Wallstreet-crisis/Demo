@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from typing import Any, Dict, List
 from datetime import datetime
 from typing import Optional
 
@@ -130,3 +130,46 @@ class AiPlayerAgentTaskCompletedPayload(BaseModel):
     requester_user_id: str
     result_summary: str
     completed_at: datetime
+
+
+class ContractCreatedPayload(BaseModel):
+    contract_id: str
+    kind: str
+    title: str
+    terms: Dict[str, Any]
+    parties: List[str]
+    required_signers: List[str]
+    created_at: datetime
+ 
+ 
+class ContractSignedPayload(BaseModel):
+    contract_id: str
+    signer: str
+    signed_at: datetime
+ 
+ 
+class ContractActivatedPayload(BaseModel):
+    contract_id: str
+    activated_at: datetime
+
+
+class ContractJoinedPayload(BaseModel):
+    contract_id: str
+    joiner: str
+    joined_at: datetime
+
+
+class ContractProposalCreatedPayload(BaseModel):
+    contract_id: str
+    proposal_id: str
+    proposal_type: str
+    proposer: str
+    details: Dict[str, Any]
+    created_at: datetime
+
+
+class ContractProposalApprovedPayload(BaseModel):
+    contract_id: str
+    proposal_id: str
+    approver: str
+    approved_at: datetime

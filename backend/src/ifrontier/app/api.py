@@ -17,12 +17,12 @@ from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account, 
 from ifrontier.services.matching import submit_limit_order, submit_market_order
 from ifrontier.domain.players.caste import get_caste_config
 from ifrontier.infra.sqlite.db import get_connection
-
+from ifrontier.services.contracts import ContractService
 router = APIRouter()
 
 _driver = create_driver()
 _event_store = Neo4jEventStore(_driver)
-
+_contract_service = ContractService(_driver, _event_store)
 
 @router.get("/health")
 def health() -> Dict[str, str]:
@@ -344,3 +344,134 @@ async def get_player_account(player_id: str) -> PlayerAccountResponse:
     account_id = f"user:{player_id}"
     snap = get_snapshot(account_id)
     return PlayerAccountResponse(account_id=snap.account_id, cash=snap.cash, positions=snap.positions)
+
+
+class ContractCreateRequest(BaseModel):
+    actor_id: str
+    kind: str
+    title: str
+    terms: Dict[str, Any]
+    parties: list[str]
+    required_signers: list[str]
+    participation_mode: str | None = None
+    invited_parties: list[str] | None = None
+
+
+class ContractCreateResponse(BaseModel):
+    contract_id: str
+
+
+@router.post("/contracts/create")
+async def contract_create(req: ContractCreateRequest) -> ContractCreateResponse:
+    try:
+        contract_id = _contract_service.create_contract(
+            kind=req.kind,
+            title=req.title,
+            terms=req.terms,
+            parties=req.parties,
+            required_signers=req.required_signers,
+            participation_mode=req.participation_mode,
+            invited_parties=req.invited_parties,
+            actor_id=req.actor_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return ContractCreateResponse(contract_id=contract_id)
+
+
+class ContractJoinRequest(BaseModel):
+    joiner: str
+
+
+@router.post("/contracts/{contract_id}/join")
+async def contract_join(contract_id: str, req: ContractJoinRequest) -> None:
+    try:
+        _contract_service.join_contract(contract_id=contract_id, joiner=req.joiner)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class ContractSignRequest(BaseModel):
+    signer: str
+
+
+class ContractSignResponse(BaseModel):
+    status: str
+
+
+@router.post("/contracts/{contract_id}/sign")
+async def contract_sign(contract_id: str, req: ContractSignRequest) -> ContractSignResponse:
+    try:
+        status = _contract_service.sign_contract(contract_id=contract_id, signer=req.signer)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return ContractSignResponse(status=status.value)
+
+
+class ContractActivateRequest(BaseModel):
+    actor_id: str
+
+
+@router.post("/contracts/{contract_id}/activate")
+async def contract_activate(contract_id: str, req: ContractActivateRequest) -> None:
+    try:
+        _contract_service.activate_contract(contract_id=contract_id, actor_id=req.actor_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class ContractProposalCreateRequest(BaseModel):
+    proposer: str
+    proposal_type: str
+    details: Dict[str, Any] = {}
+
+
+class ContractProposalCreateResponse(BaseModel):
+    proposal_id: str
+
+
+@router.post("/contracts/{contract_id}/proposals/create")
+async def contract_proposal_create(
+    contract_id: str, req: ContractProposalCreateRequest
+) -> ContractProposalCreateResponse:
+    try:
+        proposal_id = _contract_service.create_proposal(
+            contract_id=contract_id,
+            proposal_type=req.proposal_type,
+            proposer=req.proposer,
+            details=req.details,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return ContractProposalCreateResponse(proposal_id=proposal_id)
+
+
+class ContractProposalApproveRequest(BaseModel):
+    approver: str
+
+
+class ContractProposalApproveResponse(BaseModel):
+    applied: bool
+    contract_status: str
+    proposal_type: str
+
+
+@router.post("/contracts/{contract_id}/proposals/{proposal_id}/approve")
+async def contract_proposal_approve(
+    contract_id: str, proposal_id: str, req: ContractProposalApproveRequest
+) -> ContractProposalApproveResponse:
+    try:
+        result = _contract_service.approve_proposal(
+            contract_id=contract_id,
+            proposal_id=proposal_id,
+            approver=req.approver,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return ContractProposalApproveResponse(
+        applied=bool(result.get("applied")),
+        contract_status=str(result.get("contract_status")),
+        proposal_type=str(result.get("proposal_type")),
+    )
