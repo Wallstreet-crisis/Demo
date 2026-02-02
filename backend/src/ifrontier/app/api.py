@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, RootModel
 
 from ifrontier.app.ws import hub
@@ -114,6 +114,24 @@ async def debug_earnings_news(req: DebugEarningsNewsRequest) -> DebugEarningsNew
         correlation_id=correlation_id,
     )
 
+    _event_store.append(decision_json)
+    await hub.broadcast_json("events", decision_json.model_dump())
+    await hub.broadcast_json(str(EventType.AI_COMMONBOT_DECISION), decision_json.model_dump())
+
+    trade_event_id: UUID | None = None
+    if trade_json is not None:
+        _event_store.append(trade_json)
+        await hub.broadcast_json("events", trade_json.model_dump())
+        await hub.broadcast_json(str(EventType.TRADE_INTENT_SUBMITTED), trade_json.model_dump())
+        trade_event_id = trade_json.event_id
+
+    return DebugEarningsNewsResponse(
+        news_event_id=news_json.event_id,
+        ai_decision_event_id=decision_json.event_id,
+        trade_intent_event_id=trade_event_id,
+        correlation_id=correlation_id,
+    )
+
 
 class DebugExecuteTradeRequest(BaseModel):
     buy_account_id: str
@@ -158,36 +176,21 @@ async def debug_execute_trade(req: DebugExecuteTradeRequest) -> DebugExecuteTrad
     )
     event_json = EventEnvelopeJson.from_envelope(envelope)
 
-    # Apply ledger update; this can raise ValueError on insufficient balances
-    apply_trade_executed(
-        buy_account_id=req.buy_account_id,
-        sell_account_id=req.sell_account_id,
-        symbol=req.symbol,
-        price=req.price,
-        quantity=req.quantity,
-        event_id=str(event_json.event_id),
-    )
+    # Apply ledger update; 账本校验失败时返回 400，而不是 500
+    try:
+        apply_trade_executed(
+            buy_account_id=req.buy_account_id,
+            sell_account_id=req.sell_account_id,
+            symbol=req.symbol,
+            price=req.price,
+            quantity=req.quantity,
+            event_id=str(event_json.event_id),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     _event_store.append(event_json)
     await hub.broadcast_json("events", event_json.model_dump())
     await hub.broadcast_json(str(EventType.TRADE_EXECUTED), event_json.model_dump())
 
     return DebugExecuteTradeResponse(event_id=event_json.event_id, correlation_id=correlation_id)
-
-    _event_store.append(decision_json)
-    await hub.broadcast_json("events", decision_json.model_dump())
-    await hub.broadcast_json(str(EventType.AI_COMMONBOT_DECISION), decision_json.model_dump())
-
-    trade_event_id: UUID | None = None
-    if trade_json is not None:
-        _event_store.append(trade_json)
-        await hub.broadcast_json("events", trade_json.model_dump())
-        await hub.broadcast_json(str(EventType.TRADE_INTENT_SUBMITTED), trade_json.model_dump())
-        trade_event_id = trade_json.event_id
-
-    return DebugEarningsNewsResponse(
-        news_event_id=news_json.event_id,
-        ai_decision_event_id=decision_json.event_id,
-        trade_intent_event_id=trade_event_id,
-        correlation_id=correlation_id,
-    )
