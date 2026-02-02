@@ -3,10 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from ifrontier.infra.sqlite.ledger import AccountSnapshot, get_snapshot
+from ifrontier.infra.sqlite.market import get_price_series
 from ifrontier.services.chat import ChatService
 from ifrontier.services.contract_agent import ContractAgent, ContractDraftResult
 from ifrontier.services.contracts import ContractService
+from ifrontier.services.market_analytics import MarketQuote, get_quote
 from ifrontier.services.matching import submit_limit_order, submit_market_order
+from ifrontier.services.valuation import AccountValuation, value_account
 
 
 @dataclass(frozen=True)
@@ -24,6 +28,23 @@ class UserCapabilityFacade:
     contract_service: ContractService
     contract_agent: ContractAgent
     chat_service: ChatService
+
+    # --- Read-only observations (user-visible) ---
+
+    def get_account_snapshot(self) -> AccountSnapshot:
+        return get_snapshot(self.user_id)
+
+    def get_account_valuation(self) -> AccountValuation:
+        return value_account(account_id=self.user_id)
+
+    def get_market_quote(self, *, symbol: str) -> MarketQuote:
+        return get_quote(str(symbol))
+
+    def get_market_series(self, *, symbol: str, limit: int = 200) -> List[float]:
+        return get_price_series(symbol=str(symbol), limit=int(limit))
+
+    def get_recent_public_messages(self, *, limit: int = 10):
+        return self.chat_service.list_public_messages(limit=int(limit), before=None)
 
     # --- Chat ---
 
