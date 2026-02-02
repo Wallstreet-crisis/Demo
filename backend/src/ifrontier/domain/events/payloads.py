@@ -36,6 +36,16 @@ class NewsPropagatedPayload(BaseModel):
     propagated_at: datetime
 
 
+class TradeIntentSubmittedPayload(BaseModel):
+    intent_id: str
+    user_id: str
+    symbol: str
+    side: str  # BUY / SELL
+    size: float
+    price_hint: float | None = None
+    created_at: datetime
+
+
 class DisclosureEmittedPayload(BaseModel):
     disclosure_id: str
     trigger: str

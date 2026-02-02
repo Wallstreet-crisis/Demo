@@ -46,6 +46,6 @@ class EventEnvelopeJson(BaseModel):
             occurred_at=envelope.occurred_at,
             correlation_id=envelope.correlation_id,
             causation_id=envelope.causation_id,
-            actor=envelope.actor.model_dump() if envelope.actor else None,
-            payload=envelope.payload.model_dump(),
+            actor=envelope.actor.model_dump(mode="json") if envelope.actor else None,
+            payload=envelope.payload.model_dump(mode="json"),
         )
