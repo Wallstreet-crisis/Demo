@@ -16,6 +16,9 @@ class EventType(str, Enum):
     NEWS_CHAIN_ABORTED = "news.chain_aborted"
     NEWS_PROPAGATION_SUPPRESSED = "news.propagation_suppressed"
 
+    NEWS_OWNERSHIP_GRANTED = "news.ownership_granted"
+    NEWS_OWNERSHIP_TRANSFERRED = "news.ownership_transferred"
+
     AI_COMMONBOT_DECISION = "ai.commonbot.decision"
     AI_CONTRACT_DRAFTED = "ai.contract.drafted"
     AI_WHISPERER_ASSESSMENT = "ai.whisperer.assessment"

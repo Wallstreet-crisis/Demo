@@ -12,6 +12,8 @@ from ifrontier.domain.events.payloads import (
     NewsBroadcastedPayload,
     NewsCardCreatedPayload,
     NewsDeliveredPayload,
+    NewsOwnershipGrantedPayload,
+    NewsOwnershipTransferredPayload,
     NewsVariantEmittedPayload,
     NewsVariantMutatedPayload,
 )
@@ -340,6 +342,89 @@ class NewsService:
 
         return [dict(r) for r in records]
 
+    def grant_ownership(
+        self,
+        *,
+        card_id: str,
+        to_user_id: str,
+        granter_id: str,
+        correlation_id: UUID | None = None,
+    ) -> EventEnvelopeJson:
+        now = datetime.now(timezone.utc)
+        with self._driver.session() as session:
+            ok = session.execute_write(
+                self._grant_ownership_tx,
+                {"card_id": card_id, "to_user_id": to_user_id},
+            )
+        if not ok:
+            raise ValueError("card not found")
+
+        payload = NewsOwnershipGrantedPayload(
+            card_id=card_id,
+            to_user_id=to_user_id,
+            granter_id=granter_id,
+            granted_at=now,
+        )
+        envelope = EventEnvelope[NewsOwnershipGrantedPayload](
+            event_type=EventType.NEWS_OWNERSHIP_GRANTED,
+            correlation_id=correlation_id or uuid4(),
+            actor=EventActor(user_id=granter_id),
+            payload=payload,
+        )
+        event_json = EventEnvelopeJson.from_envelope(envelope)
+        self._event_store.append(event_json)
+        return event_json
+
+    def transfer_ownership(
+        self,
+        *,
+        card_id: str,
+        from_user_id: str,
+        to_user_id: str,
+        transferred_by: str,
+        correlation_id: UUID | None = None,
+    ) -> EventEnvelopeJson:
+        if from_user_id == to_user_id:
+            raise ValueError("from_user_id and to_user_id must be different")
+
+        now = datetime.now(timezone.utc)
+        with self._driver.session() as session:
+            ok = session.execute_write(
+                self._transfer_ownership_tx,
+                {
+                    "card_id": card_id,
+                    "from_user_id": from_user_id,
+                    "to_user_id": to_user_id,
+                },
+            )
+        if not ok:
+            raise ValueError("ownership not found")
+
+        payload = NewsOwnershipTransferredPayload(
+            card_id=card_id,
+            from_user_id=from_user_id,
+            to_user_id=to_user_id,
+            transferred_by=transferred_by,
+            transferred_at=now,
+        )
+        envelope = EventEnvelope[NewsOwnershipTransferredPayload](
+            event_type=EventType.NEWS_OWNERSHIP_TRANSFERRED,
+            correlation_id=correlation_id or uuid4(),
+            actor=EventActor(user_id=transferred_by),
+            payload=payload,
+        )
+        event_json = EventEnvelopeJson.from_envelope(envelope)
+        self._event_store.append(event_json)
+        return event_json
+
+    def list_owned_cards(self, *, user_id: str, limit: int = 200) -> List[str]:
+        with self._driver.session() as session:
+            rows = session.execute_read(
+                self._list_owned_cards_tx,
+                {"user_id": user_id, "limit": int(limit)},
+            )
+        return [str(r["card_id"]) for r in rows]
+
     @staticmethod
     def _follow_tx(tx, params: Dict[str, Any]) -> None:
         tx.run(
@@ -438,6 +523,46 @@ class NewsService:
             """
             MATCH (f:User)-[:FOLLOWS]->(x:User {user_id: $followee_id})
             RETURN f.user_id AS user_id
+            LIMIT $limit
+            """,
+            **params,
+        )
+        return [dict(r) for r in result]
+
+    @staticmethod
+    def _grant_ownership_tx(tx, params: Dict[str, Any]) -> bool:
+        rec = tx.run(
+            """
+            MATCH (c:NewsCard {card_id: $card_id})
+            MERGE (u:User {user_id: $to_user_id})
+            MERGE (u)-[:OWNS_NEWS]->(c)
+            RETURN true AS ok
+            """,
+            **params,
+        ).single()
+        return bool(rec and rec.get("ok"))
+
+    @staticmethod
+    def _transfer_ownership_tx(tx, params: Dict[str, Any]) -> bool:
+        rec = tx.run(
+            """
+            MATCH (from:User {user_id: $from_user_id})-[r:OWNS_NEWS]->(c:NewsCard {card_id: $card_id})
+            MERGE (to:User {user_id: $to_user_id})
+            DELETE r
+            MERGE (to)-[:OWNS_NEWS]->(c)
+            RETURN true AS ok
+            """,
+            **params,
+        ).single()
+        return bool(rec and rec.get("ok"))
+
+    @staticmethod
+    def _list_owned_cards_tx(tx, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        result = tx.run(
+            """
+            MATCH (u:User {user_id: $user_id})-[:OWNS_NEWS]->(c:NewsCard)
+            RETURN c.card_id AS card_id
+            ORDER BY c.created_at DESC
             LIMIT $limit
             """,
             **params,

@@ -897,3 +897,68 @@ async def news_suppress(req: NewsSuppressRequest) -> NewsSuppressResponse:
     await hub.broadcast_json("events", event_json.model_dump())
     await hub.broadcast_json(str(EventType.NEWS_PROPAGATION_SUPPRESSED), event_json.model_dump())
     return NewsSuppressResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
+
+
+class NewsOwnershipGrantRequest(BaseModel):
+    card_id: str
+    to_user_id: str
+    granter_id: str
+    correlation_id: UUID | None = None
+
+
+class NewsOwnershipTransferRequest(BaseModel):
+    card_id: str
+    from_user_id: str
+    to_user_id: str
+    transferred_by: str
+    correlation_id: UUID | None = None
+
+
+class NewsOwnershipEventResponse(BaseModel):
+    event_id: UUID
+    correlation_id: UUID | None
+
+
+class NewsOwnedCardsResponse(BaseModel):
+    cards: list[str]
+
+
+@router.post("/news/ownership/grant")
+async def news_ownership_grant(req: NewsOwnershipGrantRequest) -> NewsOwnershipEventResponse:
+    try:
+        event_json = _news_service.grant_ownership(
+            card_id=req.card_id,
+            to_user_id=req.to_user_id,
+            granter_id=req.granter_id,
+            correlation_id=req.correlation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await hub.broadcast_json("events", event_json.model_dump())
+    await hub.broadcast_json(str(EventType.NEWS_OWNERSHIP_GRANTED), event_json.model_dump())
+    return NewsOwnershipEventResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
+
+
+@router.post("/news/ownership/transfer")
+async def news_ownership_transfer(req: NewsOwnershipTransferRequest) -> NewsOwnershipEventResponse:
+    try:
+        event_json = _news_service.transfer_ownership(
+            card_id=req.card_id,
+            from_user_id=req.from_user_id,
+            to_user_id=req.to_user_id,
+            transferred_by=req.transferred_by,
+            correlation_id=req.correlation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await hub.broadcast_json("events", event_json.model_dump())
+    await hub.broadcast_json(str(EventType.NEWS_OWNERSHIP_TRANSFERRED), event_json.model_dump())
+    return NewsOwnershipEventResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
+
+
+@router.get("/news/ownership/{user_id}")
+async def news_ownership_list(user_id: str, limit: int = 200) -> NewsOwnedCardsResponse:
+    cards = _news_service.list_owned_cards(user_id=user_id, limit=limit)
+    return NewsOwnedCardsResponse(cards=cards)

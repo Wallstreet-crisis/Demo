@@ -125,6 +125,21 @@ class NewsPropagationSuppressedPayload(BaseModel):
     suppressed_at: datetime
 
 
+class NewsOwnershipGrantedPayload(BaseModel):
+    card_id: str
+    to_user_id: str
+    granter_id: str
+    granted_at: datetime
+
+
+class NewsOwnershipTransferredPayload(BaseModel):
+    card_id: str
+    from_user_id: str
+    to_user_id: str
+    transferred_by: str
+    transferred_at: datetime
+
+
 class TradeIntentSubmittedPayload(BaseModel):
     intent_id: str
     user_id: str
