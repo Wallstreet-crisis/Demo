@@ -25,6 +25,8 @@ from ifrontier.infra.sqlite.orders import (
     insert_limit_order,
     update_order_quantity_and_status,
 )
+from ifrontier.services.game_time import load_game_time_config_from_env
+from ifrontier.services.market_session import assert_market_accepts_orders
 
 
 _driver = create_driver()
@@ -48,6 +50,9 @@ def submit_limit_order(
 
     返回值：order_id 与产生的成交事件列表。
     """
+    cfg = load_game_time_config_from_env()
+    assert_market_accepts_orders(cfg=cfg)
+
     # 先插入订单
     order = insert_limit_order(account_id, symbol, side, price, quantity)
 
@@ -145,6 +150,9 @@ def submit_market_order(
     市价单不进入订单簿，仅按价格优先/时间优先吃对手盘。
     成交价采用对手单价格。
     """
+
+    cfg = load_game_time_config_from_env()
+    assert_market_accepts_orders(cfg=cfg)
 
     if side not in {"BUY", "SELL"}:
         raise ValueError("side must be BUY or SELL")

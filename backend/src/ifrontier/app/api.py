@@ -24,6 +24,8 @@ from ifrontier.infra.sqlite.db import get_connection
 from ifrontier.services.contracts import ContractService
 from ifrontier.services.news import NewsService
 from ifrontier.services.news_tick import NewsTickEngine
+from ifrontier.services.game_time import load_game_time_config_from_env
+from ifrontier.services.market_session import get_market_session
 router = APIRouter()
 
 _driver = create_driver()
@@ -342,6 +344,31 @@ async def account_valuation(account_id: str, discount_factor: float = 1.0) -> Ac
         total_value=v.total_value,
         discount_factor=v.discount_factor,
         prices=v.prices,
+    )
+
+
+class MarketSessionResponse(BaseModel):
+    enabled: bool
+    phase: str
+    game_day_index: int
+    seconds_into_day: int
+    seconds_per_game_day: int
+    trading_seconds: int
+    closing_buffer_seconds: int
+
+
+@router.get("/market/session")
+async def market_session() -> MarketSessionResponse:
+    cfg = load_game_time_config_from_env()
+    snap = get_market_session(cfg=cfg)
+    return MarketSessionResponse(
+        enabled=bool(snap.enabled),
+        phase=snap.phase.value,
+        game_day_index=int(snap.game_day_index),
+        seconds_into_day=int(snap.seconds_into_day),
+        seconds_per_game_day=int(snap.seconds_per_game_day),
+        trading_seconds=int(snap.trading_seconds),
+        closing_buffer_seconds=int(snap.closing_buffer_seconds),
     )
 
 
