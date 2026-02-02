@@ -387,14 +387,16 @@ class DebugSubmitOrderResponse(BaseModel):
 @router.post("/debug/submit_order")
 async def debug_submit_order(req: DebugSubmitOrderRequest) -> DebugSubmitOrderResponse:
     # 这里只是限价单提交入口，实际撮合和记账由 MatchingEngine + SQLite 账本处理
-    order_id, _matches = submit_limit_order(
+    try:
+        order_id, _matches = submit_limit_order(
         account_id=req.account_id,
         symbol=req.symbol,
         side=req.side,
         price=req.price,
         quantity=req.quantity,
     )
-
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return DebugSubmitOrderResponse(order_id=order_id)
 
 
@@ -474,13 +476,15 @@ class PlayerMarketOrderRequest(BaseModel):
 @router.post("/orders/market")
 async def submit_player_market_order(req: PlayerMarketOrderRequest) -> None:
     account_id = f"user:{req.player_id}"
-    submit_market_order(
-        account_id=account_id,
-        symbol=req.symbol,
-        side=req.side,
-        quantity=req.quantity,
-    )
-
+    try:
+        order_id, _matches = submit_market_order(
+            account_id=account_id,
+            symbol=req.symbol,
+            side=req.side,
+            quantity=req.quantity,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 class PlayerAccountResponse(BaseModel):
     account_id: str
