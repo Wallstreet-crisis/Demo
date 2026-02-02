@@ -130,7 +130,7 @@ def test_news_broadcast_delivers_to_all_known_users() -> None:
             "actor_id": u1,
             "channel": "GLOBAL_MANDATORY",
             "visibility_level": "NORMAL",
-            "limit_users": 50,
+            "limit_users": 5000,
         },
     )
     assert resp.status_code == 200

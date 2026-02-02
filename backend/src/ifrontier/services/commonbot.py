@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List, Tuple
+from typing import Any, Dict, List, Tuple
 from uuid import uuid4
 
 from ifrontier.domain.assets.profile import get_profile
@@ -11,6 +11,7 @@ from ifrontier.domain.events.payloads import (
     TradeIntentSubmittedPayload,
 )
 from ifrontier.domain.events.types import EventType
+from ifrontier.infra.llm.openrouter import OpenRouterClient, extract_first_message_text
 
 
 def _price_trend(price_series: List[float]) -> float:
@@ -65,8 +66,28 @@ def run_commonbot_for_earnings(
     price_series: List[float],
     bot_id: str,
     correlation_id,
+    news_text: str | None = None,
+    use_llm: bool = False,
 ) -> Tuple[EventEnvelopeJson, EventEnvelopeJson | None]:
-    action, score = _score_decision(visual_truth, symbol, price_series)
+    llm_result = None
+    if use_llm:
+        llm_result = _llm_decide_from_news(
+            symbol=symbol,
+            visual_truth=visual_truth,
+            news_text=news_text or "",
+            price_series=price_series,
+        )
+
+    if llm_result is not None:
+        action = str(llm_result.get("action") or "HOLD").upper()
+        confidence = float(llm_result.get("confidence") or 0.0)
+        w_visual = float(llm_result.get("w_visual") or 0.0)
+        w_text = float(llm_result.get("w_text") or 0.0)
+        w_trend = float(llm_result.get("w_trend") or 0.0)
+    else:
+        action, score = _score_decision(visual_truth, symbol, price_series)
+        confidence = abs(float(score))
+        w_visual, w_text, w_trend = 1.0, 0.0, 0.0
 
     now = datetime.now(timezone.utc)
 
@@ -75,10 +96,10 @@ def run_commonbot_for_earnings(
         tick_id="debug-tick",
         asset_symbol=symbol,
         action=action,
-        confidence=abs(score),
-        w_visual=1.0,
-        w_text=0.0,
-        w_trend=0.0,
+        confidence=confidence,
+        w_visual=w_visual,
+        w_text=w_text,
+        w_trend=w_trend,
         decided_at=now,
     )
 
@@ -112,3 +133,45 @@ def run_commonbot_for_earnings(
         trade_json = EventEnvelopeJson.from_envelope(intent_envelope)
 
     return decision_json, trade_json
+
+
+def _llm_decide_from_news(
+    *,
+    symbol: str,
+    visual_truth: str,
+    news_text: str,
+    price_series: List[float],
+) -> Dict[str, Any] | None:
+    client = OpenRouterClient.from_env()
+    if client is None:
+        return None
+
+    trend = _price_trend(price_series)
+
+    system = (
+        "你是一个市场做市机器人(common bot)。你只能输出 JSON，不要输出其它文字。"
+        "根据新闻的视觉真相、文本、以及价格趋势，生成交易动作。"
+        "action 只能是 BUY/SELL/HOLD。confidence 在 0~1 之间。"
+        "同时给出权重 w_visual/w_text/w_trend（0~1）。"
+    )
+
+    user = (
+        "请输出 JSON："
+        "{\"action\":\"BUY|SELL|HOLD\",\"confidence\":0.0,"
+        "\"w_visual\":0.0,\"w_text\":0.0,\"w_trend\":0.0}.\n"
+        f"symbol: {symbol}\n"
+        f"visual_truth: {visual_truth}\n"
+        f"news_text: {news_text}\n"
+        f"price_trend: {trend}\n"
+    )
+
+    resp = client.chat_completions(system=system, user=user, temperature=0.2, max_tokens=200)
+    text = extract_first_message_text(resp)
+    try:
+        obj = __import__("json").loads(text)
+    except Exception:
+        return None
+
+    if not isinstance(obj, dict):
+        return None
+    return obj
