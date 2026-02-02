@@ -19,12 +19,14 @@ from ifrontier.domain.players.caste import get_caste_config
 from ifrontier.infra.sqlite.db import get_connection
 from ifrontier.services.contracts import ContractService
 from ifrontier.services.news import NewsService
+from ifrontier.services.news_tick import NewsTickEngine
 router = APIRouter()
 
 _driver = create_driver()
 _event_store = Neo4jEventStore(_driver)
 _contract_service = ContractService(_driver, _event_store)
 _news_service = NewsService(_driver, _event_store)
+_news_tick_engine = NewsTickEngine(_driver, _event_store, _news_service)
 
 @router.get("/health")
 def health() -> Dict[str, str]:
@@ -785,3 +787,80 @@ async def news_broadcast(req: NewsBroadcastRequest) -> NewsBroadcastResponse:
         event_id=event_json.event_id,
         correlation_id=event_json.correlation_id,
     )
+
+
+class NewsChainStartRequest(BaseModel):
+    kind: str
+    actor_id: str
+    t0_seconds: int = 60
+    omen_interval_seconds: int = 10
+    abort_probability: float = 0.3
+    grant_count: int = 2
+    seed: int = 1
+    correlation_id: UUID | None = None
+
+
+class NewsChainStartResponse(BaseModel):
+    chain_id: str
+    major_card_id: str
+    t0_at: str
+
+
+@router.post("/news/chains/start")
+async def news_chain_start(req: NewsChainStartRequest) -> NewsChainStartResponse:
+    try:
+        result = _news_tick_engine.start_chain(
+            kind=req.kind,
+            actor_id=req.actor_id,
+            t0_seconds=req.t0_seconds,
+            omen_interval_seconds=req.omen_interval_seconds,
+            abort_probability=req.abort_probability,
+            grant_count=req.grant_count,
+            seed=req.seed,
+            correlation_id=req.correlation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # 广播链启动相关事件（card_created + chain_started）
+    await hub.broadcast_json("events", result["card_created_event"].model_dump())
+    await hub.broadcast_json(str(EventType.NEWS_CARD_CREATED), result["card_created_event"].model_dump())
+    await hub.broadcast_json("events", result["chain_started_event"].model_dump())
+    await hub.broadcast_json(str(EventType.NEWS_CHAIN_STARTED), result["chain_started_event"].model_dump())
+
+    return NewsChainStartResponse(
+        chain_id=str(result["chain_id"]),
+        major_card_id=str(result["major_card_id"]),
+        t0_at=str(result["t0_at"].isoformat()),
+    )
+
+
+class NewsTickRequest(BaseModel):
+    now_iso: str | None = None
+    limit: int = 50
+
+
+class NewsTickResponse(BaseModel):
+    now: str
+    chains: list[Dict[str, Any]]
+
+
+@router.post("/news/tick")
+async def news_tick(req: NewsTickRequest) -> NewsTickResponse:
+    now = None
+    if req.now_iso is not None:
+        now = datetime.fromisoformat(req.now_iso)
+    result = _news_tick_engine.tick(now=now, limit=req.limit)
+
+    # 将 tick 内产生的事件推送到 WS
+    for chain in result.get("chains", []):
+        for action in (chain or {}).get("actions", []):
+            for ev in (action or {}).get("events", []) or []:
+                if not ev:
+                    continue
+                if isinstance(ev, dict):
+                    await hub.broadcast_json("events", ev)
+                    ev_type = ev.get("event_type")
+                    if ev_type:
+                        await hub.broadcast_json(str(ev_type), ev)
+    return NewsTickResponse(now=str(result["now"]), chains=list(result["chains"]))

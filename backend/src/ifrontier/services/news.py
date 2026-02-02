@@ -31,6 +31,11 @@ class NewsService:
                 {"follower_id": follower_id, "followee_id": followee_id},
             )
 
+    def list_users(self, *, limit: int = 5000) -> List[str]:
+        with self._driver.session() as session:
+            users = session.execute_read(self._list_users_tx, {"limit": int(limit)})
+        return [str(r["user_id"]) for r in users]
+
     def create_card(
         self,
         *,
