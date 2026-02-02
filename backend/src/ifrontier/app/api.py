@@ -587,6 +587,190 @@ async def contract_agent_clear_context(actor_id: str) -> None:
     _contract_agent.clear_context(actor_id=actor_id)
 
 
+class ChatIntroFeeQuoteRequest(BaseModel):
+    rich_user_id: str
+    fee_cash: float = 1000.0
+    actor_id: str
+
+
+class ChatIntroFeeQuoteResponse(BaseModel):
+    event_id: UUID
+    correlation_id: UUID | None
+
+
+@router.post("/chat/intro-fee/quote")
+async def chat_intro_fee_quote(req: ChatIntroFeeQuoteRequest) -> ChatIntroFeeQuoteResponse:
+    try:
+        event_json = _chat_service.set_intro_fee_quote(
+            rich_user_id=req.rich_user_id,
+            fee_cash=req.fee_cash,
+            actor_id=req.actor_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await hub.broadcast_json("events", event_json.model_dump())
+    await hub.broadcast_json(str(event_json.event_type), event_json.model_dump())
+    return ChatIntroFeeQuoteResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
+
+
+class ChatOpenPmRequest(BaseModel):
+    requester_id: str
+    target_id: str
+
+
+class ChatOpenPmResponse(BaseModel):
+    thread_id: str
+    paid_intro_fee: bool
+    intro_fee_cash: float
+
+
+@router.post("/chat/pm/open")
+async def chat_open_pm(req: ChatOpenPmRequest) -> ChatOpenPmResponse:
+    try:
+        result, events = _chat_service.open_pm(requester_id=req.requester_id, target_id=req.target_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    for ev in events:
+        await hub.broadcast_json("events", ev.model_dump())
+        await hub.broadcast_json(str(ev.event_type), ev.model_dump())
+        await hub.broadcast_json(f"chat.pm.{result.thread_id}", ev.model_dump())
+
+    return ChatOpenPmResponse(
+        thread_id=result.thread_id,
+        paid_intro_fee=bool(result.paid_intro_fee),
+        intro_fee_cash=float(result.intro_fee_cash),
+    )
+
+
+class ChatSendMessageRequest(BaseModel):
+    sender_id: str
+    message_type: str = "TEXT"
+    content: str = ""
+    payload: Dict[str, Any] = {}
+
+
+class ChatSendMessageResponse(BaseModel):
+    event_id: UUID
+    correlation_id: UUID | None
+
+
+@router.post("/chat/public/send")
+async def chat_public_send(req: ChatSendMessageRequest) -> ChatSendMessageResponse:
+    try:
+        event_json = _chat_service.send_public_message(
+            sender_id=req.sender_id,
+            message_type=req.message_type,
+            content=req.content,
+            payload=req.payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await hub.broadcast_json("events", event_json.model_dump())
+    await hub.broadcast_json(str(event_json.event_type), event_json.model_dump())
+    await hub.broadcast_json("chat.public.global", event_json.model_dump())
+    return ChatSendMessageResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
+
+
+class ChatSendPmMessageRequest(ChatSendMessageRequest):
+    thread_id: str
+
+
+@router.post("/chat/pm/send")
+async def chat_pm_send(req: ChatSendPmMessageRequest) -> ChatSendMessageResponse:
+    try:
+        event_json = _chat_service.send_pm_message(
+            thread_id=req.thread_id,
+            sender_id=req.sender_id,
+            message_type=req.message_type,
+            content=req.content,
+            payload=req.payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await hub.broadcast_json("events", event_json.model_dump())
+    await hub.broadcast_json(str(event_json.event_type), event_json.model_dump())
+    await hub.broadcast_json(f"chat.pm.{req.thread_id}", event_json.model_dump())
+    return ChatSendMessageResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
+
+
+class ChatMessageResponse(BaseModel):
+    message_id: str
+    thread_id: str
+    sender_id: str
+    message_type: str
+    content: str
+    payload: Dict[str, Any]
+    created_at: str
+
+
+class ChatListMessagesResponse(BaseModel):
+    items: list[ChatMessageResponse]
+
+
+@router.get("/chat/public/messages")
+async def chat_public_messages(limit: int = 50, before: str | None = None) -> ChatListMessagesResponse:
+    items = _chat_service.list_public_messages(limit=limit, before=before)
+    return ChatListMessagesResponse(items=[ChatMessageResponse(**m.__dict__) for m in items])
+
+
+@router.get("/chat/pm/{thread_id}/messages")
+async def chat_pm_messages(thread_id: str, limit: int = 50, before: str | None = None) -> ChatListMessagesResponse:
+    items = _chat_service.list_pm_messages(thread_id=thread_id, limit=limit, before=before)
+    return ChatListMessagesResponse(items=[ChatMessageResponse(**m.__dict__) for m in items])
+
+
+class ChatThreadResponse(BaseModel):
+    thread_id: str
+    kind: str
+    participant_a: str
+    participant_b: str
+    status: str
+    created_at: str
+
+
+class ChatListThreadsResponse(BaseModel):
+    items: list[ChatThreadResponse]
+
+
+@router.get("/chat/threads/{user_id}")
+async def chat_list_threads(user_id: str, limit: int = 200) -> ChatListThreadsResponse:
+    items = _chat_service.list_threads(user_id=user_id, limit=limit)
+    return ChatListThreadsResponse(items=[ChatThreadResponse(**t.__dict__) for t in items])
+
+
+class WealthPublicRefreshResponse(BaseModel):
+    public_count: int
+    event_id: UUID
+    correlation_id: UUID | None
+
+
+@router.post("/wealth/public/refresh")
+async def wealth_public_refresh() -> WealthPublicRefreshResponse:
+    public_count, event_json = _chat_service.refresh_public_wealth_top10()
+    await hub.broadcast_json("events", event_json.model_dump())
+    await hub.broadcast_json(str(event_json.event_type), event_json.model_dump())
+    return WealthPublicRefreshResponse(
+        public_count=int(public_count),
+        event_id=event_json.event_id,
+        correlation_id=event_json.correlation_id,
+    )
+
+
+class WealthPublicResponse(BaseModel):
+    user_id: str
+    public_total_value: float | None
+
+
+@router.get("/wealth/public/{user_id}")
+async def wealth_public_get(user_id: str) -> WealthPublicResponse:
+    v = _chat_service.get_public_total_value(user_id=user_id)
+    return WealthPublicResponse(user_id=user_id, public_total_value=v)
+
+
 @router.post("/contracts/create")
 async def contract_create(req: ContractCreateRequest) -> ContractCreateResponse:
     try:
