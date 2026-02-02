@@ -18,16 +18,17 @@ from ifrontier.services.matching import submit_limit_order, submit_market_order
 from ifrontier.domain.players.caste import get_caste_config
 from ifrontier.infra.sqlite.db import get_connection
 from ifrontier.services.contracts import ContractService
+from ifrontier.services.news import NewsService
 router = APIRouter()
 
 _driver = create_driver()
 _event_store = Neo4jEventStore(_driver)
 _contract_service = ContractService(_driver, _event_store)
+_news_service = NewsService(_driver, _event_store)
 
 @router.get("/health")
 def health() -> Dict[str, str]:
     return {"status": "ok"}
-
 
 class DebugEmitEventRequest(BaseModel):
     event_type: EventType
@@ -552,3 +553,235 @@ async def contract_run_rules(contract_id: str, req: ContractRunRulesRequest) -> 
         _contract_service.run_rules(contract_id=contract_id, actor_id=req.actor_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class SocialFollowRequest(BaseModel):
+    follower_id: str
+    followee_id: str
+
+
+@router.post("/social/follow")
+async def social_follow(req: SocialFollowRequest) -> None:
+    try:
+        _news_service.follow(follower_id=req.follower_id, followee_id=req.followee_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class NewsCreateCardRequest(BaseModel):
+    actor_id: str
+    kind: str
+    image_anchor_id: str | None = None
+    image_uri: str | None = None
+    truth_payload: Dict[str, Any] | None = None
+    symbols: list[str] = []
+    tags: list[str] = []
+    correlation_id: UUID | None = None
+
+
+class NewsCreateCardResponse(BaseModel):
+    card_id: str
+    event_id: UUID
+    correlation_id: UUID | None
+
+
+@router.post("/news/cards")
+async def news_create_card(req: NewsCreateCardRequest) -> NewsCreateCardResponse:
+    try:
+        card_id, event_json = _news_service.create_card(
+            kind=req.kind,
+            image_anchor_id=req.image_anchor_id,
+            image_uri=req.image_uri,
+            truth_payload=req.truth_payload,
+            symbols=req.symbols,
+            tags=req.tags,
+            actor_id=req.actor_id,
+            correlation_id=req.correlation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await hub.broadcast_json("events", event_json.model_dump())
+    await hub.broadcast_json(str(EventType.NEWS_CARD_CREATED), event_json.model_dump())
+
+    return NewsCreateCardResponse(
+        card_id=card_id,
+        event_id=event_json.event_id,
+        correlation_id=event_json.correlation_id,
+    )
+
+
+class NewsEmitVariantRequest(BaseModel):
+    card_id: str
+    author_id: str
+    text: str
+    parent_variant_id: str | None = None
+    influence_cost: float = 0.0
+    risk_roll: Dict[str, Any] | None = None
+    correlation_id: UUID | None = None
+
+
+class NewsEmitVariantResponse(BaseModel):
+    variant_id: str
+    event_id: UUID
+    correlation_id: UUID | None
+
+
+@router.post("/news/variants/emit")
+async def news_emit_variant(req: NewsEmitVariantRequest) -> NewsEmitVariantResponse:
+    try:
+        variant_id, event_json = _news_service.emit_variant(
+            card_id=req.card_id,
+            author_id=req.author_id,
+            text=req.text,
+            parent_variant_id=req.parent_variant_id,
+            influence_cost=req.influence_cost,
+            risk_roll=req.risk_roll,
+            correlation_id=req.correlation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await hub.broadcast_json("events", event_json.model_dump())
+    await hub.broadcast_json(str(EventType.NEWS_VARIANT_EMITTED), event_json.model_dump())
+
+    return NewsEmitVariantResponse(
+        variant_id=variant_id,
+        event_id=event_json.event_id,
+        correlation_id=event_json.correlation_id,
+    )
+
+
+class NewsMutateVariantRequest(BaseModel):
+    parent_variant_id: str
+    editor_id: str
+    new_text: str
+    influence_cost: float = 0.0
+    risk_roll: Dict[str, Any] | None = None
+    correlation_id: UUID | None = None
+
+
+class NewsMutateVariantResponse(BaseModel):
+    new_variant_id: str
+    event_id: UUID
+    correlation_id: UUID | None
+
+
+@router.post("/news/variants/mutate")
+async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVariantResponse:
+    try:
+        new_variant_id, event_json = _news_service.mutate_variant(
+            parent_variant_id=req.parent_variant_id,
+            editor_id=req.editor_id,
+            new_text=req.new_text,
+            influence_cost=req.influence_cost,
+            risk_roll=req.risk_roll,
+            correlation_id=req.correlation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await hub.broadcast_json("events", event_json.model_dump())
+    await hub.broadcast_json(str(EventType.NEWS_VARIANT_MUTATED), event_json.model_dump())
+
+    return NewsMutateVariantResponse(
+        new_variant_id=new_variant_id,
+        event_id=event_json.event_id,
+        correlation_id=event_json.correlation_id,
+    )
+
+
+class NewsPropagateRequest(BaseModel):
+    variant_id: str
+    from_actor_id: str
+    visibility_level: str = "NORMAL"
+    spend_influence: float = 0.0
+    limit: int = 50
+    correlation_id: UUID | None = None
+
+
+class NewsPropagateResponse(BaseModel):
+    delivered: int
+    correlation_id: UUID | None
+
+
+@router.post("/news/propagate")
+async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
+    try:
+        delivered_events = _news_service.propagate_to_followers(
+            variant_id=req.variant_id,
+            from_actor_id=req.from_actor_id,
+            visibility_level=req.visibility_level,
+            spend_influence=req.spend_influence,
+            limit=req.limit,
+            correlation_id=req.correlation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    for ev in delivered_events:
+        await hub.broadcast_json("events", ev.model_dump())
+        await hub.broadcast_json(str(EventType.NEWS_DELIVERED), ev.model_dump())
+
+    correlation_id = delivered_events[0].correlation_id if delivered_events else req.correlation_id
+    return NewsPropagateResponse(delivered=len(delivered_events), correlation_id=correlation_id)
+
+
+class NewsInboxResponseItem(BaseModel):
+    delivery_id: str
+    card_id: str
+    variant_id: str
+    from_actor_id: str
+    visibility_level: str
+    delivery_reason: str
+    delivered_at: str
+    text: str
+
+
+class NewsInboxResponse(BaseModel):
+    items: list[NewsInboxResponseItem]
+
+
+@router.get("/news/inbox/{player_id}")
+async def news_inbox(player_id: str, limit: int = 50) -> NewsInboxResponse:
+    items = _news_service.list_inbox(player_id=player_id, limit=limit)
+    return NewsInboxResponse(items=[NewsInboxResponseItem(**x) for x in items])
+
+
+class NewsBroadcastRequest(BaseModel):
+    variant_id: str
+    actor_id: str
+    channel: str = "GLOBAL_MANDATORY"
+    visibility_level: str = "NORMAL"
+    limit_users: int = 5000
+    correlation_id: UUID | None = None
+
+
+class NewsBroadcastResponse(BaseModel):
+    delivered: int
+    event_id: UUID
+    correlation_id: UUID | None
+
+
+@router.post("/news/broadcast")
+async def news_broadcast(req: NewsBroadcastRequest) -> NewsBroadcastResponse:
+    try:
+        delivered, event_json = _news_service.broadcast_variant(
+            variant_id=req.variant_id,
+            channel=req.channel,
+            visibility_level=req.visibility_level,
+            actor_id=req.actor_id,
+            limit_users=req.limit_users,
+            correlation_id=req.correlation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await hub.broadcast_json("events", event_json.model_dump())
+    await hub.broadcast_json(str(EventType.NEWS_BROADCASTED), event_json.model_dump())
+
+    return NewsBroadcastResponse(
+        delivered=delivered,
+        event_id=event_json.event_id,
+        correlation_id=event_json.correlation_id,
+    )

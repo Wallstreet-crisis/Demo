@@ -36,6 +36,95 @@ class NewsPropagatedPayload(BaseModel):
     propagated_at: datetime
 
 
+class NewsCardCreatedPayload(BaseModel):
+    card_id: str
+    kind: str
+    image_anchor_id: str | None = None
+    image_uri: str | None = None
+    truth_payload: Dict[str, Any] | None = None
+    symbols: List[str] = []
+    tags: List[str] = []
+    created_at: datetime
+
+
+class NewsVariantEmittedPayload(BaseModel):
+    card_id: str
+    variant_id: str
+    parent_variant_id: str | None = None
+    author_id: str
+    text: str
+    influence_cost: float = 0.0
+    risk_roll: Dict[str, Any] | None = None
+    created_at: datetime
+
+
+class NewsVariantMutatedPayload(BaseModel):
+    card_id: str
+    new_variant_id: str
+    parent_variant_id: str
+    editor_id: str
+    new_text: str
+    influence_cost: float = 0.0
+    risk_roll: Dict[str, Any] | None = None
+    mutated_at: datetime
+
+
+class NewsDeliveredPayload(BaseModel):
+    delivery_id: str
+    card_id: str
+    variant_id: str
+    to_player_id: str
+    from_actor_id: str
+    visibility_level: str
+    delivery_reason: str
+    delivered_at: datetime
+
+
+class NewsBroadcastedPayload(BaseModel):
+    broadcast_id: str
+    card_id: str
+    variant_id: str
+    channel: str
+    delivered_count: int
+    broadcasted_at: datetime
+
+
+class NewsTruthRevealedPayload(BaseModel):
+    card_id: str
+    chain_id: str | None = None
+    outcome: str  # RESOLVED / ABORTED
+    image_anchor_id: str | None = None
+    image_uri: str | None = None
+    truth_payload: Dict[str, Any] | None = None
+    revealed_at: datetime
+
+
+class NewsChainStartedPayload(BaseModel):
+    chain_id: str
+    major_card_id: str
+    kind: str
+    t0_at: datetime | None = None
+    started_at: datetime
+
+
+class NewsChainAbortedPayload(BaseModel):
+    chain_id: str
+    major_card_id: str
+    abort_reason: str | None = None
+    aborted_at: datetime
+
+
+class NewsPropagationSuppressedPayload(BaseModel):
+    suppression_id: str
+    actor_id: str
+    target_chain_id: str | None = None
+    target_card_id: str | None = None
+    target_variant_id: str | None = None
+    spend_influence: float
+    scope: str
+    suppressed_at: datetime
+
+
 class TradeIntentSubmittedPayload(BaseModel):
     intent_id: str
     user_id: str

@@ -6,6 +6,16 @@ class EventType(str, Enum):
     NEWS_TEXT_MUTATED = "news.text_mutated"
     NEWS_PROPAGATED = "news.propagated"
 
+    NEWS_CARD_CREATED = "news.card_created"
+    NEWS_VARIANT_EMITTED = "news.variant_emitted"
+    NEWS_VARIANT_MUTATED = "news.variant_mutated"
+    NEWS_DELIVERED = "news.delivered"
+    NEWS_BROADCASTED = "news.broadcasted"
+    NEWS_TRUTH_REVEALED = "news.truth_revealed"
+    NEWS_CHAIN_STARTED = "news.chain_started"
+    NEWS_CHAIN_ABORTED = "news.chain_aborted"
+    NEWS_PROPAGATION_SUPPRESSED = "news.propagation_suppressed"
+
     AI_COMMONBOT_DECISION = "ai.commonbot.decision"
     AI_CONTRACT_DRAFTED = "ai.contract.drafted"
     AI_WHISPERER_ASSESSMENT = "ai.whisperer.assessment"
