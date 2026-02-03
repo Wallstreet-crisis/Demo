@@ -30,7 +30,22 @@ function joinUrl(baseUrl: string, path: string): string {
 }
 
 async function readJsonSafe(res: Response): Promise<unknown> {
+  const contentType = res.headers.get('content-type')
   const text = await res.text()
+  const looksLikeHtml = /^\s*</.test(text) && /<html|<!doctype\s+html/i.test(text)
+  if ((contentType && contentType.includes('text/html')) || looksLikeHtml) {
+    const snippet = text.slice(0, 200)
+    const url = res.url || '(unknown url)'
+    // 增加诊断建议
+    const advice = url.includes('localhost:5173/api') 
+      ? '检测到请求发往了 Vite 开发服务器但未被转发。请确保后端已启动在 8010 端口，并重启 Vite 以加载最新 proxy 配置。'
+      : '请检查 VITE_API_BASE_URL 配置是否正确。'
+    
+    throw new ApiError(
+      res.status,
+      `API 返回了 HTML 而不是 JSON。${advice} url=${url} status=${res.status} content-type=${contentType ?? '(none)'} snippet=${JSON.stringify(snippet)}`,
+    )
+  }
   if (!text) return undefined
   try {
     return JSON.parse(text)

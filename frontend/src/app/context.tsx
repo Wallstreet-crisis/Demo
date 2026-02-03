@@ -3,6 +3,8 @@ import { createContext, useContext } from 'react'
 export type AppSession = {
   playerId: string
   setPlayerId: (v: string) => void
+  casteId: string
+  setCasteId: (v: string) => void
   symbol: string
   setSymbol: (v: string) => void
 }

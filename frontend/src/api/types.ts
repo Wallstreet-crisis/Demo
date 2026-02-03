@@ -226,6 +226,9 @@ export type NewsInboxResponseItem = {
   delivery_reason: string
   delivered_at: string
   text: string
+  symbols?: string[]
+  tags?: string[]
+  truth_payload?: unknown
 }
 
 export type NewsInboxResponse = {
@@ -391,4 +394,122 @@ export type DebugEmitEventRequest = {
 export type DebugEmitEventResponse = {
   event_id: string
   correlation_id: string | null
+}
+
+export type ContractAgentDraftRequest = {
+  actor_id: string
+  natural_language: string
+}
+
+export type ContractAgentDraftResponse = {
+  draft_id: string
+  template_id: string
+  contract_create: Record<string, unknown>
+  explanation: string
+  questions: string[]
+  risk_rating: string
+}
+
+export type ContractAgentContextResponse = {
+  actor_id: string
+  context: Record<string, unknown>
+}
+
+export type ContractCreateRequest = {
+  actor_id: string
+  kind: string
+  title: string
+  terms: Record<string, unknown>
+  parties: string[]
+  required_signers: string[]
+  participation_mode?: string | null
+  invited_parties?: string[] | null
+}
+
+export type ContractCreateResponse = {
+  contract_id: string
+}
+
+export type ContractBatchItem = {
+  kind: string
+  title: string
+  terms: Record<string, unknown>
+  parties: string[]
+  required_signers: string[]
+  participation_mode?: string | null
+  invited_parties?: string[] | null
+}
+
+export type ContractBatchCreateRequest = {
+  actor_id: string
+  contracts: ContractBatchItem[]
+}
+
+export type ContractBatchCreateResponseItem = {
+  index: number
+  contract_id: string
+}
+
+export type ContractBatchCreateResponse = {
+  contracts: ContractBatchCreateResponseItem[]
+}
+
+export type ContractJoinRequest = {
+  joiner: string
+}
+
+export type ContractSignRequest = {
+  signer: string
+}
+
+export type ContractSignResponse = {
+  status: string
+}
+
+export type ContractActivateRequest = {
+  actor_id: string
+}
+
+export type ContractSettleRequest = {
+  actor_id: string
+}
+
+export type ContractRunRulesRequest = {
+  actor_id: string
+}
+
+export type ContractProposalCreateRequest = {
+  proposer: string
+  proposal_type: string
+  details: Record<string, unknown>
+}
+
+export type ContractProposalCreateResponse = {
+  proposal_id: string
+}
+
+export type ContractProposalApproveRequest = {
+  approver: string
+}
+
+export type ContractProposalApproveResponse = {
+  applied: boolean
+  contract_status: string
+  proposal_type: string
+}
+
+export type ContractResponse = {
+  contract_id: string
+  kind: string
+  title: string
+  status: string
+  terms: Record<string, unknown>
+  parties: string[]
+  required_signers: string[]
+  signatures: Record<string, string>
+  participation_mode: string
+  invited_parties: string[]
+  created_at: string
+  updated_at: string
+  proposals: unknown[]
 }
