@@ -8,6 +8,7 @@ from neo4j import Driver
 
 from ifrontier.infra.neo4j.driver import create_driver
 from ifrontier.infra.sqlite.ledger import ContractTransfer, get_snapshot
+from ifrontier.infra.sqlite.market import get_last_price
 
 
 @dataclass(frozen=True)
@@ -97,7 +98,11 @@ def resolve_var(var: str) -> float:
 
     # 预留空间：价格/盘口/波动率/外部数据等，由上层数据网关实现
     if kind == "price":
-        raise ValueError("price variables not implemented yet")
+        symbol = rest
+        last = get_last_price(symbol)
+        if last is None:
+            raise ValueError("price not available")
+        return float(last)
     if kind == "book":
         raise ValueError("order book variables not implemented yet")
     if kind == "vol":
@@ -317,13 +322,20 @@ def parse_transfers(raw: Any) -> List[ContractTransfer]:
     for item in raw:
         if not isinstance(item, dict):
             raise ValueError("invalid transfer")
+
+        q_raw = item.get("quantity")
+        if isinstance(q_raw, dict) and "expr" in q_raw:
+            qty = _eval_value(q_raw.get("expr"))
+        else:
+            qty = float(q_raw)
+
         transfers.append(
             ContractTransfer(
                 from_account_id=str(item.get("from")),
                 to_account_id=str(item.get("to")),
                 asset_type=str(item.get("asset_type")),
                 symbol=str(item.get("symbol")),
-                quantity=float(item.get("quantity")),
+                quantity=float(qty),
             )
         )
     return transfers

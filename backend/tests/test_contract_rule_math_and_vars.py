@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from datetime import datetime, timezone
 
 import pytest
 
@@ -27,12 +28,20 @@ def test_math_expression_add_mul_in_condition() -> None:
 
 
 @pytest.mark.parametrize("var", [
-    "price.last:BLUEGOLD",
     "book.depth_bid:BLUEGOLD",
     "vol.short:BLUEGOLD",
     "ext.index:SP500",
+    "price.last:BLUEGOLD",
 ])
 def test_unimplemented_variable_namespaces_raise(var: str) -> None:
     expr = {"op": "==", "left": {"var": var}, "right": 0}
     with pytest.raises(ValueError):
         eval_condition(expr)
+
+
+def test_price_variable_reads_last_price() -> None:
+    from ifrontier.infra.sqlite.market import record_trade
+
+    record_trade(symbol="BLUEGOLD", price=12.5, quantity=1.0, occurred_at=datetime.now(timezone.utc), event_id="test")
+    expr = {"op": "==", "left": {"var": "price:BLUEGOLD"}, "right": 12.5}
+    assert eval_condition(expr) is True

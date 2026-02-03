@@ -406,19 +406,7 @@ class ContractService:
         if not isinstance(transfers_raw, list) or not transfers_raw:
             raise ValueError("contract transfers missing")
 
-        transfers: List[ContractTransfer] = []
-        for item in transfers_raw:
-            if not isinstance(item, dict):
-                raise ValueError("invalid transfer")
-            transfers.append(
-                ContractTransfer(
-                    from_account_id=str(item.get("from")),
-                    to_account_id=str(item.get("to")),
-                    asset_type=str(item.get("asset_type")),
-                    symbol=str(item.get("symbol")),
-                    quantity=float(item.get("quantity")),
-                )
-            )
+        transfers = parse_transfers(transfers_raw)
 
         default_policy = terms.get("default_policy") if isinstance(terms, dict) else None
         scaled, fill_ratio, shortfall_by_from = self._apply_default_partial_fill(

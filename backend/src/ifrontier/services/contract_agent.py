@@ -258,6 +258,8 @@ class ContractAgent:
             "你必须只输出 JSON，不要输出其它任何文字。"
             "契约草案需要是可编辑模块：kind/title/terms(parties/transfers/rules)/parties/required_signers/participation_mode/invited_parties。"
             "terms.transfers 是列表，元素包含 from/to/asset_type(CASH|EQUITY)/symbol/quantity。"
+            "quantity 可以是 number，或 {\"expr\": <expr>} 形式的表达式（用于分期/动态数量）。"
+            "expr 支持 op(add/sub/mul/div/min/max)、args、以及变量 {\"var\": \"cash:<account_id>\"} / {\"var\": \"pos:<account_id>:<symbol>\"} / {\"var\": \"price:<symbol>\"}。"
             "terms 必须包含 default_policy（默认 DEFAULT_PARTIAL_FILL）以及 reserved_default_policies（包含 DEFAULT_LIQUIDATE_THEN_HAIRCUT 占位）。"
             "risk_rating 只能是 LOW/MEDIUM/HIGH。"
         )
