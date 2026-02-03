@@ -24,7 +24,7 @@ def test_news_ownership_grant_transfer_and_list() -> None:
     resp = client.post(
         "/news/cards",
         json={
-            "actor_id": u1,
+            "actor_id": "system",
             "kind": "RUMOR",
             "truth_payload": {"note": "asset"},
         },
@@ -70,7 +70,7 @@ def test_news_ownership_transfer_requires_current_owner() -> None:
 
     resp = client.post(
         "/news/cards",
-        json={"actor_id": u1, "kind": "RUMOR", "truth_payload": {"note": "asset2"}},
+        json={"actor_id": "system", "kind": "RUMOR", "truth_payload": {"note": "asset2"}},
     )
     assert resp.status_code == 200
     card_id = resp.json()["card_id"]

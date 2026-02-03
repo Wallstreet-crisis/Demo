@@ -23,17 +23,17 @@ def test_news_mutate_spends_cash_by_char_count(monkeypatch) -> None:
     editor = f"user:mutate:editor:{uuid4()}"
     create_account(editor, owner_type="user", initial_cash=10.0)
 
-    # Create a card + initial variant
+    # Create a card + initial variant (GM/system-only endpoint)
     resp = client.post(
         "/news/cards",
-        json={"actor_id": editor, "kind": "RUMOR", "symbols": [], "tags": []},
+        json={"actor_id": "system", "kind": "RUMOR", "symbols": [], "tags": []},
     )
     assert resp.status_code == 200
     card_id = resp.json()["card_id"]
 
     resp = client.post(
         "/news/variants/emit",
-        json={"card_id": card_id, "author_id": editor, "text": "base"},
+        json={"card_id": card_id, "author_id": "system", "text": "base"},
     )
     assert resp.status_code == 200
     parent_variant_id = resp.json()["variant_id"]
@@ -66,17 +66,17 @@ def test_news_propagate_cost_increases_with_mutation_depth(monkeypatch) -> None:
     r = client.post("/social/follow", json={"follower_id": f2, "followee_id": actor})
     assert r.status_code == 200
 
-    # Create a card + initial variant
+    # Create a card + initial variant (GM/system-only endpoint)
     resp = client.post(
         "/news/cards",
-        json={"actor_id": actor, "kind": "RUMOR", "symbols": [], "tags": []},
+        json={"actor_id": "system", "kind": "RUMOR", "symbols": [], "tags": []},
     )
     assert resp.status_code == 200
     card_id = resp.json()["card_id"]
 
     resp = client.post(
         "/news/variants/emit",
-        json={"card_id": card_id, "author_id": actor, "text": "base"},
+        json={"card_id": card_id, "author_id": "system", "text": "base"},
     )
     assert resp.status_code == 200
     parent_variant_id = resp.json()["variant_id"]

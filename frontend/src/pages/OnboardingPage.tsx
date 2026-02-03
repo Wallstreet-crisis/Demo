@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Api, ApiError } from '../api'
+import { useAppSession } from '../app/context'
 
 const PLAYER_ID_RE = /^[a-zA-Z0-9_]{3,20}$/
 
@@ -12,6 +13,7 @@ const CASTES = [
 
 export default function OnboardingPage() {
   const nav = useNavigate()
+  const { setPlayerId: setGlobalPlayerId, setCasteId: setGlobalCasteId } = useAppSession()
 
   const [err, setErr] = useState<string>('')
   const [playerId, setPlayerId] = useState<string>('')
@@ -65,8 +67,8 @@ export default function OnboardingPage() {
           player_id: playerId,
           caste_id: selected.id,
         })
-        window.localStorage.setItem('if.playerId', playerId)
-        window.localStorage.setItem('if.casteId', selected.id)
+        setGlobalPlayerId(playerId)
+        setGlobalCasteId(selected.id)
       } catch (e) {
         if (e instanceof ApiError) setErr(`${e.status}: ${e.message}`)
         else setErr(e instanceof Error ? e.message : String(e))

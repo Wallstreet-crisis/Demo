@@ -44,7 +44,7 @@ def test_news_broadcast_triggers_commonbot_emergency(monkeypatch) -> None:
     resp = client.post(
         "/news/cards",
         json={
-            "actor_id": u1,
+            "actor_id": "system",
             "kind": "MAJOR_EVENT",
             "truth_payload": {"note": "global"},
             "symbols": ["BLUEGOLD"],
@@ -57,7 +57,7 @@ def test_news_broadcast_triggers_commonbot_emergency(monkeypatch) -> None:
         "/news/variants/emit",
         json={
             "card_id": card_id,
-            "author_id": u1,
+            "author_id": "system",
             "text": "BREAKING NEWS",
         },
     )
@@ -68,7 +68,7 @@ def test_news_broadcast_triggers_commonbot_emergency(monkeypatch) -> None:
         "/news/broadcast",
         json={
             "variant_id": variant_id,
-            "actor_id": u1,
+            "actor_id": "system",
             "channel": "GLOBAL_MANDATORY",
             "visibility_level": "NORMAL",
             "limit_users": 5000,

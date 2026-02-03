@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import Layout from './app/Layout'
 import { AppSessionProvider } from './app/context'
+import DashboardPage from './pages/DashboardPage'
 import AccountPage from './pages/AccountPage'
 import ChatPage from './pages/ChatPage'
 import ContractsPage from './pages/ContractsPage'
@@ -84,8 +85,9 @@ function App() {
         <Route element={<Layout />}>
           <Route
             index
-            element={<Navigate to={playerId ? '/market' : '/onboarding'} replace />}
+            element={<Navigate to={playerId ? '/dashboard' : '/onboarding'} replace />}
           />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/market" element={<MarketPage />} />
           <Route path="/trade" element={<TradePage />} />
           <Route path="/account" element={<AccountPage />} />
