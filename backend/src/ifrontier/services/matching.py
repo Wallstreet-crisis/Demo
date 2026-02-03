@@ -25,6 +25,7 @@ from ifrontier.infra.sqlite.orders import (
     insert_limit_order,
     update_order_quantity_and_status,
 )
+from ifrontier.infra.sqlite.securities import assert_symbol_tradable
 from ifrontier.services.game_time import load_game_time_config_from_env
 from ifrontier.services.market_session import assert_market_accepts_orders
 
@@ -52,6 +53,8 @@ def submit_limit_order(
     """
     cfg = load_game_time_config_from_env()
     assert_market_accepts_orders(cfg=cfg)
+
+    assert_symbol_tradable(symbol)
 
     # 先插入订单
     order = insert_limit_order(account_id, symbol, side, price, quantity)
@@ -153,6 +156,8 @@ def submit_market_order(
 
     cfg = load_game_time_config_from_env()
     assert_market_accepts_orders(cfg=cfg)
+
+    assert_symbol_tradable(symbol)
 
     if side not in {"BUY", "SELL"}:
         raise ValueError("side must be BUY or SELL")

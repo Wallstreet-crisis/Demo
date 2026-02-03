@@ -33,6 +33,8 @@ from ifrontier.services.market_session import get_market_session
 from ifrontier.infra.sqlite.hosting import get_hosting_state, upsert_hosting_state
 from ifrontier.services.hosting_scheduler import HostingScheduler
 from ifrontier.services.user_capabilities import UserCapabilityFacade
+from ifrontier.infra.sqlite.securities import load_securities_pool_from_env, set_status
+from ifrontier.services.market_maker import MarketMaker, MarketMakerConfig
 
 router = APIRouter()
 
@@ -50,6 +52,40 @@ _hosting_scheduler: HostingScheduler | None = None
 @router.get("/health")
 def health() -> Dict[str, str]:
     return {"status": "ok"}
+
+class DebugSecuritiesSetStatusRequest(BaseModel):
+    symbol: str
+    status: str
+
+class DebugMarketMakerTickResponse(BaseModel):
+    placed: int
+
+@router.post("/debug/securities/load_pool")
+async def debug_securities_load_pool() -> Dict[str, Any]:
+    try:
+        load_securities_pool_from_env()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+@router.post("/debug/securities/set_status")
+async def debug_securities_set_status(req: DebugSecuritiesSetStatusRequest) -> Dict[str, Any]:
+    try:
+        set_status(symbol=req.symbol, status=req.status)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+@router.post("/debug/market_maker/tick_once")
+async def debug_market_maker_tick_once() -> DebugMarketMakerTickResponse:
+    cfg = MarketMakerConfig(
+        account_id=str(os.getenv("IF_MARKET_MAKER_ACCOUNT_ID") or "mm:1"),
+        spread_pct=float(os.getenv("IF_MARKET_MAKER_SPREAD_PCT") or "0.02"),
+        min_qty=float(os.getenv("IF_MARKET_MAKER_MIN_QTY") or "1.0"),
+    )
+    mm = MarketMaker(cfg=cfg)
+    placed = mm.tick_once()
+    return DebugMarketMakerTickResponse(placed=int(placed))
 
 class DebugEmitEventRequest(BaseModel):
     event_type: EventType

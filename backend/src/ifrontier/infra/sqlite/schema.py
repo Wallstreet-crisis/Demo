@@ -7,6 +7,7 @@ from ifrontier.infra.sqlite.db import get_connection
 from ifrontier.infra.sqlite.hosting import init_hosting_schema
 from ifrontier.infra.sqlite.market import init_market_schema
 from ifrontier.infra.sqlite.orders import init_order_schema
+from ifrontier.infra.sqlite.securities import init_securities_schema, load_securities_pool_from_env
 
 
 def init_schema() -> None:
@@ -46,6 +47,9 @@ def init_schema() -> None:
 
     # 订单簿（LIMIT 订单入簿，MARKET 订单由撮合引擎吃单实现）
     init_order_schema()
+
+    init_securities_schema()
+    load_securities_pool_from_env()
 
     # 市场成交记录/价格序列（用于 K 线等）
     init_market_schema()
