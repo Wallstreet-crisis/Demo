@@ -9,6 +9,7 @@ import ChatPage from './pages/ChatPage'
 import MarketPage from './pages/MarketPage'
 import NewsPage from './pages/NewsPage'
 import NotFoundPage from './pages/NotFoundPage'
+import OnboardingPage from './pages/OnboardingPage'
 import TradePage from './pages/TradePage'
 
 import { useEffect, useState } from 'react'
@@ -18,25 +19,33 @@ function App() {
   const [bootstrapErr, setBootstrapErr] = useState<string>('')
 
   const [playerId, setPlayerId] = useState<string>(() => {
-    const key = 'if.playerId'
-    const existing = window.localStorage.getItem(key)
-    if (existing) return existing
-
-    const id = `p_${crypto.randomUUID().slice(0, 8)}`
-    window.localStorage.setItem(key, id)
-    return id
+    return window.localStorage.getItem('if.playerId') ?? ''
   })
   const [symbol, setSymbol] = useState<string>('BLUEGOLD')
 
   useEffect(() => {
     const key = 'if.playerId'
-    window.localStorage.setItem(key, playerId)
+    if (playerId) window.localStorage.setItem(key, playerId)
   }, [playerId])
 
   useEffect(() => {
     let canceled = false
 
-    Api.playersBootstrap({ player_id: playerId })
+    if (!playerId) {
+      return () => {
+        canceled = true
+      }
+    }
+
+    const casteId = window.localStorage.getItem('if.casteId')
+    const initialCashRaw = window.localStorage.getItem('if.initialCash')
+    const initialCash = initialCashRaw ? Number(initialCashRaw) : undefined
+
+    Api.playersBootstrap({
+      player_id: playerId,
+      caste_id: casteId || undefined,
+      initial_cash: Number.isFinite(initialCash) ? initialCash : undefined,
+    })
       .then(() => {
         if (canceled) return
         setBootstrapErr('')
@@ -61,8 +70,13 @@ function App() {
       ) : null}
 
       <Routes>
+        <Route path="/onboarding" element={<OnboardingPage />} />
+
         <Route element={<Layout />}>
-          <Route index element={<Navigate to="/market" replace />} />
+          <Route
+            index
+            element={<Navigate to={playerId ? '/market' : '/onboarding'} replace />}
+          />
           <Route path="/market" element={<MarketPage />} />
           <Route path="/trade" element={<TradePage />} />
           <Route path="/account" element={<AccountPage />} />

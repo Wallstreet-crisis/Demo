@@ -25,6 +25,21 @@ export default function Layout() {
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: 16 }}>
+      {!sess.playerId ? (
+        <div
+          style={{
+            padding: 12,
+            background: '#fffbe6',
+            border: '1px solid #ffe58f',
+            borderRadius: 8,
+            marginBottom: 12,
+            textAlign: 'left',
+          }}
+        >
+          <strong>未初始化玩家。</strong> 请先前往 <Link to="/onboarding">/onboarding</Link> 创建或选择玩家。
+        </div>
+      ) : null}
+
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <h2 style={{ margin: 0 }}>Information Frontier</h2>
@@ -38,10 +53,22 @@ export default function Layout() {
         </div>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <span>Player</span>
-            <input value={sess.playerId} onChange={(e) => sess.setPlayerId(e.target.value)} />
-          </label>
+            <code>{sess.playerId || '(none)'}</code>
+            <Link
+              to="/onboarding"
+              style={{
+                padding: '6px 10px',
+                borderRadius: 8,
+                textDecoration: 'none',
+                color: '#333',
+                border: '1px solid #ddd',
+              }}
+            >
+              切换玩家
+            </Link>
+          </div>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <span>Symbol</span>
             <input value={sess.symbol} onChange={(e) => sess.setSymbol(e.target.value)} />
