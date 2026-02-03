@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 from ifrontier.infra.sqlite.ledger import create_account, get_snapshot
 from ifrontier.infra.sqlite.market import get_last_price
-from ifrontier.infra.sqlite.orders import insert_limit_order
 from ifrontier.infra.sqlite.securities import list_securities
+from ifrontier.services.matching import submit_limit_order
 
 
 @dataclass(frozen=True)
@@ -19,10 +19,10 @@ class MarketMaker:
     def __init__(self, *, cfg: MarketMakerConfig) -> None:
         self._cfg = cfg
 
-    def tick_once(self) -> int:
+    def tick_once(self) -> List[MatchResult]:
         create_account(self._cfg.account_id, owner_type="bot_institution", initial_cash=0.0)
 
-        placed = 0
+        all_matches = []
         for sec in list_securities(status="TRADABLE"):
             mid = get_last_price(sec.symbol) or float(sec.seed_price)
             if mid <= 0:
@@ -36,12 +36,26 @@ class MarketMaker:
 
             snap = get_snapshot(self._cfg.account_id)
             if float(snap.cash) >= float(bid) * float(qty) - 1e-9:
-                insert_limit_order(self._cfg.account_id, sec.symbol, "BUY", float(bid), float(qty))
-                placed += 1
+                print(f"[MarketMaker] Submitting BUY for {sec.symbol} at {bid:.2f}")
+                _, matches = submit_limit_order(
+                    account_id=self._cfg.account_id,
+                    symbol=sec.symbol,
+                    side="BUY",
+                    price=float(bid),
+                    quantity=float(qty)
+                )
+                all_matches.extend(matches)
 
             snap = get_snapshot(self._cfg.account_id)
             if float(snap.positions.get(sec.symbol, 0.0)) >= float(qty) - 1e-9:
-                insert_limit_order(self._cfg.account_id, sec.symbol, "SELL", float(ask), float(qty))
-                placed += 1
+                print(f"[MarketMaker] Submitting SELL for {sec.symbol} at {ask:.2f}")
+                _, matches = submit_limit_order(
+                    account_id=self._cfg.account_id,
+                    symbol=sec.symbol,
+                    side="SELL",
+                    price=float(ask),
+                    quantity=float(qty)
+                )
+                all_matches.extend(matches)
 
-        return placed
+        return all_matches

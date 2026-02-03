@@ -207,6 +207,73 @@ class ContractAgent:
                 )
                 risk = "MEDIUM"
 
+        # Template C: 对赌/对冲契约 (Bet/Wager)
+        # 例："Bet 1000 cash with user:bob on BLUEGOLD > 150"
+        if contract is None:
+            m3 = re.search(
+                r"(?P<bet_type>Bet|对赌|赌)\s*(?P<amount>\d+(?:\.\d+)?)\s*(cash|现金)?\s*(with|跟|向)\s*(?P<counter>[^\s]+)\s*(on|关于|对于)?\s*(?P<symbol>[A-Z0-9_\-]+)\s*(?P<op>>|<|>=|<=|==)\s*(?P<target>\d+(?:\.\d+)?)",
+                text,
+                re.IGNORECASE
+            )
+            if m3:
+                template_id = "P2P_PRICE_WAGER"
+                counter = str(m3.group("counter") or "").strip()
+                amount = float(m3.group("amount"))
+                symbol = str(m3.group("symbol") or "").strip().upper()
+                op_map = {">": "gt", "<": "lt", ">=": "gte", "<=": "lte", "==": "eq"}
+                op_raw = m3.group("op")
+                op = op_map.get(op_raw, "gt")
+                target = float(m3.group("target"))
+
+                invited_parties = [counter] if counter else []
+                parties = [actor_id, counter] if counter else [actor_id]
+                
+                # 构建契约条款：如果触发条件，B 向 A 转账；否则 A 向 B 转账（或者 A 预质押）
+                # 这里简化为：结算时根据价格决定 1000 块归谁
+                terms = {
+                    "transfers": [
+                        {
+                            "from": counter or "<COUNTERPARTY>",
+                            "to": actor_id,
+                            "asset_type": "CASH",
+                            "symbol": "CASH",
+                            "quantity": amount,
+                            "condition": {
+                                "var": f"price:{symbol}",
+                                "op": op,
+                                "val": target
+                            }
+                        },
+                        {
+                            "from": actor_id,
+                            "to": counter or "<COUNTERPARTY>",
+                            "asset_type": "CASH",
+                            "symbol": "CASH",
+                            "quantity": amount,
+                            "condition": {
+                                "var": f"price:{symbol}",
+                                "op": "not_" + op if not op.startswith("not_") else op[4:], # 粗略逻辑
+                                "val": target
+                            }
+                        }
+                    ],
+                    "rules": []
+                }
+                terms = self._ensure_default_policies(terms)
+
+                contract = {
+                    "actor_id": actor_id,
+                    "kind": "P2P_PRICE_WAGER",
+                    "title": f"价格对赌：{symbol} {op_raw} {target}",
+                    "terms": terms,
+                    "parties": parties,
+                    "required_signers": parties,
+                    "participation_mode": "OPT_IN",
+                    "invited_parties": invited_parties,
+                }
+                explanation = f"这是一个对赌协议：如果 {symbol} 的价格 {op_raw} {target}，你将赢得 {amount} 现金；否则你将输掉同等金额。"
+                risk = "HIGH"
+
         if contract is None:
             template_id = "UNKNOWN"
             questions.extend(
@@ -253,6 +320,7 @@ class ContractAgent:
         context: Dict[str, Any],
         llm: OpenRouterClient,
     ) -> ContractDraftResult | None:
+        print(f"[ContractAgent] Attempting LLM draft for {actor_id}...")
         system = (
             "你是一个财务经理(Contract Agent)。你的任务是把用户自然语言指令翻译为可执行的契约草案。"
             "你必须只输出 JSON，不要输出其它任何文字。"
@@ -275,11 +343,14 @@ class ContractAgent:
         try:
             resp = llm.chat_completions(system=system, user=user, temperature=0.2, max_tokens=800)
             text = extract_first_message_text(resp)
+            print(f"[ContractAgent] LLM Raw Response: {text[:200]}...")
             obj = json.loads(text)
-        except Exception:
+        except Exception as exc:
+            print(f"[ContractAgent] LLM error or parsing failed: {exc}")
             return None
 
         if not isinstance(obj, dict):
+            print("[ContractAgent] LLM returned non-dict object")
             return None
 
         template_id = str(obj.get("template_id") or "LLM")

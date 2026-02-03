@@ -35,17 +35,38 @@ def _parse_bool(value: str | None, default: bool = False) -> bool:
 def load_game_time_config_from_env() -> GameTimeConfig:
     enabled = _parse_bool(os.getenv("IF_GAME_TIME_ENABLED"), default=True)
 
-    epoch_raw = os.getenv("IF_GAME_EPOCH_UTC")
-    if epoch_raw:
-        try:
-            epoch = datetime.fromisoformat(epoch_raw)
-            if epoch.tzinfo is None:
-                epoch = epoch.replace(tzinfo=timezone.utc)
-            epoch = epoch.astimezone(timezone.utc)
-        except Exception:
+    epoch = None
+    if enabled:
+        from ifrontier.infra.sqlite.db import get_connection
+        conn = get_connection()
+        row = conn.execute("SELECT value FROM game_meta WHERE key = 'epoch_utc'").fetchone()
+        if row:
+            try:
+                epoch = datetime.fromisoformat(row[0])
+                if epoch.tzinfo is None:
+                    epoch = epoch.replace(tzinfo=timezone.utc)
+            except Exception:
+                epoch = None
+
+    if epoch is None:
+        epoch_raw = os.getenv("IF_GAME_EPOCH_UTC")
+        if epoch_raw:
+            try:
+                epoch = datetime.fromisoformat(epoch_raw)
+                if epoch.tzinfo is None:
+                    epoch = epoch.replace(tzinfo=timezone.utc)
+                epoch = epoch.astimezone(timezone.utc)
+            except Exception:
+                epoch = _DEFAULT_EPOCH_UTC
+        else:
             epoch = _DEFAULT_EPOCH_UTC
-    else:
-        epoch = _DEFAULT_EPOCH_UTC
+        
+        # Persist if enabled
+        if enabled:
+            from ifrontier.infra.sqlite.db import get_connection
+            conn = get_connection()
+            with conn:
+                conn.execute("INSERT OR REPLACE INTO game_meta(key, value) VALUES ('epoch_utc', ?)", (epoch.isoformat(),))
 
     seconds_per_game_day = int(os.getenv("IF_SECONDS_PER_GAME_DAY") or "1200")
     if seconds_per_game_day <= 0:

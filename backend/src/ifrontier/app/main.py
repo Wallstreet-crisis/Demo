@@ -10,6 +10,7 @@ from ifrontier.services.rule_scheduler import ContractRuleScheduler
 from ifrontier.services.news_tick_scheduler import NewsTickScheduler
 from ifrontier.services.market_session_scheduler import MarketSessionScheduler
 from ifrontier.services.hosting_scheduler import HostingScheduler
+from ifrontier.services.market_maker_scheduler import MarketMakerScheduler
  
  
 def create_app() -> FastAPI:
@@ -44,6 +45,11 @@ def create_app() -> FastAPI:
             broadcaster=_make_news_broadcaster(hub),
         )
 
+        market_maker_scheduler = MarketMakerScheduler(
+            tick_interval_seconds=5.0,
+            broadcaster=_make_news_broadcaster(hub),
+        )
+
         hosting_scheduler = HostingScheduler(
             min_players=8,
             tick_interval_seconds=1.0,
@@ -58,11 +64,13 @@ def create_app() -> FastAPI:
         scheduler.start()
         news_scheduler.start()
         market_session_scheduler.start()
+        market_maker_scheduler.start()
         hosting_scheduler.start()
         try:
             yield
         finally:
             await hosting_scheduler.stop()
+            await market_maker_scheduler.stop()
             api_module._hosting_scheduler = None
             await market_session_scheduler.stop()
             await news_scheduler.stop()

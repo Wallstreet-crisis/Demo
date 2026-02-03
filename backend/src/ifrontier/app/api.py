@@ -638,13 +638,19 @@ class PlayerOrderResponse(BaseModel):
 @router.post("/orders/limit")
 async def submit_player_limit_order(req: PlayerLimitOrderRequest) -> PlayerOrderResponse:
     account_id = f"user:{req.player_id}"
-    order_id, _ = submit_limit_order(
+    order_id, matches = submit_limit_order(
         account_id=account_id,
         symbol=req.symbol,
         side=req.side,
         price=req.price,
         quantity=req.quantity,
     )
+    # 广播成交事件
+    for m in matches:
+        ev = m.executed_event.model_dump()
+        await hub.broadcast_json("events", ev)
+        await hub.broadcast_json(str(ev.get("event_type")), ev)
+
     return PlayerOrderResponse(order_id=order_id)
 
 
@@ -659,12 +665,17 @@ class PlayerMarketOrderRequest(BaseModel):
 async def submit_player_market_order(req: PlayerMarketOrderRequest) -> None:
     account_id = f"user:{req.player_id}"
     try:
-        submit_market_order(
+        matches = submit_market_order(
             account_id=account_id,
             symbol=req.symbol,
             side=req.side,
             quantity=req.quantity,
         )
+        # 广播成交事件
+        for m in matches:
+            ev = m.executed_event.model_dump()
+            await hub.broadcast_json("events", ev)
+            await hub.broadcast_json(str(ev.get("event_type")), ev)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -688,28 +699,28 @@ async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountRespons
     conn = get_connection()
 
     row = conn.execute("SELECT 1 FROM accounts WHERE account_id = ?", (account_id,)).fetchone()
-    exists = row is not None
+    if row:
+        raise HTTPException(status_code=400, detail="Player already bootstrapped")
 
-    if not exists:
-        initial_cash = float(req.initial_cash) if req.initial_cash is not None else 10000.0
-        positions: Dict[str, float] = {}
+    initial_cash = float(req.initial_cash) if req.initial_cash is not None else 10000.0
+    positions: Dict[str, float] = {}
 
-        if req.caste_id is not None:
-            cfg = get_caste_config(req.caste_id)
-            if cfg is not None:
-                initial_cash = float(cfg.initial_cash)
-                positions = dict(cfg.initial_positions)
+    if req.caste_id is not None:
+        cfg = get_caste_config(req.caste_id)
+        if cfg is not None:
+            initial_cash = float(cfg.initial_cash)
+            positions = dict(cfg.initial_positions)
 
-        create_account(account_id, owner_type="user", initial_cash=float(initial_cash))
+    create_account(account_id, owner_type="user", initial_cash=float(initial_cash))
 
-        if positions:
-            with conn:
-                for symbol, qty in positions.items():
-                    conn.execute(
-                        "INSERT INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?) "
-                        "ON CONFLICT(account_id, symbol) DO UPDATE SET quantity = quantity + excluded.quantity",
-                        (account_id, symbol, qty),
-                    )
+    if positions:
+        with conn:
+            for symbol, qty in positions.items():
+                conn.execute(
+                    "INSERT INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?) "
+                    "ON CONFLICT(account_id, symbol) DO UPDATE SET quantity = quantity + excluded.quantity",
+                    (account_id, symbol, qty),
+                )
 
     snap = get_snapshot(account_id)
     return PlayerAccountResponse(account_id=snap.account_id, cash=snap.cash, positions=snap.positions)
@@ -1785,6 +1796,10 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
         )
 
     # 普通卡：等效“随机拾到”，只投递给购买者，后续靠其手动助推传播
+    initial_text = req.initial_text
+    if not initial_text:
+        initial_text = _news_service.get_preset_template(kind=str(req.kind), symbols=req.symbols or [])
+
     card_id, card_event = _news_service.create_card(
         kind=req.kind,
         image_anchor_id=req.image_anchor_id,
@@ -1801,7 +1816,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     variant_id, variant_event = _news_service.emit_variant(
         card_id=card_id,
         author_id=req.buyer_user_id,
-        text=req.initial_text or "",
+        text=initial_text,
         parent_variant_id=None,
         influence_cost=0.0,
         risk_roll=None,

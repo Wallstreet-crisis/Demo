@@ -40,6 +40,11 @@ def init_schema() -> None:
             created_at TEXT NOT NULL,
             FOREIGN KEY (account_id) REFERENCES accounts(account_id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS game_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
         """
     )
 

@@ -79,7 +79,7 @@ def submit_limit_order(
 
         trade_price = opp.price  # 吃对手价
 
-        # 构造 trade.executed 事件（这里只构造 JSON 视图即可）
+        # 构造 trade.executed 事件
         payload = {
             "buy_account_id": account_id if side == "BUY" else opp.account_id,
             "sell_account_id": opp.account_id if side == "BUY" else account_id,
@@ -97,6 +97,8 @@ def submit_limit_order(
             actor={"agent_id": "matching-engine"},
             payload=payload,
         )
+
+        print(f"[MatchingEngine] TRADE_EXECUTED: {symbol} {trade_qty} @ {trade_price} ({payload['buy_account_id']} <- {payload['sell_account_id']})")
 
         # 账本记账
         apply_trade_executed(

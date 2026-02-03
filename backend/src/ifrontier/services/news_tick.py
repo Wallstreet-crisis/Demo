@@ -255,14 +255,7 @@ class NewsTickEngine:
                 correlation_id=None,
             )
 
-            omen_text = rnd.choice(
-                [
-                    "外交关系降级。",
-                    "预备役到位。",
-                    "港口开始管制。",
-                    "边境出现异常调动。",
-                ]
-            )
+            omen_text = self._news.get_preset_template(kind="OMEN", symbols=[])
             omen_variant_id, omen_variant_event = self._news.emit_variant(
                 card_id=omen_card_id,
                 author_id="system",
@@ -316,7 +309,11 @@ class NewsTickEngine:
             aborted = rnd.random() < abort_probability
             outcome = "ABORTED" if aborted else "RESOLVED"
 
-            final_text = "全面战争爆发。" if not aborted else "全面战争事件流产。"
+            if not aborted:
+                final_text = self._news.get_preset_template(kind="MAJOR_EVENT", symbols=[])
+            else:
+                final_text = "计划中的重大事件由于未知干扰已流产。"
+
             final_variant_id, final_variant_event = self._news.emit_variant(
                 card_id=major_card_id,
                 author_id="system",

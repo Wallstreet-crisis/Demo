@@ -29,7 +29,7 @@ class OpenRouterClient:
         if not api_key:
             return None
 
-        model = os.getenv("OPENROUTER_MODEL") or "google/gemini-2.5-flash"
+        model = os.getenv("OPENROUTER_MODEL") or "google/gemini-flash-2.5"
         base_url = os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1"
         timeout = float(os.getenv("OPENROUTER_TIMEOUT_SECONDS") or "20")
 
@@ -46,6 +46,7 @@ class OpenRouterClient:
         max_tokens: int = 300,
         extra_headers: Dict[str, str] | None = None,
     ) -> Dict[str, Any]:
+        print(f"[LLM] Calling OpenRouter with model: {self._cfg.model}")
         url = f"{self._cfg.base_url}/chat/completions"
         body = {
             "model": self._cfg.model,
