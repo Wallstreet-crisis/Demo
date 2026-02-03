@@ -15,16 +15,92 @@ from ifrontier.domain.events.payloads import (
     ContractCreatedPayload,
     ContractProposalApprovedPayload,
     ContractProposalCreatedPayload,
+    ContractDefaultedPayload,
     ContractSettledPayload,
     ContractSignedPayload,
     ContractRuleExecutedPayload
 )
 from ifrontier.domain.events.types import EventType
 from ifrontier.infra.neo4j.event_store import Neo4jEventStore
-from ifrontier.infra.sqlite.ledger import ContractTransfer, apply_contract_transfers
+from ifrontier.infra.sqlite.ledger import ContractTransfer, apply_contract_transfers, get_snapshot
 from ifrontier.services.contract_rules import eval_condition, parse_transfers, should_run
 
+
 class ContractService:
+
+    @staticmethod
+    def _apply_default_partial_fill(
+        *,
+        transfers: List[ContractTransfer],
+        default_policy: Dict[str, Any] | None,
+    ) -> tuple[List[ContractTransfer], float, Dict[str, Any]]:
+        if not transfers:
+            raise ValueError("transfers must be non-empty")
+
+        dp = default_policy if isinstance(default_policy, dict) else {}
+        params = dp.get("params") if isinstance(dp.get("params"), dict) else {}
+        min_fill_ratio = float(params.get("min_fill_ratio") or 0.0)
+
+        required_by_key: Dict[tuple[str, str, str], float] = {}
+        required_by_from: Dict[str, Dict[str, float]] = {}
+        for t in transfers:
+            key = (t.from_account_id, t.asset_type, t.symbol)
+            required_by_key[key] = float(required_by_key.get(key) or 0.0) + float(t.quantity)
+            from_map = required_by_from.get(t.from_account_id)
+            if from_map is None:
+                from_map = {}
+                required_by_from[t.from_account_id] = from_map
+            k2 = f"{t.asset_type}:{t.symbol}"
+            from_map[k2] = float(from_map.get(k2) or 0.0) + float(t.quantity)
+
+        ratios: List[float] = []
+        for (from_id, asset_type, symbol), req in required_by_key.items():
+            if req <= 0:
+                continue
+            snap = get_snapshot(from_id)
+            if asset_type == "CASH":
+                avail = float(snap.cash)
+            else:
+                avail = float(snap.positions.get(symbol, 0.0))
+            ratios.append(avail / float(req))
+
+        if not ratios:
+            global_ratio = 1.0
+        else:
+            global_ratio = min(1.0, float(min(ratios)))
+
+        if global_ratio < min_fill_ratio:
+            global_ratio = 0.0
+
+        scaled: List[ContractTransfer] = []
+        for t in transfers:
+            q = float(t.quantity) * float(global_ratio)
+            if q <= 1e-9:
+                continue
+            scaled.append(
+                ContractTransfer(
+                    from_account_id=t.from_account_id,
+                    to_account_id=t.to_account_id,
+                    asset_type=t.asset_type,
+                    symbol=t.symbol,
+                    quantity=float(q),
+                )
+            )
+
+        shortfall_by_from: Dict[str, Any] = {}
+        for from_id, items in required_by_from.items():
+            for k2, req in items.items():
+                exec_q = float(req) * float(global_ratio)
+                short = float(req) - float(exec_q)
+                if short <= 1e-9:
+                    continue
+                m = shortfall_by_from.get(from_id)
+                if m is None:
+                    m = {}
+                    shortfall_by_from[from_id] = m
+                m[k2] = float(short)
+
+        return scaled, float(global_ratio), shortfall_by_from
 
     def __init__(self, driver: Driver, event_store: Neo4jEventStore) -> None:
         self._driver = driver
@@ -50,7 +126,6 @@ class ContractService:
         mode = (participation_mode or ParticipationMode.ALL_SIGNERS.value).upper()
         invited = invited_parties or []
 
-        # Neo4j: 创建 Contract 节点
         with self._driver.session() as session:
             session.execute_write(
                 self._create_contract_tx,
@@ -129,14 +204,12 @@ class ContractService:
                 }
             )
 
-        # 单个 Neo4j 写事务内批量创建
         with self._driver.session() as session:
             session.execute_write(
                 self._create_contracts_batch_tx,
                 {"contracts": specs},
             )
 
-        # 写事件（事件写入本身不要求与 Neo4j 在同一事务，否则会复杂很多）
         for spec in specs:
             payload = ContractCreatedPayload(
                 contract_id=spec["contract_id"],
@@ -257,7 +330,6 @@ class ContractService:
         )
         self._event_store.append(EventEnvelopeJson.from_envelope(env))
 
-        # record contains final status & applied flag
         return dict(record)
 
     def sign_contract(self, *, contract_id: str, signer: str) -> ContractStatus:
@@ -317,6 +389,10 @@ class ContractService:
             raise ValueError("contract not found")
 
         status = str(record.get("status") or "")
+        if status == ContractStatus.SETTLED.value:
+            return
+        if status == ContractStatus.DEFAULTED.value:
+            raise ValueError("contract defaulted")
         if status != ContractStatus.ACTIVE.value:
             raise ValueError("contract not active")
 
@@ -344,14 +420,40 @@ class ContractService:
                 )
             )
 
-        settlement_event_id = str(uuid4())
-        apply_contract_transfers(transfers=transfers, event_id=settlement_event_id)
-
-        payload = ContractSettledPayload(
-            contract_id=contract_id,
-            settlement_event_id=settlement_event_id,
-            settled_at=now,
+        default_policy = terms.get("default_policy") if isinstance(terms, dict) else None
+        scaled, fill_ratio, shortfall_by_from = self._apply_default_partial_fill(
+            transfers=transfers,
+            default_policy=default_policy if isinstance(default_policy, dict) else None,
         )
+
+        settlement_event_id = str(uuid4())
+        if scaled:
+            apply_contract_transfers(transfers=scaled, event_id=settlement_event_id)
+
+        new_status = ContractStatus.SETTLED.value if fill_ratio >= 1.0 - 1e-9 else ContractStatus.DEFAULTED.value
+        with self._driver.session() as session:
+            session.execute_write(
+                self._set_contract_status_tx,
+                {"contract_id": contract_id, "status": new_status, "updated_at": now.isoformat()},
+            )
+
+        if new_status == ContractStatus.DEFAULTED.value:
+            payload = ContractDefaultedPayload(
+                contract_id=contract_id,
+                settlement_event_id=settlement_event_id,
+                fill_ratio=float(fill_ratio),
+                shortfall_by_from=shortfall_by_from,
+                defaulted_at=now,
+            )
+            env = EventEnvelope(
+                event_type=EventType.CONTRACT_DEFAULTED,
+                correlation_id=uuid4(),
+                actor=EventActor(user_id=actor_id),
+                payload=payload,
+            )
+            self._event_store.append(EventEnvelopeJson.from_envelope(env))
+
+        payload = ContractSettledPayload(contract_id=contract_id, settlement_event_id=settlement_event_id, settled_at=now)
         env = EventEnvelope(
             event_type=EventType.CONTRACT_SETTLED,
             correlation_id=uuid4(),
@@ -373,6 +475,10 @@ class ContractService:
             raise ValueError("contract not found")
 
         status = str(record.get("status") or "")
+        if status == ContractStatus.SETTLED.value:
+            return
+        if status == ContractStatus.DEFAULTED.value:
+            raise ValueError("contract defaulted")
         if status != ContractStatus.ACTIVE.value:
             raise ValueError("contract not active")
 
@@ -397,7 +503,9 @@ class ContractService:
             raise ValueError("invalid contract rule_state")
 
         state_changed = False
+        defaulted = False
         for rule in rules_raw:
+
             if not isinstance(rule, dict):
                 raise ValueError("invalid rule")
             rule_id = str(rule.get("rule_id") or "")
@@ -457,8 +565,18 @@ class ContractService:
                 raise ValueError("invalid actions")
 
             transfers = parse_transfers(actions.get("transfers"))
+            default_policy = terms.get("default_policy") if isinstance(terms, dict) else None
+            scaled, fill_ratio, shortfall_by_from = self._apply_default_partial_fill(
+                transfers=transfers,
+                default_policy=default_policy if isinstance(default_policy, dict) else None,
+            )
+
             settlement_event_id = str(uuid4())
-            apply_contract_transfers(transfers=transfers, event_id=settlement_event_id)
+            if scaled:
+                apply_contract_transfers(transfers=scaled, event_id=settlement_event_id)
+
+            if fill_ratio < 1.0 - 1e-9:
+                defaulted = True
 
             runs = int(st.get("runs") or 0) + 1
             st["runs"] = runs
@@ -483,6 +601,23 @@ class ContractService:
             )
             self._event_store.append(EventEnvelopeJson.from_envelope(env))
 
+            if defaulted:
+                payload = ContractDefaultedPayload(
+                    contract_id=contract_id,
+                    settlement_event_id=settlement_event_id,
+                    fill_ratio=float(fill_ratio),
+                    shortfall_by_from=shortfall_by_from,
+                    defaulted_at=now,
+                )
+                env = EventEnvelope(
+                    event_type=EventType.CONTRACT_DEFAULTED,
+                    correlation_id=uuid4(),
+                    actor=EventActor(user_id=actor_id),
+                    payload=payload,
+                )
+                self._event_store.append(EventEnvelopeJson.from_envelope(env))
+                break
+
         if state_changed:
             with self._driver.session() as session:
                 session.execute_write(
@@ -493,6 +628,69 @@ class ContractService:
                         "updated_at": now.isoformat(),
                     },
                 )
+
+        if defaulted:
+            with self._driver.session() as session:
+                session.execute_write(
+                    self._set_contract_status_tx,
+                    {"contract_id": contract_id, "status": ContractStatus.DEFAULTED.value, "updated_at": now.isoformat()},
+                )
+            return
+
+        all_exhausted = True
+        for rule in rules_raw:
+            if not isinstance(rule, dict):
+                continue
+            rule_id = str(rule.get("rule_id") or "")
+            if not rule_id:
+                all_exhausted = False
+                break
+
+            schedule = rule.get("schedule") or {"type": "once"}
+            if not isinstance(schedule, dict):
+                all_exhausted = False
+                break
+
+            st = rule_state.get(rule_id) or {}
+            if not isinstance(st, dict):
+                all_exhausted = False
+                break
+
+            stype = str(schedule.get("type") or "once")
+            runs_now = int(st.get("runs") or 0)
+            if stype == "once":
+                if runs_now < 1:
+                    all_exhausted = False
+                    break
+            elif stype == "interval":
+                max_runs = schedule.get("max_runs")
+                if max_runs is None:
+                    all_exhausted = False
+                    break
+                if runs_now < int(max_runs):
+                    all_exhausted = False
+                    break
+            else:
+                all_exhausted = False
+                break
+
+        if all_exhausted:
+            with self._driver.session() as session:
+                session.execute_write(
+                    self._set_contract_status_tx,
+                    {"contract_id": contract_id, "status": ContractStatus.SETTLED.value, "updated_at": now.isoformat()},
+                )
+
+    @staticmethod
+    def _set_contract_status_tx(tx, params: Dict[str, Any]) -> None:
+        tx.run(
+            """
+            MATCH (c:Contract {contract_id: $contract_id})
+            SET c.status = $status,
+                c.updated_at = $updated_at
+            """,
+            **params,
+        )
 
     @staticmethod
     def _create_contract_tx(tx, params: Dict[str, Any]) -> None:
@@ -578,7 +776,6 @@ class ContractService:
 
     @staticmethod
     def _approve_proposal_tx(tx, params: Dict[str, Any]):
-        # 当 contract.parties 全员批准时，自动应用提案
         record = tx.run(
             """
             MATCH (c:Contract {contract_id: $contract_id})-[:HAS_PROPOSAL]->(p:ContractProposal {proposal_id: $proposal_id})
@@ -611,7 +808,6 @@ class ContractService:
 
     @staticmethod
     def _sign_contract_tx(tx, params: Dict[str, Any]):
-        # 规则：只允许 DRAFT/SIGNED 签署；签署集合去重；若 required_signers 全部签完则置 SIGNED
         result = tx.run(
             """
             MATCH (c:Contract {contract_id: $contract_id})

@@ -10,8 +10,9 @@ class ContractStatus(str, Enum):
     DRAFT = "DRAFT"
     SIGNED = "SIGNED"
     ACTIVE = "ACTIVE"
+    SETTLED = "SETTLED"
+    DEFAULTED = "DEFAULTED"
 
-    # 通过提案机制触发的状态变更（先实现骨架，不内置业务判定）
     SUSPENDED = "SUSPENDED"
     TERMINATED = "TERMINATED"
     FAILED = "FAILED"

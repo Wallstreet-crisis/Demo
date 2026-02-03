@@ -30,7 +30,6 @@ class ContractAgent:
         if not isinstance(terms, dict):
             terms = {"transfers": [], "rules": []}
 
-        # 强制默认接入：DEFAULT_PARTIAL_FILL（参数可按合约设计调整）
         dp = terms.get("default_policy")
         if not isinstance(dp, dict):
             dp = {}
@@ -43,7 +42,6 @@ class ContractAgent:
         dp["params"] = params
         terms["default_policy"] = dp
 
-        # 预留位置：DEFAULT_LIQUIDATE_THEN_HAIRCUT（尚未实现，仅占位）
         reserved = terms.get("reserved_default_policies")
         if not isinstance(reserved, list):
             reserved = []

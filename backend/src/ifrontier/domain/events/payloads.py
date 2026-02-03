@@ -285,6 +285,14 @@ class ContractSettledPayload(BaseModel):
     settled_at: datetime
 
 
+class ContractDefaultedPayload(BaseModel):
+    contract_id: str
+    settlement_event_id: str
+    fill_ratio: float
+    shortfall_by_from: Dict[str, Any]
+    defaulted_at: datetime
+
+
 class ContractRuleExecutedPayload(BaseModel):
     contract_id: str
     rule_id: str

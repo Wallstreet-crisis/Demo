@@ -280,13 +280,13 @@ def test_contract_settle_fails_and_rolls_back_on_insufficient_assets() -> None:
     before_bob = get_snapshot("user:bob")
 
     resp = client.post(f"/contracts/{contract_id}/settle", json={"actor_id": "user:alice"})
-    assert resp.status_code == 400
+    assert resp.status_code == 200
 
     after_alice = get_snapshot("user:alice")
     after_bob = get_snapshot("user:bob")
 
-    assert after_alice.cash == before_alice.cash
-    assert after_bob.cash == before_bob.cash
+    assert after_alice.cash == 0.0
+    assert after_bob.cash == 50.0
 
 
 def test_contract_run_rules_once_executes_transfers_and_does_not_repeat() -> None:

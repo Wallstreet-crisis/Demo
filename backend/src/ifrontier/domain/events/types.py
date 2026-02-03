@@ -54,6 +54,8 @@ class EventType(str, Enum):
 
     CONTRACT_SETTLED = "contract.settled"
 
+    CONTRACT_DEFAULTED = "contract.defaulted"
+
     CONTRACT_RULE_EXECUTED = "contract.rule_executed"
 
     DISCLOSURE_EMITTED = "disclosure.emitted"
