@@ -669,6 +669,46 @@ class PlayerAccountResponse(BaseModel):
     positions: Dict[str, float]
 
 
+class PlayerBootstrapRequest(BaseModel):
+    player_id: str
+    initial_cash: float | None = None
+    caste_id: str | None = None
+
+
+@router.post("/players/bootstrap")
+async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountResponse:
+    # 幂等：如果已存在则不重复发放初始资产
+    account_id = f"user:{req.player_id}"
+    conn = get_connection()
+
+    row = conn.execute("SELECT 1 FROM accounts WHERE account_id = ?", (account_id,)).fetchone()
+    exists = row is not None
+
+    if not exists:
+        initial_cash = float(req.initial_cash) if req.initial_cash is not None else 10000.0
+        positions: Dict[str, float] = {}
+
+        if req.caste_id is not None:
+            cfg = get_caste_config(req.caste_id)
+            if cfg is not None:
+                initial_cash = float(cfg.initial_cash)
+                positions = dict(cfg.initial_positions)
+
+        create_account(account_id, owner_type="user", initial_cash=float(initial_cash))
+
+        if positions:
+            with conn:
+                for symbol, qty in positions.items():
+                    conn.execute(
+                        "INSERT INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?) "
+                        "ON CONFLICT(account_id, symbol) DO UPDATE SET quantity = quantity + excluded.quantity",
+                        (account_id, symbol, qty),
+                    )
+
+    snap = get_snapshot(account_id)
+    return PlayerAccountResponse(account_id=snap.account_id, cash=snap.cash, positions=snap.positions)
+
+
 @router.get("/players/{player_id}/account")
 async def get_player_account(player_id: str) -> PlayerAccountResponse:
     account_id = f"user:{player_id}"

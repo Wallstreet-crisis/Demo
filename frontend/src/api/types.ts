@@ -48,6 +48,14 @@ export type PlayerAccountResponse = {
   positions: Record<string, number>
 }
 
+export type PlayerBootstrapRequest = {
+  player_id: string
+  initial_cash?: number | null
+  caste_id?: string | null
+}
+
+export type PlayerBootstrapResponse = PlayerAccountResponse
+
 export type AccountValuationResponse = {
   account_id: string
   cash: number

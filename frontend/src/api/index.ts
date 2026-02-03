@@ -43,6 +43,8 @@ import type {
   NewsTickRequest,
   NewsTickResponse,
   PlayerAccountResponse,
+  PlayerBootstrapRequest,
+  PlayerBootstrapResponse,
   PlayerLimitOrderRequest,
   PlayerMarketOrderRequest,
   PlayerOrderResponse,
@@ -72,6 +74,8 @@ export const Api = {
   submitMarketOrder: async (req: PlayerMarketOrderRequest) => {
     await api.post<unknown>('/orders/market', req)
   },
+
+  playersBootstrap: (req: PlayerBootstrapRequest) => api.post<PlayerBootstrapResponse>('/players/bootstrap', req),
 
   playerAccount: (player_id: string) => api.get<PlayerAccountResponse>(`/players/${encodeURIComponent(player_id)}/account`),
   accountValuation: (account_id: string, discount_factor = 1.0) =>
