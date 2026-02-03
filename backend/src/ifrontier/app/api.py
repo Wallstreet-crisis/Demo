@@ -1378,6 +1378,7 @@ class NewsChainStartRequest(BaseModel):
     kind: str
     actor_id: str
     t0_seconds: int = 60
+    t0_at: str | None = None
     omen_interval_seconds: int = 10
     abort_probability: float = 0.3
     grant_count: int = 2
@@ -1394,10 +1395,14 @@ class NewsChainStartResponse(BaseModel):
 @router.post("/news/chains/start")
 async def news_chain_start(req: NewsChainStartRequest) -> NewsChainStartResponse:
     try:
+        t0_at = None
+        if req.t0_at is not None:
+            t0_at = datetime.fromisoformat(req.t0_at)
         result = _news_tick_engine.start_chain(
             kind=req.kind,
             actor_id=req.actor_id,
             t0_seconds=req.t0_seconds,
+            t0_at=t0_at,
             omen_interval_seconds=req.omen_interval_seconds,
             abort_probability=req.abort_probability,
             grant_count=req.grant_count,
@@ -1570,6 +1575,7 @@ class NewsStorePurchaseRequest(BaseModel):
 
     # Only used for MAJOR_EVENT
     t0_seconds: int = 60
+    t0_at: str | None = None
     omen_interval_seconds: int = 10
     abort_probability: float = 0.3
     grant_count: int = 2
@@ -1599,10 +1605,14 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     # MAJOR_EVENT：购买即创建事件链，T0 延迟广播；不立即投递给所有人
     if str(req.kind) == "MAJOR_EVENT":
         try:
+            t0_at = None
+            if req.t0_at is not None:
+                t0_at = datetime.fromisoformat(req.t0_at)
             result = _news_tick_engine.start_chain(
                 kind=req.kind,
                 actor_id=req.buyer_user_id,
                 t0_seconds=req.t0_seconds,
+                t0_at=t0_at,
                 omen_interval_seconds=req.omen_interval_seconds,
                 abort_probability=req.abort_probability,
                 grant_count=req.grant_count,

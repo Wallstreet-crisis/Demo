@@ -50,6 +50,7 @@ class NewsTickEngine:
         kind: str,
         actor_id: str,
         t0_seconds: int,
+        t0_at: datetime | None = None,
         omen_interval_seconds: int,
         abort_probability: float,
         grant_count: int,
@@ -67,7 +68,15 @@ class NewsTickEngine:
 
         now = datetime.now(timezone.utc)
         chain_id = str(uuid4())
-        t0_at = now + timedelta(seconds=int(t0_seconds))
+        min_t0_at = now + timedelta(seconds=int(t0_seconds))
+        if t0_at is None:
+            t0_at = min_t0_at
+        else:
+            if t0_at.tzinfo is None:
+                t0_at = t0_at.replace(tzinfo=timezone.utc)
+            t0_at = t0_at.astimezone(timezone.utc)
+            if t0_at < min_t0_at:
+                raise ValueError("t0_at must be >= now + t0_seconds")
         next_omen_at = now
 
         truth_payload = {
