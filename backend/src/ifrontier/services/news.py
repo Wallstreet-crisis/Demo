@@ -113,6 +113,7 @@ class NewsService:
                     "parent_variant_id": parent_variant_id,
                     "author_id": author_id,
                     "text": text,
+                    "mutation_depth": 0,
                     "influence_cost": float(influence_cost),
                     "risk_roll_json": json.dumps(risk_roll or {}, ensure_ascii=False),
                     "created_at": now.isoformat(),
@@ -468,6 +469,7 @@ class NewsService:
             MERGE (v:NewsVariant {variant_id: $variant_id})
             SET v.text = $text,
                 v.author_id = $author_id,
+                v.mutation_depth = $mutation_depth,
                 v.influence_cost = $influence_cost,
                 v.risk_roll_json = $risk_roll_json,
                 v.created_at = $created_at
@@ -491,6 +493,7 @@ class NewsService:
             MERGE (v:NewsVariant {variant_id: $new_variant_id})
             SET v.text = $new_text,
                 v.author_id = $editor_id,
+                v.mutation_depth = CASE WHEN p.mutation_depth IS NULL THEN 1 ELSE toInteger(p.mutation_depth) + 1 END,
                 v.influence_cost = $influence_cost,
                 v.risk_roll_json = $risk_roll_json,
                 v.created_at = $mutated_at
@@ -606,6 +609,7 @@ class NewsService:
             """
             MATCH (c:NewsCard)-[:HAS_VARIANT]->(v:NewsVariant {variant_id: $variant_id})
             RETURN v.text AS text,
+                   CASE WHEN v.mutation_depth IS NULL THEN 0 ELSE toInteger(v.mutation_depth) END AS mutation_depth,
                    c.symbols AS symbols
             """,
             **params,

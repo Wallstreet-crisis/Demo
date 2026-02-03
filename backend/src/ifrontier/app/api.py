@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import UUID, uuid4
@@ -1239,6 +1240,7 @@ class NewsMutateVariantRequest(BaseModel):
     editor_id: str
     new_text: str
     influence_cost: float = 0.0
+    spend_cash: float | None = None
     risk_roll: Dict[str, Any] | None = None
     correlation_id: UUID | None = None
 
@@ -1251,12 +1253,23 @@ class NewsMutateVariantResponse(BaseModel):
 
 @router.post("/news/variants/mutate")
 async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVariantResponse:
+    # 按字计费（现金），并把成本写入 influence_cost 做审计。
+    unit_cash = float(os.getenv("IF_NEWS_MUTATE_CASH_PER_CHAR") or "0.1")
+    char_count = len(req.new_text or "")
+    cash_cost = float(req.spend_cash) if req.spend_cash is not None else float(char_count) * float(unit_cash)
+
+    if cash_cost > 0:
+        try:
+            spend_cash(account_id=req.editor_id, amount=float(cash_cost), event_id=str(uuid4()))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     try:
         new_variant_id, event_json = _news_service.mutate_variant(
             parent_variant_id=req.parent_variant_id,
             editor_id=req.editor_id,
             new_text=req.new_text,
-            influence_cost=req.influence_cost,
+            influence_cost=float(cash_cost),
             risk_roll=req.risk_roll,
             correlation_id=req.correlation_id,
         )
@@ -1278,6 +1291,7 @@ class NewsPropagateRequest(BaseModel):
     from_actor_id: str
     visibility_level: str = "NORMAL"
     spend_influence: float = 0.0
+    spend_cash: float | None = None
     limit: int = 50
     correlation_id: UUID | None = None
 
@@ -1289,13 +1303,43 @@ class NewsPropagateResponse(BaseModel):
 
 @router.post("/news/propagate")
 async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
+    # 若提供 spend_cash，则按 mutation_depth 提高单次投递成本，并用预算限制可投递人数。
+    limit = int(req.limit)
+    if req.spend_cash is not None:
+        ctx = _news_service.get_variant_context(variant_id=req.variant_id) or {}
+        depth = int(ctx.get("mutation_depth") or 0)
+
+        unit_per_delivery = float(os.getenv("IF_NEWS_PROPAGATE_CASH_PER_DELIVERY") or "1.0")
+        depth_multiplier = float(os.getenv("IF_NEWS_PROPAGATE_MUTATION_MULT") or "0.5")
+        multiplier = 1.0 + float(depth) * float(depth_multiplier)
+
+        per_delivery_cost = float(unit_per_delivery) * float(multiplier)
+        budget = float(req.spend_cash)
+        if budget <= 0:
+            raise HTTPException(status_code=400, detail="spend_cash must be > 0")
+        if per_delivery_cost <= 0:
+            raise HTTPException(status_code=400, detail="invalid propagate cost config")
+
+        affordable = int(budget // per_delivery_cost)
+        if affordable < 0:
+            affordable = 0
+        if affordable < limit:
+            limit = affordable
+
+        if limit > 0:
+            total_cost = per_delivery_cost * float(limit)
+            try:
+                spend_cash(account_id=req.from_actor_id, amount=float(total_cost), event_id=str(uuid4()))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     try:
         delivered_events = _news_service.propagate_to_followers(
             variant_id=req.variant_id,
             from_actor_id=req.from_actor_id,
             visibility_level=req.visibility_level,
             spend_influence=req.spend_influence,
-            limit=req.limit,
+            limit=limit,
             correlation_id=req.correlation_id,
         )
     except ValueError as exc:
