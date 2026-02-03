@@ -25,6 +25,33 @@ class ContractDraftResult:
 
 
 class ContractAgent:
+    @staticmethod
+    def _ensure_default_policies(terms: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(terms, dict):
+            terms = {"transfers": [], "rules": []}
+
+        # 强制默认接入：DEFAULT_PARTIAL_FILL（参数可按合约设计调整）
+        dp = terms.get("default_policy")
+        if not isinstance(dp, dict):
+            dp = {}
+        dp.setdefault("kind", "DEFAULT_PARTIAL_FILL")
+        params = dp.get("params")
+        if not isinstance(params, dict):
+            params = {}
+        params.setdefault("min_fill_ratio", 0.0)
+        params.setdefault("penalty_bps", 0)
+        dp["params"] = params
+        terms["default_policy"] = dp
+
+        # 预留位置：DEFAULT_LIQUIDATE_THEN_HAIRCUT（尚未实现，仅占位）
+        reserved = terms.get("reserved_default_policies")
+        if not isinstance(reserved, list):
+            reserved = []
+        if not any(isinstance(x, dict) and x.get("kind") == "DEFAULT_LIQUIDATE_THEN_HAIRCUT" for x in reserved):
+            reserved.append({"kind": "DEFAULT_LIQUIDATE_THEN_HAIRCUT", "params": {}})
+        terms["reserved_default_policies"] = reserved
+        return terms
+
     def draft(self, *, actor_id: str, natural_language: str) -> ContractDraftResult:
         text = (natural_language or "").strip()
         if not text:
@@ -85,6 +112,7 @@ class ContractAgent:
                 ],
                 "rules": [],
             }
+            terms = self._ensure_default_policies(terms)
 
             contract = {
                 "actor_id": actor_id,
@@ -161,6 +189,7 @@ class ContractAgent:
                     "rules": [],
                     "pricing": {"price": price, "currency": "CASH"},
                 }
+                terms = self._ensure_default_policies(terms)
 
                 contract = {
                     "actor_id": actor_id,
@@ -192,7 +221,7 @@ class ContractAgent:
                 "actor_id": actor_id,
                 "kind": "UNKNOWN",
                 "title": "待澄清的契约草案",
-                "terms": {"transfers": [], "rules": []},
+                "terms": self._ensure_default_policies({"transfers": [], "rules": []}),
                 "parties": [actor_id],
                 "required_signers": [actor_id],
                 "participation_mode": "ALL_SIGNERS",
@@ -231,6 +260,7 @@ class ContractAgent:
             "你必须只输出 JSON，不要输出其它任何文字。"
             "契约草案需要是可编辑模块：kind/title/terms(parties/transfers/rules)/parties/required_signers/participation_mode/invited_parties。"
             "terms.transfers 是列表，元素包含 from/to/asset_type(CASH|EQUITY)/symbol/quantity。"
+            "terms 必须包含 default_policy（默认 DEFAULT_PARTIAL_FILL）以及 reserved_default_policies（包含 DEFAULT_LIQUIDATE_THEN_HAIRCUT 占位）。"
             "risk_rating 只能是 LOW/MEDIUM/HIGH。"
         )
 
@@ -262,6 +292,7 @@ class ContractAgent:
         contract_create.setdefault("terms", {"transfers": [], "rules": []})
         if not isinstance(contract_create.get("terms"), dict):
             contract_create["terms"] = {"transfers": [], "rules": []}
+        contract_create["terms"] = self._ensure_default_policies(dict(contract_create.get("terms") or {}))
 
         explanation = str(obj.get("explanation") or "")
         questions = obj.get("questions")
