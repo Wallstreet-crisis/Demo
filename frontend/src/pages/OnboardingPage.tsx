@@ -77,116 +77,118 @@ export default function OnboardingPage() {
   }
 
   function enterGame() {
-    nav('/market', { replace: true })
+    nav('/dashboard', { replace: true })
   }
 
   return (
-    <div className="card" style={{ 
+    <div className="cyber-card" style={{ 
       textAlign: 'center', 
-      maxWidth: 600, 
-      margin: '40px auto', 
-      padding: '40px 20px',
-      background: '#000',
-      color: '#0f0',
-      fontFamily: 'monospace',
-      border: '1px solid #0f0',
-      boxShadow: '0 0 20px rgba(0, 255, 0, 0.2)'
+      maxWidth: '500px', 
+      margin: '80px auto', 
+      padding: '40px',
+      background: 'var(--panel-bg)',
+      border: '1px solid var(--terminal-border)',
+      borderRadius: '4px'
     }}>
-      <h2 style={{ textShadow: '0 0 10px #0f0' }}>阶级分配系统 (The Great Lottery)</h2>
+      <h2 style={{ color: '#fff', fontSize: '20px', marginBottom: '8px' }}>IDENTITY_ASSIGNMENT</h2>
+      <div style={{ color: '#64748b', fontSize: '13px', marginBottom: '30px' }}>THE GREAT LOTTERY // PROTOCOL v4.2</div>
       
       {!resultCaste ? (
-        <div style={{ marginTop: 30 }}>
-          <div style={{ marginBottom: 20, fontSize: 14 }}>
-            请输入你的公民唯一识别码以启动分配程序
+        <div style={{ marginTop: '20px' }}>
+          <div style={{ marginBottom: '20px', fontSize: '14px', color: '#94a3b8' }}>
+            Enter citizen identification code to initiate allocation
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 15, alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
             <input 
               value={playerId} 
               onChange={(e) => setPlayerId(e.target.value)} 
-              placeholder="PLAYER_ID"
+              placeholder="CITIZEN_ID"
               disabled={isRolling}
+              className="cyber-input"
               style={{
-                background: '#111',
-                border: '1px solid #0f0',
-                color: '#0f0',
-                padding: '10px 20px',
-                fontSize: 18,
+                fontSize: '18px',
                 textAlign: 'center',
-                width: '80%'
+                width: '100%',
+                height: '48px',
+                letterSpacing: '2px'
               }}
             />
             
             <div style={{ 
-              height: 60, 
+              height: '60px', 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center',
-              fontSize: 24,
-              fontWeight: 'bold',
-              color: isRolling ? '#0f0' : '#333',
-              border: '1px solid #333',
-              width: '80%',
-              background: '#111'
+              fontSize: '20px',
+              fontWeight: '700',
+              color: isRolling ? 'var(--terminal-info)' : '#334155',
+              border: '1px solid var(--terminal-border)',
+              width: '100%',
+              background: 'var(--terminal-bg)',
+              borderRadius: '2px'
             }}>
-              {isRolling ? CASTES[rollIndex].label : '--- 等待初始化 ---'}
+              {isRolling ? CASTES[rollIndex].label.toUpperCase() : '--- WAITING_FOR_INIT ---'}
             </div>
 
             <button 
               onClick={startLottery} 
               disabled={!canSubmit}
+              className="cyber-button"
               style={{
-                padding: '12px 40px',
-                fontSize: 18,
-                background: canSubmit ? '#0f0' : '#333',
-                color: '#000',
+                width: '100%',
+                height: '48px',
+                fontSize: '16px',
+                background: canSubmit ? 'var(--terminal-info)' : '#1e293b',
+                color: '#fff',
                 border: 'none',
-                cursor: canSubmit ? 'pointer' : 'not-allowed',
-                fontWeight: 'bold'
+                fontWeight: '700',
+                opacity: canSubmit ? 1 : 0.5
               }}
             >
-              {isRolling ? '分配中...' : '启动分配程序'}
+              {isRolling ? 'ALLOCATING...' : 'INITIATE_ALLOCATION'}
             </button>
           </div>
         </div>
       ) : (
-        <div style={{ marginTop: 30, animation: 'fadeIn 0.5s' }}>
-          <div style={{ fontSize: 18, marginBottom: 10 }}>分配完成</div>
+        <div style={{ marginTop: '20px', animation: 'fadeIn 0.3s ease-out' }}>
+          <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '10px' }}>ALLOCATION_COMPLETE</div>
           <div style={{ 
-            fontSize: 32, 
-            fontWeight: 'bold', 
+            fontSize: '28px', 
+            fontWeight: '800', 
             color: resultCaste.color,
-            margin: '20px 0',
-            textShadow: `0 0 15px ${resultCaste.color}`
+            margin: '24px 0',
+            letterSpacing: '1px'
           }}>
-            {resultCaste.label}
+            {resultCaste.label.toUpperCase()}
           </div>
-          <div style={{ color: '#aaa', fontSize: 14, marginBottom: 30 }}>
+          <div style={{ color: '#cbd5e1', fontSize: '14px', marginBottom: '40px', lineHeight: '1.6' }}>
             {resultCaste.desc}
           </div>
           
           <button 
             onClick={enterGame}
+            className="cyber-button"
             style={{
-              padding: '12px 40px',
-              fontSize: 18,
+              width: '100%',
+              height: '48px',
+              fontSize: '16px',
               background: resultCaste.color,
               color: '#fff',
               border: 'none',
-              cursor: 'pointer',
-              fontWeight: 'bold'
+              fontWeight: '700'
             }}
           >
-            进入华尔街
+            ENTER_TERMINAL
           </button>
         </div>
       )}
 
-      {err ? <div style={{ color: '#ff4d4f', marginTop: 20 }}>[ERROR]: {err}</div> : null}
+      {err ? <div style={{ color: 'var(--terminal-error)', marginTop: '24px', fontSize: '13px', padding: '10px', background: 'rgba(239, 68, 68, 0.1)', borderLeft: '3px solid var(--terminal-error)' }}>[ERROR]: {err}</div> : null}
       
-      <div style={{ marginTop: 40, fontSize: 10, color: '#444', textAlign: 'left' }}>
-        SYSTEM_V2.0_IDENTITY_ASSIGNMENT_PROTOCOL<br/>
-        ENCRYPTION: AES-256-GCM<br/>
-        STATUS: {isRolling ? 'RUNNING...' : 'READY'}
+      <div style={{ marginTop: '40px', fontSize: '10px', color: '#475569', textAlign: 'left', borderTop: '1px solid var(--terminal-border)', paddingTop: '10px' }}>
+        STATUS: {isRolling ? 'EXECUTING_RANDOM_WALK' : 'IDLE'}<br/>
+        ENCRYPTION: RSA_4096_GCM<br/>
+        GATEWAY: WALLSTREET_MAIN_GRID
       </div>
     </div>
   )

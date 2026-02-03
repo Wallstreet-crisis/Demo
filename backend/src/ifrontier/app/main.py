@@ -21,6 +21,8 @@ def create_app() -> FastAPI:
         from ifrontier.app import api as api_module
         from ifrontier.app.ws import hub
 
+        api_module._news_service.init_news_seed_data()
+
         scheduler = ContractRuleScheduler(
             driver=api_module._driver,
             contract_service=api_module._contract_service,

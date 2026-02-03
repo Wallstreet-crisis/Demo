@@ -26,36 +26,40 @@ export default function CyberWidget({
         height: height || '100%', 
         display: 'flex', 
         flexDirection: 'column',
+        border: '1px solid var(--terminal-border)',
+        boxShadow: 'none',
+        background: 'var(--panel-bg)',
         ...style 
       }}
     >
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
-        alignItems: 'flex-start',
-        marginBottom: '12px',
-        borderBottom: '1px solid rgba(0, 255, 65, 0.3)',
-        paddingBottom: '8px'
+        alignItems: 'center',
+        marginBottom: '10px',
+        borderBottom: '1px solid var(--terminal-border)',
+        paddingBottom: '6px',
+        height: '24px'
       }}>
-        <div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
           <div style={{ 
-            fontSize: '10px', 
-            textTransform: 'uppercase', 
-            letterSpacing: '1px',
-            opacity: 0.7 
-          }}>
-            {subtitle || 'WIDGET_ID: ' + title.toUpperCase().replace(/\s+/g, '_')}
-          </div>
-          <div style={{ 
-            fontSize: '14px', 
-            fontWeight: 'bold', 
-            color: 'var(--terminal-text)',
-            textShadow: '0 0 5px var(--terminal-glow)'
+            fontSize: '13px', 
+            fontWeight: '700', 
+            color: '#fff',
+            letterSpacing: '0.5px'
           }}>
             {title}
           </div>
+          <div style={{ 
+            fontSize: '10px', 
+            textTransform: 'uppercase', 
+            color: '#64748b',
+            fontWeight: '500'
+          }}>
+            {subtitle}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '6px' }}>
           {actions}
         </div>
       </div>
@@ -65,13 +69,15 @@ export default function CyberWidget({
       </div>
 
       <div style={{ 
-        marginTop: '8px', 
-        fontSize: '8px', 
+        marginTop: '6px', 
+        fontSize: '9px', 
         textAlign: 'right', 
-        opacity: 0.3,
-        letterSpacing: '1px'
+        color: '#475569',
+        letterSpacing: '0.5px',
+        borderTop: '1px solid rgba(51, 65, 85, 0.3)',
+        paddingTop: '4px'
       }}>
-        STATUS: RUNNING // SECTOR: {title.toUpperCase().slice(0, 3)}
+        LOG_LEVEL: TRACE // SYNC_OK
       </div>
     </div>
   );

@@ -112,82 +112,82 @@ export default function TradeWidget() {
       title={`TRADE_EXECUTION: ${symbol}`} 
       subtitle="QUANTUM_ORDER_ROUTING"
     >
-      {err && <div style={{ color: 'var(--terminal-error)', fontSize: '11px', marginBottom: 10 }}>[ERR]: {err}</div>}
+      {err && <div style={{ color: 'var(--terminal-error)', fontSize: '12px', marginBottom: '10px', background: 'rgba(239, 68, 68, 0.1)', padding: '8px', borderLeft: '3px solid var(--terminal-error)' }}>[ERR]: {err}</div>}
       
-      <div style={{ display: 'flex', gap: 2, background: '#111', padding: 2, border: '1px solid #333', marginBottom: 15 }}>
+      <div style={{ display: 'flex', gap: '2px', background: 'var(--terminal-bg)', padding: '2px', borderRadius: '4px', marginBottom: '15px', border: '1px solid var(--terminal-border)' }}>
         <button 
           onClick={() => setSide('BUY')}
-          className="cyber-button"
-          style={{ flex: 1, border: 'none', background: side === 'BUY' ? '#52c41a' : 'transparent', color: side === 'BUY' ? '#000' : '#52c41a', fontSize: '11px' }}
+          className={`cyber-button ${side === 'BUY' ? 'active' : ''}`}
+          style={{ flex: 1, border: 'none', background: side === 'BUY' ? 'var(--terminal-success)' : 'transparent', color: side === 'BUY' ? '#fff' : '#94a3b8' }}
         >BUY</button>
         <button 
           onClick={() => setSide('SELL')}
-          className="cyber-button"
-          style={{ flex: 1, border: 'none', background: side === 'SELL' ? '#ff4d4f' : 'transparent', color: side === 'SELL' ? '#fff' : '#ff4d4f', fontSize: '11px' }}
+          className={`cyber-button ${side === 'SELL' ? 'active' : ''}`}
+          style={{ flex: 1, border: 'none', background: side === 'SELL' ? 'var(--terminal-error)' : 'transparent', color: side === 'SELL' ? '#fff' : '#94a3b8' }}
         >SELL</button>
       </div>
 
-      <div style={{ display: 'grid', gap: 10 }}>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '9px', opacity: 0.6, marginBottom: 4 }}>TYPE</div>
+      <div style={{ display: 'grid', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div>
+            <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>ORDER_TYPE</div>
             <select 
               className="cyber-input" 
               value={orderType} 
               onChange={e => setOrderType(e.target.value as 'LIMIT' | 'MARKET')}
-              style={{ width: '100%', fontSize: '11px' }}
+              style={{ width: '100%', height: '32px' }}
             >
               <option value="LIMIT">LIMIT</option>
               <option value="MARKET">MARKET</option>
             </select>
           </div>
           {orderType === 'LIMIT' && (
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '9px', opacity: 0.6, marginBottom: 4 }}>PRICE</div>
+            <div>
+              <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>PRICE</div>
               <input 
                 className="cyber-input"
                 type="number" 
                 value={price} 
                 onChange={e => setPrice(e.target.value)}
-                style={{ width: '100%', fontSize: '11px' }}
+                style={{ width: '100%', height: '32px', boxSizing: 'border-box' }}
               />
             </div>
           )}
         </div>
 
         <div>
-          <div style={{ fontSize: '9px', opacity: 0.6, marginBottom: 4 }}>QUANTITY</div>
+          <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>QUANTITY</div>
           <input 
             className="cyber-input"
             type="number" 
             value={quantity} 
             onChange={e => setQuantity(e.target.value)}
-            style={{ width: '100%', fontSize: '11px' }}
+            style={{ width: '100%', height: '32px', boxSizing: 'border-box' }}
           />
         </div>
 
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: '4px' }}>
           {[0.25, 0.5, 0.75, 1].map(p => (
             <button 
               key={p} 
               onClick={() => setPercent(p)}
               className="cyber-button"
-              style={{ flex: 1, fontSize: '9px', padding: '2px' }}
+              style={{ flex: 1, fontSize: '11px', padding: '4px 0' }}
             >
               {p * 100}%
             </button>
           ))}
         </div>
 
-        <div style={{ padding: '8px', background: 'rgba(255,255,255,0.05)', fontSize: '10px', border: '1px solid #222' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-            <span style={{ opacity: 0.6 }}>TOTAL_EST:</span>
-            <span style={{ fontWeight: 'bold' }}>{estimatedValue.toFixed(2)}</span>
+        <div style={{ padding: '10px', background: 'rgba(0,0,0,0.2)', fontSize: '11px', border: '1px solid var(--terminal-border)', borderRadius: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <span style={{ color: '#64748b' }}>TOTAL_ESTIMATED</span>
+            <span style={{ fontWeight: '700', color: '#fff' }}>${estimatedValue.toFixed(2)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ opacity: 0.6 }}>AVAILABLE:</span>
-            <span style={{ fontWeight: 'bold', color: (side === 'BUY' ? estimatedValue > availableCash : Number(quantity) > availablePos) ? 'var(--terminal-error)' : 'inherit' }}>
-              {side === 'BUY' ? availableCash.toFixed(2) : availablePos.toFixed(2)}
+            <span style={{ color: '#64748b' }}>{side === 'BUY' ? 'AVAILABLE_CASH' : 'AVAILABLE_POS'}</span>
+            <span style={{ fontWeight: '700', color: (side === 'BUY' ? estimatedValue > availableCash : Number(quantity) > availablePos) ? 'var(--terminal-error)' : 'var(--terminal-success)' }}>
+              {side === 'BUY' ? `$${availableCash.toLocaleString()}` : `${availablePos.toLocaleString()} unit`}
             </span>
           </div>
         </div>
@@ -198,16 +198,17 @@ export default function TradeWidget() {
           onClick={handleSubmit}
           style={{ 
             width: '100%', 
-            padding: '10px', 
-            background: side === 'BUY' ? '#52c41a' : '#ff4d4f', 
-            color: side === 'BUY' ? '#000' : '#fff',
-            fontWeight: 'bold',
-            opacity: canSubmit ? 1 : 0.3,
+            height: '40px',
+            background: side === 'BUY' ? 'var(--terminal-success)' : 'var(--terminal-error)', 
+            color: '#fff',
+            fontWeight: '700',
+            opacity: canSubmit ? 1 : 0.4,
             border: 'none',
-            marginTop: 5
+            fontSize: '14px',
+            marginTop: '5px'
           }}
         >
-          {loading ? 'EXECUTING...' : `CONFIRM_${side}_${symbol}`}
+          {loading ? 'EXECUTING...' : `PLACE_${side}_ORDER`}
         </button>
       </div>
     </CyberWidget>

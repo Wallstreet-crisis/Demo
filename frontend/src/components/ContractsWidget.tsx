@@ -60,15 +60,17 @@ export default function ContractsWidget() {
       title="SMART_CONTRACT_AGENT" 
       subtitle="AI_LEGAL_PROCUREMENT"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <textarea
           className="cyber-input"
           style={{ 
             width: '100%', 
-            minHeight: '80px', 
-            fontSize: '11px', 
-            background: 'rgba(0,0,0,0.3)',
-            resize: 'none'
+            minHeight: '100px', 
+            fontSize: '12px', 
+            background: 'var(--terminal-bg)',
+            resize: 'none',
+            border: '1px solid var(--terminal-border)',
+            padding: '10px'
           }}
           placeholder="DESCRIBE_TERMS: e.g. 'Bet 1000 cash with user:bob on BLUEGOLD > 150'"
           value={naturalLanguage}
@@ -79,27 +81,35 @@ export default function ContractsWidget() {
           className="cyber-button"
           onClick={handleDraft} 
           disabled={loading || !naturalLanguage.trim()}
-          style={{ fontSize: '11px', padding: '8px' }}
+          style={{ 
+            fontSize: '12px', 
+            padding: '10px',
+            background: 'var(--terminal-info)',
+            borderColor: 'var(--terminal-info)',
+            color: '#fff',
+            fontWeight: '600'
+          }}
         >
-          {loading ? 'ANALYZING...' : 'GENERATE_DRAFT'}
+          {loading ? 'ANALYZING_PROTOCOL...' : 'GENERATE_LEGAL_DRAFT'}
         </button>
 
         {draft && (
           <div style={{ 
-            marginTop: '10px', 
-            padding: '10px', 
-            border: '1px solid #52c41a', 
-            background: 'rgba(82, 196, 26, 0.05)',
-            fontSize: '11px'
+            marginTop: '5px', 
+            padding: '12px', 
+            border: '1px solid var(--terminal-success)', 
+            background: 'rgba(16, 185, 129, 0.05)',
+            fontSize: '12px',
+            borderRadius: '2px'
           }}>
-            <div style={{ fontWeight: 'bold', color: '#52c41a', marginBottom: '5px' }}>DRAFT_READY</div>
-            <div style={{ opacity: 0.8, marginBottom: '10px' }}>{draft.explanation}</div>
+            <div style={{ fontWeight: 'bold', color: 'var(--terminal-success)', marginBottom: '6px', fontSize: '11px' }}>DRAFT_VALIDATED</div>
+            <div style={{ color: '#cbd5e1', marginBottom: '12px', lineHeight: '1.4' }}>{draft.explanation}</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '9px', opacity: 0.5 }}>RISK: {draft.risk_rating}</span>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>RISK_LEVEL: <span style={{ color: draft.risk_rating === 'HIGH' ? 'var(--terminal-error)' : 'var(--terminal-success)' }}>{draft.risk_rating}</span></span>
               <button 
                 className="cyber-button"
                 onClick={handleCreate}
-                style={{ fontSize: '9px', padding: '2px 8px', background: '#52c41a', color: '#000' }}
+                style={{ fontSize: '11px', padding: '4px 12px', background: 'var(--terminal-success)', borderColor: 'var(--terminal-success)', color: '#fff' }}
               >
                 EXECUTE_DEPLOYMENT
               </button>

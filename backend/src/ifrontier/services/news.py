@@ -439,6 +439,58 @@ class NewsService:
             )
         return [str(r["card_id"]) for r in rows]
 
+    def init_news_seed_data(self) -> None:
+        """初始化预设的新闻卡牌组"""
+        with self._driver.session() as session:
+            # 检查是否已有卡牌，避免重复创建
+            count = session.execute_read(lambda tx: tx.run("MATCH (c:NewsCard) RETURN count(c) as c").single()["c"])
+            if count > 0:
+                return
+
+        seeds = [
+            {
+                "kind": "EARNINGS",
+                "symbols": ["NEURALINK"],
+                "text": "Neuralink 脑机接口三期临床实验数据远超预期。",
+                "truth_payload": {"impact": 0.15, "direction": "UP"}
+            },
+            {
+                "kind": "MILITARY",
+                "symbols": ["BLUEGOLD"],
+                "text": "BlueGold 获得北方联盟 500 亿信用点防御订单。",
+                "truth_payload": {"impact": 0.2, "direction": "UP"}
+            },
+            {
+                "kind": "ENERGY",
+                "symbols": ["MARS_GEN"],
+                "text": "火星二号核聚变电站发生容器泄漏事故。",
+                "truth_payload": {"impact": -0.25, "direction": "DOWN"}
+            },
+            {
+                "kind": "FINANCE",
+                "symbols": ["CIVILBANK"],
+                "text": "联邦储备局宣布将维持当前基准利率不变。",
+                "truth_payload": {"impact": 0.02, "direction": "STABLE"}
+            }
+        ]
+
+        for s in seeds:
+            card_id, _ = self.create_card(
+                kind=s["kind"],
+                image_anchor_id=None,
+                image_uri=None,
+                truth_payload=s["truth_payload"],
+                symbols=s["symbols"],
+                tags=["seed"],
+                actor_id="system"
+            )
+            # 默认给系统生成一个变体
+            self.emit_variant(
+                card_id=card_id,
+                author_id="system",
+                text=s["text"]
+            )
+
     @staticmethod
     def _follow_tx(tx, params: Dict[str, Any]) -> None:
         tx.run(

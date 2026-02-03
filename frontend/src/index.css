@@ -1,24 +1,27 @@
 :root {
-  font-family: 'Fira Code', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: dark;
-  color: #00ff41; /* Classic Matrix Green */
-  background-color: #0a0a0a;
+  color: #e2e8f0; 
+  background-color: #0f172a; /* Dark Slate Blue-Gray */
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --terminal-bg: #0a0a0a;
-  --terminal-border: #00ff41;
-  --terminal-glow: rgba(0, 255, 65, 0.2);
-  --terminal-text: #00ff41;
-  --terminal-error: #ff4d4f;
-  --terminal-warn: #faad14;
-  --terminal-info: #1890ff;
+  --terminal-bg: #0f172a;
+  --terminal-border: #334155;
+  --terminal-glow: rgba(51, 65, 85, 0.5);
+  --terminal-text: #f1f5f9;
+  --terminal-error: #ef4444;
+  --terminal-warn: #f59e0b;
+  --terminal-info: #3b82f6;
+  --terminal-success: #10b981;
+  --panel-bg: #1e293b;
+  --header-bg: #1e293b;
 }
 
 body {
@@ -26,10 +29,7 @@ body {
   display: block;
   min-width: 320px;
   min-height: 100vh;
-  background-image: 
-    linear-gradient(rgba(0, 255, 65, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 255, 65, 0.05) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-color: var(--terminal-bg);
 }
 
 #root {
@@ -37,79 +37,72 @@ body {
 }
 
 .cyber-card {
-  background: rgba(0, 0, 0, 0.8);
+  background: var(--panel-bg);
   border: 1px solid var(--terminal-border);
-  box-shadow: 0 0 10px var(--terminal-glow);
-  padding: 16px;
+  border-radius: 2px;
+  padding: 12px;
   position: relative;
-  overflow: hidden;
-}
-
-.cyber-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: var(--terminal-border);
-  box-shadow: 0 0 10px var(--terminal-border);
+  display: flex;
+  flex-direction: column;
 }
 
 .cyber-button {
-  background: transparent;
-  border: 1px solid var(--terminal-border);
-  color: var(--terminal-border);
-  padding: 8px 16px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  background: #334155;
+  border: 1px solid #475569;
+  color: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 2px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.1s ease;
   font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none; /* 移除全大写 */
 }
 
 .cyber-button:hover {
-  background: var(--terminal-border);
-  color: #000;
-  box-shadow: 0 0 15px var(--terminal-border);
+  background: #475569;
+}
+
+.cyber-button.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
 }
 
 .cyber-input {
-  background: #000;
-  border: 1px solid #444;
-  border-bottom: 2px solid var(--terminal-border);
-  color: var(--terminal-border);
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 2px;
+  color: #f1f5f9;
   padding: 4px 8px;
   font-family: inherit;
+  font-size: 12px;
   outline: none;
 }
 
 .cyber-input:focus {
-  border-color: #fff;
-  box-shadow: 0 0 5px var(--terminal-border);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
-}
-
+/* 移除扫描线效果 */
 .scanlines {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    rgba(18, 16, 16, 0) 50%,
-    rgba(0, 0, 0, 0.25) 50%
-  ), linear-gradient(
-    90deg,
-    rgba(255, 0, 0, 0.06),
-    rgba(0, 255, 0, 0.02),
-    rgba(0, 0, 255, 0.06)
-  );
-  background-size: 100% 4px, 3px 100%;
-  pointer-events: none;
-  z-index: 9999;
+  display: none;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }

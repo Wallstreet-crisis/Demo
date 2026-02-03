@@ -19,7 +19,6 @@ function formatTime(s: string): string {
 
 export default function NewsWidget() {
   const { playerId } = useAppSession()
-  const [loading, setLoading] = useState(true)
   const [inbox, setInbox] = useState<NewsInboxResponse | null>(null)
   const [selectedItem, setSelectedItem] = useState<NewsInboxResponseItem | null>(null)
 
@@ -28,14 +27,11 @@ export default function NewsWidget() {
 
   const refreshInbox = async () => {
     if (!playerId) return
-    setLoading(true)
     try {
       const r = await Api.newsInbox(`user:${playerId}`, 20)
       setInbox(r)
     } catch (e) {
       console.error('Failed to refresh inbox', e)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -65,31 +61,33 @@ export default function NewsWidget() {
     <CyberWidget 
       title="INTELLIGENCE_INBOX" 
       subtitle="ENCRYPTED_FEED_STREAM"
-      actions={<button className="cyber-button" style={{ fontSize: '9px', padding: '2px 6px' }} onClick={refreshInbox}>SYNC</button>}
+      actions={<button className="cyber-button" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={refreshInbox}>SYNC</button>}
     >
-      {loading && !inbox && <div style={{ fontSize: '11px', opacity: 0.5 }}>DECRYPTING...</div>}
-      
-      <div style={{ display: 'grid', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {inbox?.items?.map((it) => (
           <div
             key={it.delivery_id}
             onClick={() => setSelectedItem(it === selectedItem ? null : it)}
             style={{
-              border: `1px solid ${selectedItem === it ? 'var(--terminal-border)' : '#222'}`,
-              padding: '8px',
-              fontSize: '12px',
+              borderBottom: '1px solid rgba(51, 65, 85, 0.3)',
+              padding: '10px 8px',
+              fontSize: '13px',
               cursor: 'pointer',
-              background: selectedItem === it ? 'rgba(0, 255, 65, 0.1)' : 'transparent',
-              position: 'relative'
+              background: selectedItem === it ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+              transition: 'background 0.1s'
             }}
+            onMouseOver={e => selectedItem !== it && (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
+            onMouseOut={e => selectedItem !== it && (e.currentTarget.style.background = 'transparent')}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', marginBottom: 4, opacity: 0.6 }}>
-              <span>[{it.delivery_reason}]</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '4px', color: '#64748b', fontWeight: '600' }}>
+              <span style={{ color: it.from_actor_id === 'SYSTEM' ? 'var(--terminal-warn)' : '#3b82f6' }}>
+                [{it.delivery_reason}]
+              </span>
               <span>{formatTime(it.delivered_at)}</span>
             </div>
             <div style={{ 
-              lineHeight: 1.4, 
-              color: it.from_actor_id === 'SYSTEM' ? 'var(--terminal-warn)' : 'inherit',
+              lineHeight: 1.5, 
+              color: '#f1f5f9',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               display: '-webkit-box',
@@ -99,11 +97,26 @@ export default function NewsWidget() {
               {it.text}
             </div>
             {selectedItem === it && (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #444', fontSize: '10px' }}>
-                <div style={{ opacity: 0.5 }}>SOURCE_ID: {it.from_actor_id}</div>
-                <div style={{ opacity: 0.5 }}>VARIANT_ID: {it.variant_id}</div>
+              <div style={{ 
+                marginTop: '12px', 
+                padding: '10px', 
+                background: 'rgba(0,0,0,0.2)', 
+                border: '1px solid var(--terminal-border)',
+                borderRadius: '2px',
+                fontSize: '11px' 
+              }}>
+                <div style={{ color: '#94a3b8', marginBottom: '4px' }}>SOURCE: <code style={{ color: '#3b82f6' }}>{it.from_actor_id}</code></div>
+                <div style={{ color: '#94a3b8', marginBottom: '8px' }}>VARIANT: <code style={{ color: '#94a3b8' }}>{it.variant_id}</code></div>
                 {it.truth_payload !== undefined && it.truth_payload !== null && (
-                  <pre style={{ fontSize: '9px', color: 'var(--terminal-info)', marginTop: 4, background: '#000', padding: 4 }}>
+                  <pre style={{ 
+                    fontSize: '10px', 
+                    color: 'var(--terminal-success)', 
+                    marginTop: '8px', 
+                    background: '#0f172a', 
+                    padding: '8px',
+                    borderLeft: '2px solid var(--terminal-success)',
+                    overflow: 'auto'
+                  }}>
                     {JSON.stringify(it.truth_payload as Record<string, unknown>, null, 2)}
                   </pre>
                 )}
@@ -111,7 +124,11 @@ export default function NewsWidget() {
             )}
           </div>
         ))}
-        {inbox?.items?.length === 0 && <div style={{ textAlign: 'center', opacity: 0.3, padding: 20 }}>NO_DATA_IN_FEED</div>}
+        {inbox?.items?.length === 0 && (
+          <div style={{ textAlign: 'center', color: '#64748b', padding: '40px 20px', fontSize: '13px' }}>
+            NO_INTEL_STREAM_DETECTED
+          </div>
+        )}
       </div>
     </CyberWidget>
   )

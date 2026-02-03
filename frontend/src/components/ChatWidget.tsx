@@ -77,47 +77,48 @@ export default function ChatWidget() {
           style={{ 
             flex: 1, 
             overflowY: 'auto', 
-            marginBottom: '10px',
+            marginBottom: '12px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
-            paddingRight: '5px'
+            gap: '6px',
+            paddingRight: '8px',
+            fontSize: '13px'
           }}
         >
           {messages?.items?.map((m) => {
             const isMine = m.sender_id === `user:${playerId}`
             return (
-              <div key={m.message_id} style={{ fontSize: '11px', lineHeight: 1.4 }}>
-                <span style={{ color: isMine ? '#fff' : 'var(--terminal-text)', fontWeight: 'bold' }}>
-                  {m.sender_display}:
-                </span>{' '}
-                <span style={{ color: isMine ? 'rgba(255,255,255,0.8)' : 'inherit' }}>
+              <div key={m.message_id} style={{ lineHeight: 1.4, padding: '4px 0', borderBottom: '1px solid rgba(51, 65, 85, 0.2)' }}>
+                <span style={{ color: isMine ? '#3b82f6' : '#94a3b8', fontWeight: '700', fontSize: '11px', marginRight: '6px' }}>
+                  {m.sender_display}
+                </span>
+                <span style={{ color: '#f1f5f9' }}>
                   {m.content}
                 </span>
               </div>
             )
           })}
           {messages?.items?.length === 0 && (
-            <div style={{ opacity: 0.3, textAlign: 'center', padding: '20px' }}>SILENCE_IN_SECTOR</div>
+            <div style={{ opacity: 0.3, textAlign: 'center', padding: '40px 20px', fontSize: '12px' }}>SILENCE_IN_SECTOR</div>
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: '5px' }}>
+        <div style={{ display: 'flex', gap: '8px', paddingTop: '10px', borderTop: '1px solid var(--terminal-border)' }}>
           <input 
             className="cyber-input"
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && send()}
             placeholder="BROADCAST_MSG..."
-            style={{ flex: 1, fontSize: '11px' }}
+            style={{ flex: 1, height: '32px' }}
           />
           <button 
             className="cyber-button" 
             onClick={send}
             disabled={loading || !text.trim()}
-            style={{ fontSize: '10px', padding: '2px 8px' }}
+            style={{ padding: '0 16px', height: '32px', background: '#3b82f6', borderColor: '#3b82f6', color: '#fff' }}
           >
-            TX
+            SEND
           </button>
         </div>
       </div>

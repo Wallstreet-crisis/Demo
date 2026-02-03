@@ -17,12 +17,13 @@ function NavItem(props: { to: string; label: string }) {
       to={props.to}
       className={active ? 'cyber-button active' : 'cyber-button'}
       style={{
-        fontSize: '11px',
-        padding: '4px 10px',
+        fontSize: '12px',
+        padding: '4px 12px',
         textDecoration: 'none',
-        background: active ? 'var(--terminal-border)' : 'transparent',
-        color: active ? '#000' : 'var(--terminal-text)',
-        boxShadow: active ? '0 0 10px var(--terminal-border)' : 'none'
+        background: active ? 'var(--terminal-info)' : 'transparent',
+        border: 'none',
+        color: active ? '#fff' : '#94a3b8',
+        fontWeight: active ? '600' : '500'
       }}
     >
       {props.label}
@@ -143,58 +144,52 @@ export default function Layout() {
       
       {/* HUD Header */}
       <header style={{ 
-        padding: '10px 20px', 
+        padding: '0 20px', 
+        height: '48px',
         borderBottom: '1px solid var(--terminal-border)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        background: 'rgba(0, 255, 65, 0.05)',
-        fontSize: '12px'
+        background: 'var(--header-bg)',
+        fontSize: '13px',
+        zIndex: 100
       }}>
-        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-          <div style={{ fontWeight: 'bold', fontSize: '16px', letterSpacing: '2px' }}>
-            IF_TERMINAL_v2.0
+        <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
+          <div style={{ fontWeight: '800', fontSize: '14px', color: '#fff' }}>
+            TERMINAL_<span style={{ color: '#3b82f6' }}>IF</span>
           </div>
-          <div style={{ display: 'flex', gap: 15 }}>
+          <nav style={{ display: 'flex', gap: '4px' }}>
             <NavItem to="/dashboard" label="DASHBOARD" />
-            <NavItem to="/market" label="MARKET" />
-            <NavItem to="/trade" label="TRADE" />
-            <NavItem to="/news" label="NEWS" />
-            <NavItem to="/chat" label="CHAT" />
-            <NavItem to="/account" label="ACCOUNT" />
+            <NavItem to="/news" label="INTELLIGENCE" />
             <NavItem to="/contracts" label="CONTRACTS" />
-            <NavItem to="/hosting" label="HOSTING" />
-          </div>
+            <NavItem to="/account" label="PORTFOLIO" />
+          </nav>
         </div>
 
-        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
           {sess.playerId && (
             <>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <span>ID: <code style={{ color: '#fff' }}>{sess.playerId}</code></span>
-                {caste && <span style={{ color: caste.color }}>[{caste.id}]</span>}
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', color: '#94a3b8' }}>
+                <span>{sess.playerId}</span>
+                {caste && <span style={{ color: caste.color, fontSize: '11px', fontWeight: 'bold' }}>[{caste.id}]</span>}
               </div>
-              <div style={{ display: 'flex', gap: 15, padding: '2px 10px', border: '1px solid var(--terminal-border)', borderRadius: '4px' }}>
-                <span>CASH: <strong style={{ color: '#fff' }}>${typeof cash === 'number' ? cash.toLocaleString() : '--'}</strong></span>
-                <span>EQUITY: <strong style={{ color: '#fff' }}>${typeof totalValue === 'number' ? totalValue.toLocaleString() : '--'}</strong></span>
-                {!valuationOk && <span style={{ color: 'var(--terminal-error)' }}>[SYNC_ERR]</span>}
+              <div style={{ display: 'flex', gap: '15px', paddingLeft: '15px', borderLeft: '1px solid var(--terminal-border)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '10px', color: '#64748b' }}>CASH</span>
+                  <span style={{ fontWeight: '600', color: '#fff' }}>${typeof cash === 'number' ? cash.toLocaleString() : '--'}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '10px', color: '#64748b' }}>EQUITY</span>
+                  <span style={{ fontWeight: '600', color: '#fff' }}>${typeof totalValue === 'number' ? totalValue.toLocaleString() : '--'}</span>
+                </div>
+                {!valuationOk && <span style={{ color: 'var(--terminal-error)', alignSelf: 'center' }}>[SYNC_ERR]</span>}
               </div>
             </>
           )}
           
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span>SYM:</span>
-            <input 
-              className="cyber-input"
-              value={sess.symbol} 
-              onChange={(e) => sess.setSymbol(e.target.value.toUpperCase())}
-              style={{ width: 80, fontSize: '12px', padding: '2px 4px' }}
-            />
-          </div>
-
-          <Link to="/onboarding" className="cyber-button" style={{ fontSize: '10px', padding: '2px 8px' }}>
+          <button onClick={() => window.location.href='/onboarding'} className="cyber-button" style={{ fontSize: '11px', height: '28px', padding: '0 12px' }}>
             RE_AUTH
-          </Link>
+          </button>
         </div>
       </header>
 
@@ -216,20 +211,24 @@ export default function Layout() {
 
       {/* Terminal Footer Status Bar */}
       <footer style={{ 
-        padding: '4px 20px', 
+        padding: '0 20px', 
+        height: '32px',
         borderTop: '1px solid var(--terminal-border)', 
-        fontSize: '10px',
+        fontSize: '11px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        color: 'rgba(0, 255, 65, 0.5)',
-        background: 'rgba(0, 0, 0, 0.5)'
+        color: '#64748b',
+        background: 'var(--header-bg)'
       }}>
-        <div style={{ flex: 1 }}>NETWORK_STATUS: ENCRYPTED // CONNECTION: STABLE</div>
+        <div style={{ flex: 1, display: 'flex', gap: '15px' }}>
+          <span>STATUS: ONLINE</span>
+          <span>LATENCY: 24ms</span>
+        </div>
         <div style={{ flex: 2, overflow: 'hidden' }}>
           <NewsTicker />
         </div>
-        <div style={{ flex: 1, textAlign: 'right' }}>{new Date().toISOString()} // IF_CORE_ACTIVE</div>
+        <div style={{ flex: 1, textAlign: 'right' }}>{new Date().toLocaleTimeString()} // IF_CORE_v4.2</div>
       </footer>
     </div>
   )

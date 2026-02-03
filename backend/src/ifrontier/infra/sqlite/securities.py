@@ -35,6 +35,23 @@ def init_securities_schema() -> None:
     )
     conn.commit()
 
+    # 初始化种子数据
+    default_symbols = [
+        ("BLUEGOLD", "MILITARY", 150.0),
+        ("CIVILBANK", "FINANCE", 80.0),
+        ("FOODMART", "CONSUMER", 45.0),
+        ("NEURALINK", "TECH", 210.0),
+        ("MARS_GEN", "ENERGY", 120.0),
+        ("BIO_SYNTH", "HEALTHCARE", 95.0),
+        ("ORBIT_LOG", "LOGISTICS", 65.0),
+    ]
+    with conn:
+        for sym, sec, price in default_symbols:
+            conn.execute(
+                "INSERT OR IGNORE INTO securities(symbol, sector, seed_price) VALUES (?, ?, ?)",
+                (sym, sec, float(price))
+            )
+
 
 def upsert_security(*, symbol: str, sector: str = "", status: str = "TRADABLE", seed_price: float = 1.0) -> None:
     sym = str(symbol or "").strip().upper()

@@ -53,61 +53,68 @@ export default function AccountWidget() {
   return (
     <CyberWidget 
       title="ASSET_MANAGEMENT" 
-      subtitle="LEDGER_SNAPSHOT_v4"
-      actions={<button className="cyber-button" style={{ fontSize: '9px', padding: '2px 6px' }} onClick={refresh}>RESCAN</button>}
+      subtitle="REALTIME_PORTFOLIO_TRACKER"
+      actions={<button className="cyber-button" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={refresh}>REFRESH</button>}
     >
-      {err && <div style={{ color: 'var(--terminal-error)', fontSize: '11px', marginBottom: 10 }}>[ERR]: {err}</div>}
+      {err && <div style={{ color: 'var(--terminal-error)', fontSize: '12px', marginBottom: '10px', background: 'rgba(239, 68, 68, 0.1)', padding: '8px', borderLeft: '3px solid var(--terminal-error)' }}>[ERR]: {err}</div>}
       
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 15 }}>
-        <div style={{ padding: '8px', border: '1px solid #222', background: 'rgba(255,255,255,0.02)' }}>
-          <div style={{ fontSize: '9px', opacity: 0.5 }}>CASH_LIQUID</div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>${cash.toLocaleString()}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
+        <div style={{ padding: '10px', border: '1px solid var(--terminal-border)', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
+          <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>CASH_LIQUID</div>
+          <div style={{ fontSize: '18px', fontWeight: '700', color: '#fff' }}>${cash.toLocaleString()}</div>
         </div>
-        <div style={{ padding: '8px', border: '1px solid #222', background: 'rgba(255,255,255,0.02)' }}>
-          <div style={{ fontSize: '9px', opacity: 0.5 }}>EQUITY_VALUATION</div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>${equityValue.toLocaleString()}</div>
+        <div style={{ padding: '10px', border: '1px solid var(--terminal-border)', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
+          <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>EQUITY_VALUE</div>
+          <div style={{ fontSize: '18px', fontWeight: '700', color: '#fff' }}>${equityValue.toLocaleString()}</div>
         </div>
       </div>
 
-      <div style={{ fontSize: '10px', marginBottom: 5, opacity: 0.7 }}>PORTFOLIO_POSITIONS</div>
-      <div style={{ border: '1px solid #222', maxHeight: '200px', overflow: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
-          <thead style={{ position: 'sticky', top: 0, background: '#000', borderBottom: '1px solid #333' }}>
-            <tr>
-              <th style={{ textAlign: 'left', padding: '4px' }}>SYM</th>
-              <th style={{ textAlign: 'right', padding: '4px' }}>QTY</th>
-              <th style={{ textAlign: 'right', padding: '4px' }}>MKT_VAL</th>
-            </tr>
-          </thead>
-          <tbody>
-            {positionItems.map((p) => (
-              <tr key={p.symbol} style={{ borderBottom: '1px solid #111' }}>
-                <td style={{ padding: '4px' }}>{p.symbol}</td>
-                <td style={{ padding: '4px', textAlign: 'right' }}>{p.qty.toFixed(2)}</td>
-                <td style={{ padding: '4px', textAlign: 'right' }}>
-                  {p.mktValue === null ? 'N/A' : `$${p.mktValue.toFixed(2)}`}
-                </td>
-              </tr>
-            ))}
-            {positionItems.length === 0 && (
+      <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '8px', color: '#94a3b8' }}>PORTFOLIO_POSITIONS</div>
+      <div style={{ border: '1px solid var(--terminal-border)', borderRadius: '4px', overflow: 'hidden' }}>
+        <div style={{ maxHeight: '180px', overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead style={{ position: 'sticky', top: 0, background: 'var(--header-bg)', color: '#64748b', borderBottom: '1px solid var(--terminal-border)' }}>
               <tr>
-                <td colSpan={3} style={{ padding: '20px', textAlign: 'center', opacity: 0.3 }}>EMPTY_INVENTORY</td>
+                <th style={{ textAlign: 'left', padding: '8px' }}>SYM</th>
+                <th style={{ textAlign: 'right', padding: '8px' }}>QTY</th>
+                <th style={{ textAlign: 'right', padding: '8px' }}>VALUE</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {positionItems.map((p) => (
+                <tr key={p.symbol} style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.3)', transition: 'background 0.1s' }}>
+                  <td style={{ padding: '8px', fontWeight: '600' }}>{p.symbol}</td>
+                  <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{p.qty.toFixed(2)}</td>
+                  <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace', color: '#fff' }}>
+                    {p.mktValue === null ? 'N/A' : `$${p.mktValue.toFixed(2)}`}
+                  </td>
+                </tr>
+              ))}
+              {positionItems.length === 0 && (
+                <tr>
+                  <td colSpan={3} style={{ padding: '24px', textAlign: 'center', opacity: 0.4, fontSize: '11px' }}>NO_ACTIVE_POSITIONS</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div style={{ 
-        marginTop: '15px', 
-        padding: '10px', 
-        border: '1px solid var(--terminal-border)', 
-        background: 'rgba(0, 255, 65, 0.05)',
-        textAlign: 'right'
+        marginTop: 'auto',
+        paddingTop: '15px'
       }}>
-        <div style={{ fontSize: '9px', opacity: 0.6 }}>TOTAL_NET_WORTH</div>
-        <div style={{ fontSize: '24px', fontWeight: 'bold', textShadow: '0 0 10px var(--terminal-border)' }}>
-          ${totalValue.toLocaleString()}
+        <div style={{ 
+          padding: '12px', 
+          borderRadius: '4px',
+          background: 'linear-gradient(to right, rgba(59, 130, 246, 0.1), transparent)',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          textAlign: 'right'
+        }}>
+          <div style={{ fontSize: '10px', color: '#3b82f6', fontWeight: '700', marginBottom: '4px' }}>TOTAL_NET_WORTH</div>
+          <div style={{ fontSize: '24px', fontWeight: '800', color: '#fff', fontFamily: 'monospace' }}>
+            ${totalValue.toLocaleString()}
+          </div>
         </div>
       </div>
     </CyberWidget>

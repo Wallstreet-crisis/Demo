@@ -63,24 +63,24 @@ export default function HostingWidget() {
       title="AI_CO-PILOT_SYSTEM" 
       subtitle="AUTONOMOUS_TRADING_CORE"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div style={{ 
           padding: '12px', 
-          border: '1px solid #333', 
+          border: '1px solid var(--terminal-border)', 
           background: 'rgba(255,255,255,0.02)',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          borderRadius: '2px'
         }}>
           <div>
-            <div style={{ fontSize: '9px', opacity: 0.5, marginBottom: '4px' }}>OPERATIONAL_STATUS</div>
+            <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>OPERATIONAL_STATUS</div>
             <div style={{ 
               fontSize: '16px', 
               fontWeight: 'bold', 
               color: getStatusColor(status?.status ?? 'OFF'),
-              textShadow: status?.enabled ? `0 0 8px ${getStatusColor(status?.status ?? 'OFF')}` : 'none'
             }}>
-              {loading && !status ? 'INITIALIZING...' : (status?.enabled ? 'ACTIVE' : 'IDLE')}
+              {loading && !status ? 'INITIALIZING...' : (status?.enabled ? 'ACTIVE_RUNNING' : 'SYSTEM_IDLE')}
             </div>
           </div>
           
@@ -89,34 +89,42 @@ export default function HostingWidget() {
             disabled={actionLoading || loading}
             className="cyber-button"
             style={{ 
-              fontSize: '10px', 
-              padding: '4px 12px',
-              background: status?.enabled ? 'rgba(255, 77, 79, 0.1)' : 'rgba(82, 196, 26, 0.1)',
-              borderColor: status?.enabled ? '#ff4d4f' : '#52c41a',
-              color: status?.enabled ? '#ff4d4f' : '#52c41a'
+              fontSize: '11px', 
+              padding: '6px 16px',
+              background: status?.enabled ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+              borderColor: status?.enabled ? 'var(--terminal-error)' : 'var(--terminal-success)',
+              color: status?.enabled ? 'var(--terminal-error)' : 'var(--terminal-success)',
+              fontWeight: '600'
             }}
           >
             {actionLoading ? 'PROCESSING...' : (status?.enabled ? 'TERMINATE' : 'INITIALIZE')}
           </button>
         </div>
 
-        <div style={{ fontSize: '10px', opacity: 0.7, lineHeight: 1.6 }}>
-          <div>// LOG_STREAM</div>
-          <div style={{ padding: '8px', background: '#000', border: '1px solid #222', minHeight: '60px', fontFamily: 'monospace' }}>
-            {status?.enabled ? (
-              <div style={{ color: 'var(--terminal-info)' }}>
-                [OK] Neural network engaged.<br/>
-                [OK] Monitoring market for {playerId}...<br/>
-                [OK] Auto-liquidation rules active.
-              </div>
-            ) : (
-              <div style={{ opacity: 0.4 }}>[SYS] Waiting for initialization signal...</div>
-            )}
-          </div>
+        <div style={{ fontSize: '11px', fontWeight: '600', color: '#94a3b8' }}>// SYSTEM_LOG_STREAM</div>
+        <div style={{ 
+          padding: '10px', 
+          background: 'var(--terminal-bg)', 
+          border: '1px solid var(--terminal-border)', 
+          minHeight: '80px', 
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          borderRadius: '2px',
+          lineHeight: '1.4'
+        }}>
+          {status?.enabled ? (
+            <div style={{ color: 'var(--terminal-info)' }}>
+              <span style={{ opacity: 0.5 }}>[{new Date().toLocaleTimeString()}]</span> NEURAL_NET_ENGAGED<br/>
+              <span style={{ opacity: 0.5 }}>[{new Date().toLocaleTimeString()}]</span> MONITORING_MARKET: {playerId}<br/>
+              <span style={{ opacity: 0.5 }}>[{new Date().toLocaleTimeString()}]</span> RISK_MITIGATION_ACTIVE
+            </div>
+          ) : (
+            <div style={{ opacity: 0.4 }}>[SYS] WAITING_FOR_SIGNAL...</div>
+          )}
         </div>
 
-        <div style={{ fontSize: '9px', opacity: 0.4, fontStyle: 'italic' }}>
-          * Caution: AI co-pilot operates with full account permissions.
+        <div style={{ fontSize: '10px', color: '#64748b', fontStyle: 'italic' }}>
+          * AUTH_NOTICE: AI CO-PILOT HAS FULL CLEARANCE.
         </div>
       </div>
     </CyberWidget>

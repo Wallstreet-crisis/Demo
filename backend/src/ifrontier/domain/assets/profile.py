@@ -14,6 +14,10 @@ _ASSET_PROFILES: Dict[str, AssetProfile] = {
     "BLUEGOLD": AssetProfile(symbol="BLUEGOLD", sector="MILITARY"),
     "CIVILBANK": AssetProfile(symbol="CIVILBANK", sector="FINANCE"),
     "FOODMART": AssetProfile(symbol="FOODMART", sector="CONSUMER"),
+    "NEURALINK": AssetProfile(symbol="NEURALINK", sector="TECH"),
+    "MARS_GEN": AssetProfile(symbol="MARS_GEN", sector="ENERGY"),
+    "BIO_SYNTH": AssetProfile(symbol="BIO_SYNTH", sector="HEALTHCARE"),
+    "ORBIT_LOG": AssetProfile(symbol="ORBIT_LOG", sector="LOGISTICS"),
 }
 
 

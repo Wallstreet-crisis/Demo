@@ -78,6 +78,8 @@ const api = new ApiClient()
 export const Api = {
   health: () => api.get<HealthResponse>('/health'),
 
+  marketSymbols: () => api.get<string[]>('/market/symbols'),
+
   marketQuote: (symbol: string) => api.get<MarketQuoteResponse>(`/market/quote/${encodeURIComponent(symbol)}`),
   marketSeries: (symbol: string, limit = 200) =>
     api.get<MarketSeriesResponse>(`/market/series/${encodeURIComponent(symbol)}`, { limit }),

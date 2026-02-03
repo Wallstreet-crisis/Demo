@@ -427,6 +427,12 @@ class MarketQuoteResponse(BaseModel):
     vol_20: float | None
 
 
+@router.get("/market/symbols")
+async def get_market_symbols() -> list[str]:
+    from ifrontier.domain.assets.profile import _ASSET_PROFILES
+    return list(_ASSET_PROFILES.keys())
+
+
 @router.get("/market/quote/{symbol}")
 async def market_quote(symbol: str) -> MarketQuoteResponse:
     q = get_quote(symbol)
