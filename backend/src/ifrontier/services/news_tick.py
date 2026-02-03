@@ -20,6 +20,7 @@ from ifrontier.domain.events.types import EventType
 from ifrontier.infra.neo4j.event_store import Neo4jEventStore
 from ifrontier.services.commonbot_emergency import CommonBotEmergencyRunner
 from ifrontier.services.news import NewsService
+from ifrontier.services.game_time import game_time_now, load_game_time_config_from_env
 
 
 @dataclass(frozen=True)
@@ -66,7 +67,8 @@ class NewsTickEngine:
         if grant_count < 0:
             raise ValueError("grant_count must be >= 0")
 
-        now = datetime.now(timezone.utc)
+        cfg = load_game_time_config_from_env()
+        now = game_time_now(cfg=cfg, real_now_utc=None).real_now_utc
         chain_id = str(uuid4())
         min_t0_at = now + timedelta(seconds=int(t0_seconds))
         if t0_at is None:

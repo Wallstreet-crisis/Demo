@@ -1253,7 +1253,8 @@ class NewsMutateVariantResponse(BaseModel):
 
 @router.post("/news/variants/mutate")
 async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVariantResponse:
-    # 按字计费（现金），并把成本写入 influence_cost 做审计。
+    # v0.1：按字计费（现金），并把成本写入 influence_cost 做审计。
+    # 可用 spend_cash 覆盖（策划/脚本显式指定花费）。
     unit_cash = float(os.getenv("IF_NEWS_MUTATE_CASH_PER_CHAR") or "0.1")
     char_count = len(req.new_text or "")
     cash_cost = float(req.spend_cash) if req.spend_cash is not None else float(char_count) * float(unit_cash)
@@ -1273,6 +1274,7 @@ async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVarian
             risk_roll=req.risk_roll,
             correlation_id=req.correlation_id,
         )
+
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

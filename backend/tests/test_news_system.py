@@ -12,6 +12,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from ifrontier.app.main import app
+from ifrontier.infra.sqlite.ledger import create_account
 
 client = TestClient(app)
 
@@ -20,6 +21,9 @@ def test_news_card_variant_mutate_propagate_and_inbox() -> None:
     # Use unique ids to avoid cross-test pollution in shared Neo4j
     u_author = f"user:author:{uuid4()}"
     u_follower = f"user:follower:{uuid4()}"
+
+    # Cash-backed costs are explicit: mutation/propagation may consume cash.
+    create_account(u_author, owner_type="user", initial_cash=100.0)
 
     # follower follows author, so author can propagate to follower
     resp = client.post(

@@ -19,12 +19,17 @@ from ifrontier.domain.events.payloads import (
 )
 from ifrontier.domain.events.types import EventType
 from ifrontier.infra.neo4j.event_store import Neo4jEventStore
+from ifrontier.services.game_time import game_time_now, load_game_time_config_from_env
 
 
 class NewsService:
     def __init__(self, driver: Driver, event_store: Neo4jEventStore) -> None:
         self._driver = driver
         self._event_store = event_store
+
+    def _now_game_utc(self) -> datetime:
+        cfg = load_game_time_config_from_env()
+        return game_time_now(cfg=cfg, real_now_utc=None).real_now_utc
 
     def follow(self, *, follower_id: str, followee_id: str) -> None:
         with self._driver.session() as session:
@@ -50,7 +55,7 @@ class NewsService:
         actor_id: str,
         correlation_id: UUID | None = None,
     ) -> tuple[str, EventEnvelopeJson]:
-        now = datetime.now(timezone.utc)
+        now = self._now_game_utc()
         card_id = str(uuid4())
 
         with self._driver.session() as session:
@@ -101,7 +106,7 @@ class NewsService:
         risk_roll: Dict[str, Any] | None = None,
         correlation_id: UUID | None = None,
     ) -> tuple[str, EventEnvelopeJson]:
-        now = datetime.now(timezone.utc)
+        now = self._now_game_utc()
         variant_id = str(uuid4())
 
         with self._driver.session() as session:
@@ -152,7 +157,7 @@ class NewsService:
         risk_roll: Dict[str, Any] | None = None,
         correlation_id: UUID | None = None,
     ) -> tuple[str, EventEnvelopeJson]:
-        now = datetime.now(timezone.utc)
+        now = self._now_game_utc()
         new_variant_id = str(uuid4())
 
         with self._driver.session() as session:
@@ -205,7 +210,7 @@ class NewsService:
         delivery_reason: str,
         correlation_id: UUID | None = None,
     ) -> tuple[str, EventEnvelopeJson]:
-        now = datetime.now(timezone.utc)
+        now = self._now_game_utc()
         delivery_id = str(uuid4())
 
         with self._driver.session() as session:
@@ -320,7 +325,7 @@ class NewsService:
             variant_id=variant_id,
             channel=channel,
             delivered_count=count,
-            broadcasted_at=datetime.now(timezone.utc),
+            broadcasted_at=self._now_game_utc(),
         )
         envelope = EventEnvelope[
             NewsBroadcastedPayload
@@ -359,7 +364,7 @@ class NewsService:
         granter_id: str,
         correlation_id: UUID | None = None,
     ) -> EventEnvelopeJson:
-        now = datetime.now(timezone.utc)
+        now = self._now_game_utc()
         with self._driver.session() as session:
             ok = session.execute_write(
                 self._grant_ownership_tx,
@@ -396,7 +401,7 @@ class NewsService:
         if from_user_id == to_user_id:
             raise ValueError("from_user_id and to_user_id must be different")
 
-        now = datetime.now(timezone.utc)
+        now = self._now_game_utc()
         with self._driver.session() as session:
             ok = session.execute_write(
                 self._transfer_ownership_tx,
