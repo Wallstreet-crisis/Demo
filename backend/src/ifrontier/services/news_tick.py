@@ -442,8 +442,12 @@ class NewsTickEngine:
         rec = tx.run(
             """
             MATCH (ch:NewsChain {chain_id: $chain_id})
-            WITH ch, CASE WHEN ch.suppression_budget_total IS NULL THEN 0.0 ELSE toFloat(ch.suppression_budget_total) END AS total
-            SET ch.suppression_budget_total = total + toFloat($spend)
+            WITH ch,
+                 CASE WHEN ch.suppression_budget_grants IS NULL THEN 0 ELSE toInteger(ch.suppression_budget_grants) END AS grants,
+                 CASE WHEN ch.suppression_budget_total IS NULL THEN 0.0 ELSE toFloat(ch.suppression_budget_total) END AS total,
+                 toInteger(toFloat($spend)) AS spend_grants
+            SET ch.suppression_budget_grants = grants + spend_grants,
+                ch.suppression_budget_total = total + toFloat($spend)
             RETURN true AS ok
             """,
             **params,
@@ -452,17 +456,19 @@ class NewsTickEngine:
 
     @staticmethod
     def _consume_suppression_tx(tx, params: Dict[str, Any]) -> Dict[str, Any] | None:
-        # v0：只消费 total suppression_budget_total（不区分 signal_class），避免引入 APOC 依赖。
+        # v0：只消费 suppression_budget_grants（不区分 signal_class），避免引入 APOC 依赖。
         rec = tx.run(
             """
             MATCH (ch:NewsChain {chain_id: $chain_id})
-            WITH ch, CASE WHEN ch.suppression_budget_total IS NULL THEN 0.0 ELSE toFloat(ch.suppression_budget_total) END AS total
-            WITH ch, total,
-                 CASE WHEN total <= 0 THEN 0 ELSE
-                   CASE WHEN total >= toFloat($requested) THEN toInteger($requested) ELSE toInteger(total) END
+            WITH ch,
+                 CASE WHEN ch.suppression_budget_grants IS NULL THEN 0 ELSE toInteger(ch.suppression_budget_grants) END AS grants,
+                 toInteger($requested) AS requested
+            WITH ch, grants,
+                 CASE WHEN grants <= 0 THEN 0 ELSE
+                   CASE WHEN grants >= requested THEN requested ELSE grants END
                  END AS suppressed
-            SET ch.suppression_budget_total = total - toFloat(suppressed)
-            RETURN suppressed AS suppressed, ch.suppression_budget_total AS suppression_left
+            SET ch.suppression_budget_grants = grants - suppressed
+            RETURN suppressed AS suppressed, toFloat(ch.suppression_budget_grants) AS suppression_left
             """,
             **params,
         ).single()

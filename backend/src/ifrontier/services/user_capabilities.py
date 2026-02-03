@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from ifrontier.infra.sqlite.ledger import AccountSnapshot, get_snapshot
-from ifrontier.infra.sqlite.market import get_price_series
+from ifrontier.infra.sqlite.market import get_price_series, list_active_symbols
 from ifrontier.services.chat import ChatService
 from ifrontier.services.contract_agent import ContractAgent, ContractDraftResult
 from ifrontier.services.contracts import ContractService
@@ -42,6 +42,9 @@ class UserCapabilityFacade:
 
     def get_market_series(self, *, symbol: str, limit: int = 200) -> List[float]:
         return get_price_series(symbol=str(symbol), limit=int(limit))
+
+    def list_market_active_symbols(self, *, limit: int = 20) -> List[str]:
+        return list_active_symbols(limit=int(limit))
 
     def get_recent_public_messages(self, *, limit: int = 10):
         return self.chat_service.list_public_messages(limit=int(limit), before=None)

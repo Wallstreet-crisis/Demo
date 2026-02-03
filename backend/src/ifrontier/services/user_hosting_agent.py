@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -65,8 +66,14 @@ class UserHostingAgent:
                     if sym and abs(float(qty)) > 1e-12
                 ][:5]
 
+                market_active_symbols: List[str] = []
+                try:
+                    market_active_symbols = self.facade.list_market_active_symbols(limit=12)
+                except Exception:
+                    market_active_symbols = []
+
                 quotes: Dict[str, Any] = {}
-                for sym in held_symbols:
+                for sym in (held_symbols + [s for s in market_active_symbols if s not in held_symbols])[:12]:
                     try:
                         q = self.facade.get_market_quote(symbol=sym)
                         quotes[sym] = {
@@ -110,6 +117,7 @@ class UserHostingAgent:
                             "prices": dict(valuation.prices or {}),
                         },
                         "held_symbols": held_symbols,
+                        "market_active_symbols": market_active_symbols,
                         "market_quotes": quotes,
                         "recent_public_messages": recent_msgs,
                     }
@@ -154,8 +162,13 @@ class UserHostingAgent:
             if calls:
                 action_type = "SKILLS"
                 decision = {"tool_calls": [{"name": c.name, "arguments": c.arguments} for c in calls]}
-            for c in calls[:3]:
-                # 单 tick 限制最多执行 3 个动作，避免过度激进
+
+            max_tools = int(os.getenv("IF_HOSTING_MAX_SKILLS_PER_TICK") or "5")
+            if max_tools < 0:
+                max_tools = 0
+
+            for c in calls[:max_tools]:
+                # 单 tick 执行上限，避免过度激进导致副作用爆炸
                 results.append(reg.execute_one(facade=self.facade, call=c))
 
         ctx["last_tick_at"] = now.isoformat()

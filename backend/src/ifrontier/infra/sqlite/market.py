@@ -126,6 +126,15 @@ def get_price_series(*, symbol: str, limit: int = 200) -> List[float]:
     return [float(r["price"]) for r in rows]
 
 
+def list_active_symbols(*, limit: int = 20) -> List[str]:
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT symbol, MAX(occurred_at) AS last_at FROM market_trades GROUP BY symbol ORDER BY last_at DESC LIMIT ?",
+        (int(limit),),
+    ).fetchall()
+    return [str(r["symbol"]) for r in rows]
+
+
 def get_candles(*, symbol: str, interval_seconds: int = 60, limit: int = 200) -> List[Candle]:
     if interval_seconds <= 0:
         raise ValueError("interval_seconds must be > 0")
