@@ -15,7 +15,7 @@ from ifrontier.infra.neo4j.driver import create_driver
 from ifrontier.infra.neo4j.event_store import Neo4jEventStore
 from ifrontier.services.commonbot import run_commonbot_for_earnings
 from ifrontier.services.commonbot_emergency import CommonBotEmergencyRunner
-from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account, get_snapshot
+from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account, get_snapshot, spend_cash
 from ifrontier.infra.sqlite.market import get_candles, get_last_price, get_price_series, record_trade
 from ifrontier.services.matching import submit_limit_order, submit_market_order
 from ifrontier.services.market_analytics import get_quote
@@ -1555,3 +1555,139 @@ async def news_ownership_transfer(req: NewsOwnershipTransferRequest) -> NewsOwne
 async def news_ownership_list(user_id: str, limit: int = 200) -> NewsOwnedCardsResponse:
     cards = _news_service.list_owned_cards(user_id=user_id, limit=limit)
     return NewsOwnedCardsResponse(cards=cards)
+
+
+class NewsStorePurchaseRequest(BaseModel):
+    buyer_user_id: str
+    kind: str
+    price_cash: float
+    image_anchor_id: str | None = None
+    image_uri: str | None = None
+    truth_payload: Dict[str, Any] | None = None
+    symbols: list[str] = []
+    tags: list[str] = []
+    initial_text: str = ""
+
+    # Only used for MAJOR_EVENT
+    t0_seconds: int = 60
+    omen_interval_seconds: int = 10
+    abort_probability: float = 0.3
+    grant_count: int = 2
+    seed: int = 1
+    correlation_id: UUID | None = None
+
+
+class NewsStorePurchaseResponse(BaseModel):
+    kind: str
+    buyer_user_id: str
+    card_id: str | None = None
+    variant_id: str | None = None
+    chain_id: str | None = None
+
+
+@router.post("/news/store/purchase")
+async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchaseResponse:
+    if req.price_cash <= 0:
+        raise HTTPException(status_code=400, detail="price_cash must be > 0")
+
+    purchase_event_id = str(uuid4())
+    try:
+        spend_cash(account_id=req.buyer_user_id, amount=float(req.price_cash), event_id=purchase_event_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # MAJOR_EVENT：购买即创建事件链，T0 延迟广播；不立即投递给所有人
+    if str(req.kind) == "MAJOR_EVENT":
+        try:
+            result = _news_tick_engine.start_chain(
+                kind=req.kind,
+                actor_id=req.buyer_user_id,
+                t0_seconds=req.t0_seconds,
+                omen_interval_seconds=req.omen_interval_seconds,
+                abort_probability=req.abort_probability,
+                grant_count=req.grant_count,
+                seed=req.seed,
+                correlation_id=req.correlation_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        major_card_id = str(result["major_card_id"])
+        # 购买者获得主事件卡所有权
+        try:
+            _news_service.grant_ownership(
+                card_id=major_card_id,
+                to_user_id=req.buyer_user_id,
+                granter_id="system",
+                correlation_id=req.correlation_id,
+            )
+        except ValueError:
+            pass
+
+        return NewsStorePurchaseResponse(
+            kind=str(req.kind),
+            buyer_user_id=str(req.buyer_user_id),
+            chain_id=str(result["chain_id"]),
+            card_id=major_card_id,
+            variant_id=None,
+        )
+
+    # 普通卡：等效“随机拾到”，只投递给购买者，后续靠其手动助推传播
+    card_id, card_event = _news_service.create_card(
+        kind=req.kind,
+        image_anchor_id=req.image_anchor_id,
+        image_uri=req.image_uri,
+        truth_payload=req.truth_payload,
+        symbols=req.symbols,
+        tags=req.tags,
+        actor_id=req.buyer_user_id,
+        correlation_id=req.correlation_id,
+    )
+    await hub.broadcast_json("events", card_event.model_dump())
+    await hub.broadcast_json(str(EventType.NEWS_CARD_CREATED), card_event.model_dump())
+
+    variant_id, variant_event = _news_service.emit_variant(
+        card_id=card_id,
+        author_id=req.buyer_user_id,
+        text=req.initial_text or "",
+        parent_variant_id=None,
+        influence_cost=0.0,
+        risk_roll=None,
+        correlation_id=req.correlation_id,
+    )
+    await hub.broadcast_json("events", variant_event.model_dump())
+    await hub.broadcast_json(str(EventType.NEWS_VARIANT_EMITTED), variant_event.model_dump())
+
+    try:
+        ownership_event = _news_service.grant_ownership(
+            card_id=card_id,
+            to_user_id=req.buyer_user_id,
+            granter_id="system",
+            correlation_id=req.correlation_id,
+        )
+        await hub.broadcast_json("events", ownership_event.model_dump())
+        await hub.broadcast_json(str(EventType.NEWS_OWNERSHIP_GRANTED), ownership_event.model_dump())
+    except ValueError:
+        pass
+
+    try:
+        _delivery_id, delivered_event = _news_service.deliver_variant(
+            variant_id=variant_id,
+            to_player_id=req.buyer_user_id,
+            from_actor_id="system",
+            visibility_level="NORMAL",
+            delivery_reason="PURCHASED",
+            correlation_id=req.correlation_id,
+        )
+        await hub.broadcast_json("events", delivered_event.model_dump())
+        await hub.broadcast_json(str(EventType.NEWS_DELIVERED), delivered_event.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return NewsStorePurchaseResponse(
+        kind=str(req.kind),
+        buyer_user_id=str(req.buyer_user_id),
+        card_id=str(card_id),
+        variant_id=str(variant_id),
+        chain_id=None,
+    )

@@ -33,6 +33,13 @@
 - **强制广播内容一致**：广播只保证“全员收到同一份内容”，阶级差异体现在可见性/渲染等级。
 - **新闻资产化 MVP**：先只做 `Ownership` 转移（P2P），传播/编辑权跟随所有权。
 
+补充（v0.1 决策）：
+- **购买卡片以现金结算**：从系统购买 `NewsCard` 直接消耗现金（ledger）。
+- **购买后两类发布路径**：
+  - `MAJOR_EVENT`（系统级重大事件）：购买后进入孵化/前兆链，并在 T=0 延迟广播（Mandatory Broadcast）。
+  - 其他普通卡：购买后等效“随机拾到的新闻”，走社交关系网链式病毒传播（Propagate）。
+- **助推/压制都花现金**：传播助推（propagate boost）和抑制他人助推（suppress）均消耗现金，并落为事件流审计。
+
 ---
 
 ## 3. 核心概念与数据模型
@@ -217,6 +224,96 @@ MVP：只做所有权转移，传播/编辑权跟随所有权。
 - `POST /news/variants/{variant_id}/propagate`：按社交图传播（消耗影响力）
 - `GET /news/inbox/{player_id}`：收件箱
 - `POST /news/broadcast`：强制广播（系统/GM）
+
+### 9.2 现金购买与投递策略（v0.1）
+
+#### 9.2.1 购买（Purchase）
+
+目标：后端策划/系统用一条 API 完成“扣现金 + 铸造卡牌 + 绑定发布策略”。
+
+- `POST /news/store/purchase`
+
+请求建议：
+```json
+{
+  "buyer_user_id": "user:rich:xxx",
+  "kind": "RUMOR",
+  "price_cash": 100.0,
+  "image_anchor_id": null,
+  "image_uri": null,
+  "truth_payload": {"topic": "..."},
+  "symbols": ["ABC"],
+  "tags": ["purchased"],
+  "initial_text": "...",
+  "policy": {
+    "type": "PURCHASED_RANDOM_PICKUP",
+    "seed_deliveries": 1,
+    "delivery_reason": "PURCHASED"
+  }
+}
+```
+
+语义：
+- 现金扣款：从 `buyer_user_id` 的账户扣减 `price_cash`
+- 创建卡牌与初始版本：`create_card` + `emit_variant(author=buyer_user_id)`
+- 授予所有权：`ownership.grant` 给 `buyer_user_id`
+- 执行发布策略：
+  - 普通卡（非 `MAJOR_EVENT`）：等效随机拾到（至少给购买者自己投递 1 次），之后进入社交链传播。
+  - `MAJOR_EVENT`：创建/绑定事件链状态（`truth_payload` 含 `t0_at/chain_id/phase`），并由 tick 在孵化期生成 omen，在 T0 广播。
+
+#### 9.2.2 普通卡：随机拾到 + 社交链式传播
+
+推荐策略：
+- 购买瞬间至少投递给购买者（让其“拿到卡”）
+- 后续传播通过关系图传播（followers / 朋友链），传播由“助推现金”驱动
+
+- `POST /news/variants/{variant_id}/propagate`
+
+请求建议（现金助推）：
+```json
+{
+  "from_actor_id": "user:rich:xxx",
+  "spend_cash": 50.0,
+  "scope": "followers",
+  "limit": 30,
+  "visibility_level": "NORMAL"
+}
+```
+
+语义：
+- 从传播者扣现金（ledger）
+- 将现金映射为可覆盖人数/跳数（v0 先做确定性：例如 `limit = floor(spend_cash / unit_cost)`）
+- 对目标集合投递 `deliver_variant(reason=SOCIAL_PROPAGATION)`
+
+#### 9.2.3 系统级重大事件：延迟广播（孵化/前兆链）
+
+购买 `kind=MAJOR_EVENT` 后：
+- 创建主事件占位卡（或购买即是主事件卡）
+- `truth_payload` 内包含 `chain_id/phase/t0_at/abort_probability` 等
+- 由 `/news/tick` 驱动：
+  - 孵化期按 `omen_interval_seconds` 生成前兆 omen，并随机播撒（可被压制）
+  - 到达 `t0_at` 后触发强制全局广播（同一份内容）
+
+#### 9.2.4 压制（Suppress）与反制（仍以现金计费）
+
+- `POST /news/suppress`
+
+请求建议：
+```json
+{
+  "actor_id": "user:rich:yyy",
+  "chain_id": "...",
+  "spend_cash": 100.0,
+  "scope": "chain"
+}
+```
+
+语义：
+- 从 `actor_id` 扣现金（ledger）
+- 将现金转为 suppression budget（以“可抑制的投递次数”计）
+- 影响 `/news/tick` 的 omen 投递覆盖，使 `delivered_to` 下降甚至归零
+
+备注：当前实现中 suppression 是针对 chain omen 的投递预算；后续可扩展到 variant 级别。
 
 ### 9.2 第二阶段
 - tick 生成器：前兆/孵化/流产/T=0

@@ -137,6 +137,34 @@ def apply_trade_executed(
                 raise ValueError("negative position after trade")
 
 
+def spend_cash(*, account_id: str, amount: float, event_id: str) -> None:
+    if amount <= 0:
+        raise ValueError("amount must be positive")
+
+    conn = get_connection()
+    now = datetime.now(timezone.utc).isoformat()
+
+    with conn:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT OR IGNORE INTO accounts(account_id, owner_type, cash) VALUES (?, ?, 0)",
+            (account_id, "user"),
+        )
+        row = cur.execute(
+            "SELECT cash FROM accounts WHERE account_id = ?",
+            (account_id,),
+        ).fetchone()
+        cash = float(row["cash"]) if row is not None else 0.0
+        if cash < float(amount) - 1e-9:
+            raise ValueError("insufficient cash")
+
+        _insert_ledger(cur, account_id, "CASH", "CASH", -float(amount), str(event_id), now)
+        cur.execute(
+            "UPDATE accounts SET cash = cash - ? WHERE account_id = ?",
+            (float(amount), account_id),
+        )
+
+
 def _insert_ledger(cur, account_id: str, asset_type: str, symbol: str, delta: float, event_id: str, created_at: str) -> None:
     cur.execute(
         "INSERT INTO ledger_entries(entry_id, account_id, asset_type, symbol, delta, event_id, created_at) "
