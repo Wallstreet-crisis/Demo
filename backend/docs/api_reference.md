@@ -480,6 +480,13 @@ Response: `200 OK` with empty body.
 ### POST `/news/cards`
 Create a news card.
 
+Permission / usage:
+- This endpoint is **GM/script/debug-only** by default.
+- Server-side gate:
+  - Allowed if `actor_id == "system"` or `actor_id` starts with `gm:`.
+  - Otherwise requires env `IF_NEWS_ALLOW_DIRECT_CREATE=1`.
+- Normal gameplay for players: use `POST /news/store/purchase` to obtain a card.
+
 Request:
 ```json
 {
@@ -691,6 +698,10 @@ Response:
 
 ### POST `/news/store/purchase`
 Purchase a news item from store. For `MAJOR_EVENT`, returns chain_id; otherwise returns card_id + variant_id.
+
+Notes:
+- This is the **player-facing** way to obtain cards in current implementation.
+- Charges cash immediately via SQLite ledger (`spend_cash`).
 
 Request:
 ```json

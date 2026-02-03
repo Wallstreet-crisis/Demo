@@ -1247,6 +1247,19 @@ class NewsCreateCardResponse(BaseModel):
 
 @router.post("/news/cards")
 async def news_create_card(req: NewsCreateCardRequest) -> NewsCreateCardResponse:
+    # 该端点用于 GM/脚本/调试直接铸造卡牌。
+    # 正式玩法中，玩家应通过 /news/store/purchase 购买获得卡牌，而不是自行创建。
+    allow_direct_create = str(os.getenv("IF_NEWS_ALLOW_DIRECT_CREATE") or "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "y",
+        "on",
+    }
+    is_privileged_actor = req.actor_id == "system" or str(req.actor_id).startswith("gm:")
+    if not allow_direct_create and not is_privileged_actor:
+        raise HTTPException(status_code=403, detail="direct news card creation is GM-only")
+
     try:
         card_id, event_json = _news_service.create_card(
             kind=req.kind,

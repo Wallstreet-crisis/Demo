@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Api,
   ApiError,
-  type NewsCreateCardResponse,
-  type NewsEmitVariantResponse,
   type NewsInboxResponse,
   type NewsInboxResponseItem,
 } from '../api'
@@ -41,11 +39,6 @@ export default function NewsPage() {
   const [inbox, setInbox] = useState<NewsInboxResponse | null>(null)
   const [ownedCards, setOwnedCards] = useState<string[]>([])
   const [loadingOwned, setLoadingOwned] = useState(false)
-
-  const [cardKind, setCardKind] = useState<string>('RUMOR')
-  const [cardText, setCardText] = useState<string>('')
-  const [lastCard, setLastCard] = useState<NewsCreateCardResponse | null>(null)
-  const [lastVariant, setLastVariant] = useState<NewsEmitVariantResponse | null>(null)
 
   // Pre-fill fields
   const [targetVariantId, setTargetVariantId] = useState<string>('')
@@ -96,35 +89,6 @@ export default function NewsPage() {
     }
   }
 
-  async function createCardAndVariant(): Promise<void> {
-    try {
-      const card = await Api.newsCreateCard({
-        actor_id: `user:${playerId}`,
-        kind: cardKind,
-        symbols: [symbol],
-        tags: [],
-        truth_payload: null,
-      })
-      setLastCard(card)
-
-      const v = await Api.newsEmitVariant({
-        card_id: card.card_id,
-        author_id: `user:${playerId}`,
-        text: cardText,
-        parent_variant_id: null,
-        influence_cost: 0.0,
-        risk_roll: null,
-      })
-      setLastVariant(v)
-      setTargetVariantId(v.variant_id)
-      notify('success', `卡片与变体已创建`)
-      await refreshInbox()
-    } catch (e) {
-      const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
-      notify('error', msg)
-    }
-  }
-
   async function purchase(): Promise<void> {
     try {
       const r = await Api.newsStorePurchase({
@@ -169,7 +133,7 @@ export default function NewsPage() {
   }, [])
 
   async function propagateLast(): Promise<void> {
-    const vid = targetVariantId || lastVariant?.variant_id
+    const vid = targetVariantId
     if (!vid) {
       notify('error', '请先选择或创建一个变体')
       return
@@ -279,12 +243,10 @@ export default function NewsPage() {
               >准备传播该变体</button>
               <button 
                 onClick={() => {
-                  setCardText(selectedInboxItem.text)
-                  notify('info', '内容已填入创建面板，可在此基础上修改')
-                  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+                  notify('info', '当前版本不支持玩家直接创建新闻；请通过“新闻商店”购买后再传播。')
                 }}
-                style={{ flex: 1, background: '#52c41a', color: '#fff', border: 'none' }}
-              >以此创建新变体</button>
+                style={{ flex: 1, background: '#f0f0f0', color: '#666', border: 'none' }}
+              >创建新闻（不可用）</button>
             </div>
           </div>
         </div>
@@ -340,26 +302,11 @@ export default function NewsPage() {
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           <div style={{ borderRight: '1px solid #eee', paddingRight: 20 }}>
-            <h4 style={{ margin: '0 0 10px' }}>第一步: 创建并发布 (Create & Emit)</h4>
-            <div style={{ display: 'grid', gap: 10 }}>
-              <label>
-                <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>新闻类型</div>
-                <select value={cardKind} onChange={(e) => setCardKind(e.target.value)} style={{ width: '100%', padding: '6px' }}>
-                  <option value="RUMOR">传闻 (Rumor)</option>
-                  <option value="OFFICIAL">官方 (Official)</option>
-                  <option value="ANALYSIS">分析 (Analysis)</option>
-                </select>
-              </label>
-              <label>
-                <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>正文内容</div>
-                <textarea
-                  style={{ width: '100%', minHeight: 60, padding: '6px', boxSizing: 'border-box' }}
-                  placeholder="输入新闻内容..."
-                  value={cardText}
-                  onChange={(e) => setCardText(e.target.value)}
-                />
-              </label>
-              <button onClick={createCardAndVariant} style={{ width: '100%', padding: '12px', borderRadius: 8, background: '#1890ff', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }} onMouseOver={e => e.currentTarget.style.opacity = '0.9'} onMouseOut={e => e.currentTarget.style.opacity = '1'}>发布新闻</button>
+            <h4 style={{ margin: '0 0 10px' }}>第一步: 获取新闻 (Purchase)</h4>
+            <div style={{ color: '#666', fontSize: 13, lineHeight: 1.6 }}>
+              玩家当前版本不支持直接创建新闻卡牌。
+              <br />
+              请通过下方“新闻商店 (Store)”购买获得 `variant_id`，再到右侧进行传播。
             </div>
           </div>
 
@@ -423,7 +370,6 @@ export default function NewsPage() {
       <details style={{ textAlign: 'left', color: '#999' }}>
         <summary style={{ cursor: 'pointer', fontSize: 13 }}>调试数据 (Debug Info)</summary>
         <div style={{ padding: 10, background: '#f8f8f8', borderRadius: 4, marginTop: 10 }}>
-          <div><strong>Last Created:</strong> {JSON.stringify({ lastCard, lastVariant })}</div>
           <div><strong>Inbox Raw:</strong> {JSON.stringify(inbox)}</div>
         </div>
       </details>

@@ -45,7 +45,10 @@
 - **购买后两类发布路径**：
   - `MAJOR_EVENT`（系统级重大事件）：购买后进入孵化/前兆链，并在 T=0 延迟广播（Mandatory Broadcast）。
   - 其他普通卡：购买后等效“随机拾到的新闻”，走社交关系网链式病毒传播（Propagate）。
-- **助推/压制都花现金**：传播助推（propagate boost）和抑制他人助推（suppress）均消耗现金，并落为事件流审计。
+- **助推花现金；压制花影响力**：
+  - `POST /news/propagate` 在提供 `spend_cash` 时会扣现金，并用预算限制可投递人数。
+  - `POST /news/variants/mutate` 会按字数扣现金（可用 `spend_cash` 覆盖）。
+  - `POST /news/suppress` 当前实现消耗的是 `spend_influence`（并写入事件流）。
 
 ---
 
@@ -236,7 +239,7 @@ MVP：只做所有权转移，传播/编辑权跟随所有权。
 ## 9. API 规划（实现顺序建议）
 
 ### 9.1 MVP（第一阶段）
-- `POST /news/cards`：创建占位/无配图卡牌
+- `POST /news/cards`：创建占位/无配图卡牌（GM/脚本/调试用途；玩家不应直接调用）
 - `POST /news/variants/emit`：发布初始文本版本
 - `POST /news/variants/{variant_id}/mutate`：篡改生成新版本（需 ownership 或付费策略）
 - `POST /news/variants/{variant_id}/propagate`：按社交图传播（消耗影响力）
@@ -250,6 +253,10 @@ MVP：只做所有权转移，传播/编辑权跟随所有权。
 目标：后端策划/系统用一条 API 完成“扣现金 + 铸造卡牌 + 绑定发布策略”。
 
 - `POST /news/store/purchase`
+
+实现边界（以现有代码为准）：
+- **玩家获取卡牌的唯一推荐入口**是 `/news/store/purchase`。
+- `/news/cards` 默认仅允许 `system` 或 `gm:*`（除非显式开启 `IF_NEWS_ALLOW_DIRECT_CREATE=1`）。
 
 请求建议：
 ```json
@@ -326,9 +333,8 @@ MVP：只做所有权转移，传播/编辑权跟随所有权。
 }
 ```
 
-语义：
-- 从 `actor_id` 扣现金（ledger）
-- 将现金转为 suppression budget（以“可抑制的投递次数”计）
+语义（当前实现）：
+- `spend_influence` 会被转换为 suppression budget（以“可抑制的投递次数”计）
 - 影响 `/news/tick` 的 omen 投递覆盖，使 `delivered_to` 下降甚至归零
 
 备注：当前实现中 suppression 是针对 chain omen 的投递预算；后续可扩展到 variant 级别。

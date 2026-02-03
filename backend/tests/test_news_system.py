@@ -32,33 +32,25 @@ def test_news_card_variant_mutate_propagate_and_inbox() -> None:
     )
     assert resp.status_code == 200
 
-    # create card (placeholder / no image)
+    # 玩家不直接创建卡牌：通过 store/purchase 购买获得 card + root variant，并投递给自己
     resp = client.post(
-        "/news/cards",
+        "/news/store/purchase",
         json={
-            "actor_id": u_author,
+            "buyer_user_id": u_author,
             "kind": "RUMOR",
-            "image_anchor_id": None,
-            "image_uri": None,
+            "price_cash": 1.0,
             "truth_payload": {"chain_id": f"chain:{uuid4()}"},
             "symbols": ["BLUEGOLD"],
             "tags": ["test"],
+            "initial_text": "Diplomacy downgraded.",
         },
     )
     assert resp.status_code == 200
-    card_id = resp.json()["card_id"]
-
-    # emit first variant
-    resp = client.post(
-        "/news/variants/emit",
-        json={
-            "card_id": card_id,
-            "author_id": u_author,
-            "text": "Diplomacy downgraded.",
-        },
-    )
-    assert resp.status_code == 200
-    root_variant_id = resp.json()["variant_id"]
+    payload = resp.json()
+    card_id = payload["card_id"]
+    root_variant_id = payload["variant_id"]
+    assert card_id
+    assert root_variant_id
 
     # mutate (fork)
     resp = client.post(
@@ -105,10 +97,11 @@ def test_news_broadcast_delivers_to_all_known_users() -> None:
     )
     assert resp.status_code == 200
 
+    # 该测试只关心 broadcast 行为：用 GM/system 直接创建卡牌更稳定
     resp = client.post(
         "/news/cards",
         json={
-            "actor_id": u1,
+            "actor_id": "system",
             "kind": "MAJOR_EVENT",
             "truth_payload": {"note": "global"},
         },
@@ -120,7 +113,7 @@ def test_news_broadcast_delivers_to_all_known_users() -> None:
         "/news/variants/emit",
         json={
             "card_id": card_id,
-            "author_id": u1,
+            "author_id": "system",
             "text": "EARNINGS REPORT RELEASED.",
         },
     )
