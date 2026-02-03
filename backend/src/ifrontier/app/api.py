@@ -653,7 +653,7 @@ class PlayerMarketOrderRequest(BaseModel):
 async def submit_player_market_order(req: PlayerMarketOrderRequest) -> None:
     account_id = f"user:{req.player_id}"
     try:
-        order_id, _matches = submit_market_order(
+        submit_market_order(
             account_id=account_id,
             symbol=req.symbol,
             side=req.side,
@@ -661,6 +661,7 @@ async def submit_player_market_order(req: PlayerMarketOrderRequest) -> None:
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
 
 class PlayerAccountResponse(BaseModel):
     account_id: str
