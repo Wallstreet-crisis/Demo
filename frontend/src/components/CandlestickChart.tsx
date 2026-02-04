@@ -59,8 +59,8 @@ export default function CandlestickChart({ candles, height = 300 }: CandlestickC
     // Calculate optimal bar width with constraints
     const availableWidth = width - margin.left - margin.right
     const rawBarWidth = availableWidth / Math.max(candles.length, 1)
-    const barWidth = Math.min(rawBarWidth, 20) // Limit max width
-    const gap = Math.max(barWidth * 0.2, 1) // 20% gap
+    const barWidth = Math.min(rawBarWidth, 14) // Limit max width further
+    const gap = barWidth * 0.35 // 35% gap for better separation
     const bodyWidth = Math.max(barWidth - gap, 1)
     
     const scaleX = (index: number) => {
@@ -124,8 +124,8 @@ export default function CandlestickChart({ candles, height = 300 }: CandlestickC
         gap: '10px',
         pointerEvents: 'none'
       }}>
-        <span style={{ color: '#fbbf24' }}>MA5: {lastCandle ? ma5[candles.length - 1]?.toFixed(2) : '--'}</span>
-        <span style={{ color: '#8b5cf6' }}>MA20: {lastCandle ? ma20[candles.length - 1]?.toFixed(2) : '--'}</span>
+        <span style={{ color: '#fbbf24' }}>MA5: {lastCandle && ma5[candles.length - 1] != null ? ma5[candles.length - 1]?.toFixed(2) : '--'}</span>
+        <span style={{ color: '#8b5cf6' }}>MA20: {lastCandle && ma20[candles.length - 1] != null ? ma20[candles.length - 1]?.toFixed(2) : '--'}</span>
       </div>
 
       {/* Floating Tooltip */}
@@ -185,12 +185,12 @@ export default function CandlestickChart({ candles, height = 300 }: CandlestickC
                 y2={y} 
                 stroke="#1e293b" 
                 strokeWidth="0.5" 
-                strokeDasharray="4 4" 
+                strokeDasharray="2 4" 
               />
               <text 
                 x={width - margin.right + 8} 
                 y={y + 3} 
-                fill="#94a3b8" 
+                fill="#475569" 
                 fontSize="10" 
                 fontFamily="monospace"
               >
@@ -268,7 +268,7 @@ export default function CandlestickChart({ candles, height = 300 }: CandlestickC
               width={bodyWidth} 
               height={Math.max(height - margin.bottom - volY, 1)} 
               fill={color} 
-              opacity={hoveredCandle === c ? "0.4" : "0.15"} 
+              opacity={hoveredCandle === c ? "0.3" : "0.1"} 
             />
           )
         })}
@@ -311,7 +311,7 @@ export default function CandlestickChart({ candles, height = 300 }: CandlestickC
                 x2={centerX} 
                 y2={yLow} 
                 stroke={color} 
-                strokeWidth="1" 
+                strokeWidth="0.8" 
               />
               {/* Body */}
               <rect 
@@ -339,12 +339,12 @@ export default function CandlestickChart({ candles, height = 300 }: CandlestickC
                 x1={x} 
                 y1={margin.top} 
                 x2={x} 
-                y2={margin.top + chartAreaHeight} 
+                y2={margin.top + chartAreaHeight + volHeight + 10} 
                 stroke="#1e293b" 
                 strokeWidth="0.5" 
                 strokeDasharray="2 4"
               />
-              <text x={x} y={height - 10} fill="#64748b" fontSize="9" fontFamily="monospace" textAnchor="middle">
+              <text x={x} y={height - 10} fill="#475569" fontSize="9" fontFamily="monospace" textAnchor="middle">
                 {new Date(c.bucket_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </text>
             </g>
