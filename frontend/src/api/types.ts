@@ -322,6 +322,7 @@ export type NewsStoreCatalogItem = {
   requires_symbols?: boolean
   preview_text: string
   presets?: NewsStoreCatalogPreset[]
+  symbol_options?: string[]
 }
 
 export type NewsStoreCatalogResponse = {

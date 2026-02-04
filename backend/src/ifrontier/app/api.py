@@ -129,12 +129,15 @@ class NewsStoreCatalogItem(BaseModel):
     requires_symbols: bool = False
     preview_text: str
     presets: List[NewsStoreCatalogPreset]
+    symbol_options: List[str] = []
 
 class NewsStoreCatalogResponse(BaseModel):
     items: List[NewsStoreCatalogItem]
 
 @router.get("/news/store/catalog")
 async def news_store_catalog() -> NewsStoreCatalogResponse:
+    from ifrontier.infra.sqlite.securities import list_securities
+
     items_cfg: List[Dict[str, Any]] = [
         {"kind": "RUMOR", "price_cash": 50.0, "requires_symbols": False},
         {"kind": "LEAK", "price_cash": 120.0, "requires_symbols": True},
@@ -143,15 +146,42 @@ async def news_store_catalog() -> NewsStoreCatalogResponse:
         {"kind": "DISCLOSURE", "price_cash": 180.0, "requires_symbols": True},
         {"kind": "EARNINGS", "price_cash": 150.0, "requires_symbols": True},
         {"kind": "MAJOR_EVENT", "price_cash": 300.0, "requires_symbols": True},
+        {"kind": "WORLD_EVENT", "price_cash": 500.0, "requires_symbols": False},
     ]
+
+    sec_symbols = [s.symbol for s in list_securities()]
+    if not sec_symbols:
+        sec_symbols = ["BLUEGOLD"]
+
+    default_symbol_by_kind: Dict[str, List[str]] = {
+        "LEAK": ["CIVILBANK", "NEURALINK", "FOODMART", "BLUEGOLD"],
+        "ANALYST_REPORT": ["NEURALINK", "CIVILBANK", "FOODMART", "BLUEGOLD"],
+        "OMEN": ["BLUEGOLD", "CIVILBANK", "NEURALINK", "FOODMART"],
+        "DISCLOSURE": ["CIVILBANK", "BLUEGOLD", "NEURALINK", "FOODMART"],
+        "EARNINGS": ["NEURALINK", "CIVILBANK", "FOODMART", "BLUEGOLD"],
+        "MAJOR_EVENT": ["BLUEGOLD", "NEURALINK", "CIVILBANK", "FOODMART"],
+    }
 
     out: List[NewsStoreCatalogItem] = []
     for it in items_cfg:
         kind = str(it["kind"])
         requires_symbols = bool(it.get("requires_symbols") or False)
-        symbols = ["BLUEGOLD"] if requires_symbols else []
-        presets_texts = _news_service.get_preset_templates(kind=kind, symbols=symbols)
-        preview = presets_texts[0] if presets_texts else _news_service.get_preset_template(kind=kind, symbols=symbols)
+        symbol_options: List[str] = []
+        if requires_symbols:
+            preferred = default_symbol_by_kind.get(kind, [])
+            for p in preferred:
+                if p in sec_symbols and p not in symbol_options:
+                    symbol_options.append(p)
+            if not symbol_options:
+                symbol_options = [str(sec_symbols[0])]
+
+        preview_symbols = symbol_options[:1]
+        presets_texts = _news_service.get_preset_templates(kind=kind, symbols=preview_symbols)
+        preview = (
+            presets_texts[0]
+            if presets_texts
+            else _news_service.get_preset_template(kind=kind, symbols=preview_symbols)
+        )
         out.append(
             NewsStoreCatalogItem(
                 kind=kind,
@@ -162,13 +192,11 @@ async def news_store_catalog() -> NewsStoreCatalogResponse:
                     NewsStoreCatalogPreset(preset_id=f"{kind}:{idx}", text=str(t))
                     for idx, t in enumerate(presets_texts)
                 ],
+                symbol_options=list(symbol_options),
             )
         )
 
     return NewsStoreCatalogResponse(items=out)
-
-def _news_debug_enabled() -> bool:
-    return str(os.getenv("IF_NEWS_DEBUG") or "0").strip().lower() in {"1", "true", "yes"}
 
 class DebugNewsChainsResponse(BaseModel):
     items: List[Dict[str, Any]]
@@ -803,7 +831,7 @@ async def create_player(req: CreatePlayerRequest) -> CreatePlayerResponse:
     if req.initial_cash is not None:
         initial_cash = req.initial_cash
 
-    create_account(account_id, owner_type="user", initial_cash=initial_cash)
+    create_account(account_id, owner_type="user", initial_cash=float(initial_cash))
 
     if positions:
         conn = get_connection()
@@ -891,29 +919,29 @@ class PlayerBootstrapRequest(BaseModel):
 async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountResponse:
     # 幂等：如果已存在则返回现有数据，不报错也不重复发放初始资产
     account_id = f"user:{req.player_id}"
-    conn = get_connection()
+    # 如果提供 caste_id, 优先使用阶级配置; 否则回退到显式 initial_cash 或 0
+    initial_cash = 0.0
+    positions: Dict[str, float] = {}
 
-    row = conn.execute("SELECT 1 FROM accounts WHERE account_id = ?", (account_id,)).fetchone()
-    if not row:
-        initial_cash = float(req.initial_cash) if req.initial_cash is not None else 10000.0
-        positions: Dict[str, float] = {}
+    if req.caste_id is not None:
+        cfg = get_caste_config(req.caste_id)
+        if cfg is not None:
+            initial_cash = cfg.initial_cash
+            positions = cfg.initial_positions
+    if req.initial_cash is not None:
+        initial_cash = req.initial_cash
 
-        if req.caste_id is not None:
-            cfg = get_caste_config(req.caste_id)
-            if cfg is not None:
-                initial_cash = float(cfg.initial_cash)
-                positions = dict(cfg.initial_positions)
+    create_account(account_id, owner_type="user", initial_cash=float(initial_cash))
 
-        create_account(account_id, owner_type="user", initial_cash=float(initial_cash))
-
-        if positions:
-            with conn:
-                for symbol, qty in positions.items():
-                    conn.execute(
-                        "INSERT INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?) "
-                        "ON CONFLICT(account_id, symbol) DO UPDATE SET quantity = quantity + excluded.quantity",
-                        (account_id, symbol, qty),
-                    )
+    if positions:
+        conn = get_connection()
+        with conn:
+            for symbol, qty in positions.items():
+                conn.execute(
+                    "INSERT INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?) "
+                    "ON CONFLICT(account_id, symbol) DO UPDATE SET quantity = quantity + excluded.quantity",
+                    (account_id, symbol, qty),
+                )
 
     # 确保 Neo4j 中存在该玩家 User 节点（供新闻传播/调试使用）
     try:
@@ -1972,6 +2000,8 @@ class NewsStorePurchaseRequest(BaseModel):
 
 @router.post("/news/store/purchase")
 async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchaseResponse:
+    from ifrontier.infra.sqlite.securities import list_securities
+
     items_cfg: List[Dict[str, Any]] = [
         {"kind": "RUMOR", "price_cash": 50.0, "requires_symbols": False},
         {"kind": "LEAK", "price_cash": 120.0, "requires_symbols": True},
@@ -1980,6 +2010,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
         {"kind": "DISCLOSURE", "price_cash": 180.0, "requires_symbols": True},
         {"kind": "EARNINGS", "price_cash": 150.0, "requires_symbols": True},
         {"kind": "MAJOR_EVENT", "price_cash": 300.0, "requires_symbols": True},
+        {"kind": "WORLD_EVENT", "price_cash": 500.0, "requires_symbols": False},
     ]
     kind_key = str(req.kind)
     cfg = next((x for x in items_cfg if str(x.get("kind")) == kind_key), None)
@@ -1991,8 +2022,37 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
         raise HTTPException(status_code=400, detail="invalid system price")
 
     requires_symbols = bool(cfg.get("requires_symbols") or False)
-    if requires_symbols and not (req.symbols or []):
-        raise HTTPException(status_code=400, detail="symbols required for this kind")
+    sec_symbols = [s.symbol for s in list_securities()]
+    if not sec_symbols:
+        sec_symbols = ["BLUEGOLD"]
+
+    default_symbol_by_kind: Dict[str, List[str]] = {
+        "LEAK": ["CIVILBANK", "NEURALINK", "FOODMART", "BLUEGOLD"],
+        "ANALYST_REPORT": ["NEURALINK", "CIVILBANK", "FOODMART", "BLUEGOLD"],
+        "OMEN": ["BLUEGOLD", "CIVILBANK", "NEURALINK", "FOODMART"],
+        "DISCLOSURE": ["CIVILBANK", "BLUEGOLD", "NEURALINK", "FOODMART"],
+        "EARNINGS": ["NEURALINK", "CIVILBANK", "FOODMART", "BLUEGOLD"],
+        "MAJOR_EVENT": ["BLUEGOLD", "NEURALINK", "CIVILBANK", "FOODMART"],
+    }
+
+    symbol_options: List[str] = []
+    if requires_symbols:
+        preferred = default_symbol_by_kind.get(kind_key, [])
+        for p in preferred:
+            if p in sec_symbols and p not in symbol_options:
+                symbol_options.append(p)
+        if not symbol_options:
+            symbol_options = [str(sec_symbols[0])]
+
+    req_symbols = list(req.symbols or [])
+    if not symbol_options:
+        if req_symbols:
+            raise HTTPException(status_code=400, detail="symbols not allowed for this kind")
+    else:
+        if len(req_symbols) != 1:
+            raise HTTPException(status_code=400, detail="exactly one symbol required")
+        if req_symbols[0] not in symbol_options:
+            raise HTTPException(status_code=400, detail="symbol must be in symbol_options")
 
     purchase_event_id = str(uuid4())
     try:
@@ -2015,7 +2075,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
                 abort_probability=req.abort_probability,
                 grant_count=req.grant_count,
                 seed=req.seed,
-                symbols=req.symbols or [],
+                symbols=req_symbols,
                 correlation_id=req.correlation_id,
             )
         except ValueError as exc:
@@ -2042,7 +2102,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
         )
 
     # 普通卡：等效“随机拾到”，只投递给购买者，后续靠其手动助推传播
-    symbols = req.symbols or []
+    symbols = req_symbols
     presets = _news_service.get_preset_templates(kind=str(req.kind), symbols=symbols)
     preset_id = str(req.preset_id) if req.preset_id is not None else ""
     initial_text = ""

@@ -5,7 +5,7 @@ import { useNotification } from '../app/NotificationContext'
 import CyberWidget from './CyberWidget'
 
 export default function PropagandaWidget() {
-  const { playerId, symbol } = useAppSession()
+  const { playerId } = useAppSession()
   const { notify } = useNotification()
   
   const [loading, setLoading] = useState(false)
@@ -19,6 +19,7 @@ export default function PropagandaWidget() {
   const [purchasePrice, setPurchasePrice] = useState(100)
   const [purchaseText, setPurchaseText] = useState('')
   const [purchasePresetId, setPurchasePresetId] = useState('')
+  const [purchaseSymbol, setPurchaseSymbol] = useState('')
 
   // Propagation
   const [targetVariantId, setTargetVariantId] = useState('')
@@ -54,6 +55,8 @@ export default function PropagandaWidget() {
           const p0 = selected.presets?.[0]?.preset_id ?? ''
           setPurchasePresetId(p0)
           setPurchaseText(String(selected.presets?.[0]?.text ?? selected.preview_text ?? ''))
+          const s0 = selected.symbol_options?.[0] ?? ''
+          setPurchaseSymbol(s0)
         }
       }
     } catch (e) {
@@ -80,6 +83,13 @@ export default function PropagandaWidget() {
       setPurchasePresetId('')
       setPurchaseText(String(selected.preview_text ?? ''))
     }
+
+    const opts = selected.symbol_options ?? []
+    if (opts.length > 0) {
+      if (!purchaseSymbol || !opts.includes(purchaseSymbol)) setPurchaseSymbol(opts[0])
+    } else {
+      if (purchaseSymbol) setPurchaseSymbol('')
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [purchaseKind, storeItems])
 
@@ -95,7 +105,8 @@ export default function PropagandaWidget() {
     setLoading(true)
     try {
       const selected = storeItems.find((x) => x.kind === purchaseKind) ?? null
-      const reqSymbols = selected?.requires_symbols ? [symbol] : []
+      const options = selected?.symbol_options ?? []
+      const reqSymbols = options.length > 0 ? [purchaseSymbol || options[0]] : []
       const presetId = purchasePresetId || (selected?.presets?.[0]?.preset_id ?? null)
       const r = await Api.newsStorePurchase({
         buyer_user_id: `user:${playerId}`,
@@ -177,6 +188,21 @@ export default function PropagandaWidget() {
             ))}
             {!storeItems.find((x) => x.kind === purchaseKind)?.presets?.length && <option value="">(no presets)</option>}
           </select>
+          {((storeItems.find((x) => x.kind === purchaseKind)?.symbol_options ?? []).length > 0) && (
+            <select
+              className="cyber-input"
+              value={purchaseSymbol}
+              onChange={e => setPurchaseSymbol(e.target.value)}
+              disabled={loadingStore}
+              style={{ fontSize: '12px', height: '32px' }}
+            >
+              {(storeItems.find((x) => x.kind === purchaseKind)?.symbol_options ?? []).map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          )}
           <textarea 
             className="cyber-input"
             value={purchaseText}

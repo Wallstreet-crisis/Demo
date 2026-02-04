@@ -27,7 +27,9 @@ function App() {
   const [casteId, setCasteId] = useState<string>(() => {
     return window.localStorage.getItem('if.casteId') ?? ''
   })
-  const [symbol, setSymbol] = useState<string>('BLUEGOLD')
+  const [symbol, setSymbol] = useState<string>(() => {
+    return window.localStorage.getItem('if.symbol') ?? 'BLUEGOLD'
+  })
 
   useEffect(() => {
     if (playerId) window.localStorage.setItem('if.playerId', playerId)
@@ -37,6 +39,10 @@ function App() {
     if (casteId) window.localStorage.setItem('if.casteId', casteId)
     else window.localStorage.removeItem('if.casteId')
   }, [casteId])
+
+  useEffect(() => {
+    if (symbol) window.localStorage.setItem('if.symbol', symbol)
+  }, [symbol])
 
   useEffect(() => {
     let canceled = false

@@ -33,7 +33,7 @@ async function copyToClipboard(text: string, notify: (type: 'success' | 'error' 
 }
 
 export default function NewsPage() {
-  const { playerId, symbol } = useAppSession()
+  const { playerId } = useAppSession()
   const { notify } = useNotification()
   const [loading, setLoading] = useState(true)
 
@@ -53,6 +53,7 @@ export default function NewsPage() {
   const [purchasePrice, setPurchasePrice] = useState<number>(100)
   const [purchaseText, setPurchaseText] = useState<string>('')
   const [purchasePresetId, setPurchasePresetId] = useState<string>('')
+  const [purchaseSymbol, setPurchaseSymbol] = useState<string>('')
 
   const [selectedInboxItem, setSelectedInboxItem] = useState<NewsInboxResponseItem | null>(null)
 
@@ -97,7 +98,8 @@ export default function NewsPage() {
   async function purchase(): Promise<void> {
     try {
       const selected = storeItems.find((x) => x.kind === purchaseKind) ?? null
-      const reqSymbols = selected?.requires_symbols ? [symbol] : []
+      const options = selected?.symbol_options ?? []
+      const reqSymbols = options.length > 0 ? [purchaseSymbol || options[0]] : []
       const presetId = purchasePresetId || (selected?.presets?.[0]?.preset_id ?? null)
       const r = await Api.newsStorePurchase({
         buyer_user_id: `user:${playerId}`,
@@ -132,6 +134,8 @@ export default function NewsPage() {
           const p0 = selected.presets?.[0]?.preset_id ?? ''
           setPurchasePresetId(p0)
           setPurchaseText(String(selected.presets?.[0]?.text ?? selected.preview_text ?? ''))
+          const s0 = selected.symbol_options?.[0] ?? ''
+          setPurchaseSymbol(s0)
         }
       }
     } catch (e) {
@@ -161,6 +165,13 @@ export default function NewsPage() {
     } else {
       setPurchasePresetId('')
       setPurchaseText(String(selected.preview_text ?? ''))
+    }
+
+    const opts = selected.symbol_options ?? []
+    if (opts.length > 0) {
+      if (!purchaseSymbol || !opts.includes(purchaseSymbol)) setPurchaseSymbol(opts[0])
+    } else {
+      if (purchaseSymbol) setPurchaseSymbol('')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [purchaseKind, storeItems])
@@ -442,6 +453,23 @@ export default function NewsPage() {
               )}
             </select>
           </label>
+          {((storeItems.find((x) => x.kind === purchaseKind)?.symbol_options ?? []).length > 0) && (
+            <label style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>标的</div>
+              <select
+                value={purchaseSymbol}
+                onChange={(e) => setPurchaseSymbol(e.target.value)}
+                disabled={loadingStore}
+                style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #ddd', boxSizing: 'border-box' }}
+              >
+                {(storeItems.find((x) => x.kind === purchaseKind)?.symbol_options ?? []).map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label style={{ flex: 3 }}>
             <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>预览</div>
             <input
