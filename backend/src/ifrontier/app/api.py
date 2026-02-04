@@ -159,14 +159,14 @@ async def news_store_catalog() -> NewsStoreCatalogResponse:
     from ifrontier.infra.sqlite.securities import list_securities
 
     items_cfg: List[Dict[str, Any]] = [
-        {"kind": "RUMOR", "price_cash": 50.0, "requires_symbols": False},
-        {"kind": "LEAK", "price_cash": 120.0, "requires_symbols": True},
-        {"kind": "ANALYST_REPORT", "price_cash": 80.0, "requires_symbols": True},
-        {"kind": "OMEN", "price_cash": 100.0, "requires_symbols": True},
-        {"kind": "DISCLOSURE", "price_cash": 180.0, "requires_symbols": True},
-        {"kind": "EARNINGS", "price_cash": 150.0, "requires_symbols": True},
-        {"kind": "MAJOR_EVENT", "price_cash": 300.0, "requires_symbols": True},
-        {"kind": "WORLD_EVENT", "price_cash": 500.0, "requires_symbols": False},
+        {"kind": "RUMOR", "price_cash": 2000.0, "requires_symbols": False},
+        {"kind": "LEAK", "price_cash": 15000.0, "requires_symbols": True},
+        {"kind": "ANALYST_REPORT", "price_cash": 8000.0, "requires_symbols": True},
+        {"kind": "OMEN", "price_cash": 25000.0, "requires_symbols": True},
+        {"kind": "DISCLOSURE", "price_cash": 45000.0, "requires_symbols": True},
+        {"kind": "EARNINGS", "price_cash": 35000.0, "requires_symbols": True},
+        {"kind": "MAJOR_EVENT", "price_cash": 100000.0, "requires_symbols": True},
+        {"kind": "WORLD_EVENT", "price_cash": 500000.0, "requires_symbols": False},
     ]
 
     sec_symbols = [s.symbol for s in list_securities()]
@@ -2095,14 +2095,14 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     from ifrontier.infra.sqlite.securities import list_securities
 
     items_cfg: List[Dict[str, Any]] = [
-        {"kind": "RUMOR", "price_cash": 50.0, "requires_symbols": False},
-        {"kind": "LEAK", "price_cash": 120.0, "requires_symbols": True},
-        {"kind": "ANALYST_REPORT", "price_cash": 80.0, "requires_symbols": True},
-        {"kind": "OMEN", "price_cash": 100.0, "requires_symbols": True},
-        {"kind": "DISCLOSURE", "price_cash": 180.0, "requires_symbols": True},
-        {"kind": "EARNINGS", "price_cash": 150.0, "requires_symbols": True},
-        {"kind": "MAJOR_EVENT", "price_cash": 300.0, "requires_symbols": True},
-        {"kind": "WORLD_EVENT", "price_cash": 500.0, "requires_symbols": False},
+        {"kind": "RUMOR", "price_cash": 2000.0, "requires_symbols": False},
+        {"kind": "LEAK", "price_cash": 15000.0, "requires_symbols": True},
+        {"kind": "ANALYST_REPORT", "price_cash": 8000.0, "requires_symbols": True},
+        {"kind": "OMEN", "price_cash": 25000.0, "requires_symbols": True},
+        {"kind": "DISCLOSURE", "price_cash": 45000.0, "requires_symbols": True},
+        {"kind": "EARNINGS", "price_cash": 35000.0, "requires_symbols": True},
+        {"kind": "MAJOR_EVENT", "price_cash": 100000.0, "requires_symbols": True},
+        {"kind": "WORLD_EVENT", "price_cash": 500000.0, "requires_symbols": False},
     ]
     kind_key = str(req.kind)
     cfg = next((x for x in items_cfg if str(x.get("kind")) == kind_key), None)
