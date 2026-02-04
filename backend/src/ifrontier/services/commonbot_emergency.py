@@ -53,18 +53,11 @@ class CommonBotEmergencyRunner:
         self._news = news
         self._event_store = event_store
         self._cohorts = cohorts or [
-            CommonBotCohortConfig(
-                cohort_id="retail",
-                bot_id="commonbot:retail:cohort",
-                account_id="bot:ret:1",
-                use_llm=False,
-            ),
-            CommonBotCohortConfig(
-                cohort_id="institutional",
-                bot_id="commonbot:institutional:cohort",
-                account_id="bot:inst:1",
-                use_llm=True,
-            ),
+            CommonBotCohortConfig(cohort_id=f"ret:{i}", bot_id=f"commonbot:ret:{i}", account_id=f"bot:ret:{i}", use_llm=True)
+            for i in range(1, 11)
+        ] + [
+            CommonBotCohortConfig(cohort_id=f"inst:{i}", bot_id=f"commonbot:inst:{i}", account_id=f"bot:inst:{i}", use_llm=True)
+            for i in range(1, 4)
         ]
         self._market_data_provider = market_data_provider
         self._pending_market_open: _PendingMarketOpenReaction | None = None
@@ -75,6 +68,7 @@ class CommonBotEmergencyRunner:
         broadcast_event: EventEnvelopeJson,
         force: bool = False,
     ) -> List[EventEnvelopeJson]:
+        print(f"[CommonBotEmergency:maybe_react] Triggered by {broadcast_event.event_type}")
         if not self._is_news_broadcasted(broadcast_event.event_type):
             return []
 
@@ -89,10 +83,14 @@ class CommonBotEmergencyRunner:
 
         variant_text, symbols = self._load_variant_text_and_symbols(variant_id)
         if not symbols:
-            return []
+            # v0.1: 对于 WORLD_EVENT 等可能影响全局的新闻，如果没定义符号，则赋予默认关键证券
+            # 确保 CommonBot 能够对重大新闻产生市场反应
+            symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
+            print(f"[CommonBotEmergency:maybe_react] News {variant_id} has no symbols, using defaults: {symbols}")
 
         emitted: List[EventEnvelopeJson] = []
         corr = broadcast_event.correlation_id or uuid4()
+        print(f"[CommonBotEmergency:maybe_react] Reacting to {variant_id} for {len(self._cohorts)} cohorts. Symbols: {symbols}")
 
         cfg = load_game_time_config_from_env()
         session = get_market_session(cfg=cfg)
@@ -102,7 +100,7 @@ class CommonBotEmergencyRunner:
             ctx = self._build_shared_context(cohort=cohort, variant_id=variant_id, news_text=variant_text, symbols=symbols)
             if ctx is None:
                 continue
-            for symbol in symbols[:1]:
+            for symbol in symbols:
                 decision_json, trade_json = run_commonbot_for_earnings(
                     symbol=symbol,
                     visual_truth="UNKNOWN",
@@ -133,14 +131,25 @@ class CommonBotEmergencyRunner:
                     # 真正提交订单进入撮合引擎
                     try:
                         side = str(trade_json.payload.get("side"))
-                        price = float(trade_json.payload.get("price_hint") or 0.0)
+                        # 从 trade_json 获取由 run_commonbot_for_earnings 计算出的动态规模和价格
+                        last_price = float(trade_json.payload.get("price_hint") or 0.0)
                         size = float(trade_json.payload.get("size") or 1.0)
+                        confidence = float(trade_json.payload.get("confidence") or 0.5)
+
+                        # 使用相同的激进报价逻辑
+                        offset = 0.01 + (confidence * 0.04)
+                        if side == "BUY":
+                            order_price = last_price * (1.0 + offset)
+                        else:
+                            order_price = last_price * (1.0 - offset)
+
+                        print(f"[CommonBotEmergency:maybe_react] Bot {cohort.account_id} submitting {side} for {symbol} at {order_price:.2f} (size: {size}, offset: {offset:.2%})")
                         
                         _order_id, matches = submit_limit_order(
                             account_id=cohort.account_id,
                             symbol=symbol,
                             side=side,
-                            price=price,
+                            price=float(order_price),
                             quantity=size,
                         )
                         # 广播成交事件
@@ -198,14 +207,24 @@ class CommonBotEmergencyRunner:
                     # 真正提交订单进入撮合引擎
                     try:
                         side = str(trade_json.payload.get("side"))
-                        price = float(trade_json.payload.get("price_hint") or 0.0)
+                        last_price = float(trade_json.payload.get("price_hint") or 0.0)
                         size = float(trade_json.payload.get("size") or 1.0)
+                        confidence = float(trade_json.payload.get("confidence") or 0.5)
+
+                        # 使用相同的激进报价逻辑
+                        offset = 0.01 + (confidence * 0.04)
+                        if side == "BUY":
+                            order_price = last_price * (1.0 + offset)
+                        else:
+                            order_price = last_price * (1.0 - offset)
+
+                        print(f"[CommonBotEmergency:open] Bot {cohort.account_id} submitting {side} for {symbol} at {order_price:.2f} (size: {size}, offset: {offset:.2%})")
 
                         _order_id, matches = submit_limit_order(
                             account_id=cohort.account_id,
                             symbol=symbol,
                             side=side,
-                            price=price,
+                            price=float(order_price),
                             quantity=size,
                         )
                         # 广播成交事件
@@ -272,6 +291,86 @@ class CommonBotEmergencyRunner:
             symbols = []
         symbols = [str(s) for s in symbols if s]
         return text, symbols
+
+    async def react_to_delivery(
+        self,
+        *,
+        delivery_event: EventEnvelopeJson,
+    ) -> List[EventEnvelopeJson]:
+        """让机器人响应直接投递给它们的新闻（如 Omen）"""
+        payload = delivery_event.payload or {}
+        to_player_id = str(payload.get("to_player_id") or "")
+        variant_id = str(payload.get("variant_id") or "")
+        
+        # 查找该机器人属于哪个 cohort
+        target_cohort = next((c for c in self._cohorts if c.account_id == to_player_id), None)
+        if not target_cohort or not variant_id:
+            return []
+
+        print(f"[CommonBotEmergency:react_to_delivery] Bot {to_player_id} reacting to news {variant_id}")
+        
+        variant_text, symbols = self._load_variant_text_and_symbols(variant_id)
+        if not symbols:
+            symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
+
+        corr = delivery_event.correlation_id or uuid4()
+        emitted: List[EventEnvelopeJson] = []
+        
+        cfg = load_game_time_config_from_env()
+        session = get_market_session(cfg=cfg)
+        
+        ctx = self._build_shared_context(cohort=target_cohort, variant_id=variant_id, news_text=variant_text, symbols=symbols)
+        if ctx is None:
+            return []
+
+        for symbol in symbols:
+            decision_json, trade_json = run_commonbot_for_earnings(
+                symbol=symbol,
+                visual_truth="UNKNOWN",
+                price_series=ctx.trends.symbol_price_series.get(symbol, []),
+                bot_id=target_cohort.bot_id,
+                correlation_id=corr,
+                news_text="\n".join(ctx.recent_news_texts),
+                use_llm=target_cohort.use_llm,
+            )
+            self._event_store.append(decision_json)
+            emitted.append(decision_json)
+
+            if session.phase == MarketPhase.TRADING and trade_json is not None:
+                self._event_store.append(trade_json)
+                emitted.append(trade_json)
+                try:
+                    side = str(trade_json.payload.get("side"))
+                    last_price = float(trade_json.payload.get("price_hint") or 0.0)
+                    
+                    # 让机器人更具攻击性以促成成交：
+                    # 根据信心指数动态调整价格偏移，最高可达 5%
+                    # 这将确保能穿透做市商的盘口并直接拉升/砸盘
+                    confidence = float(trade_json.payload.get("confidence") or 0.5)
+                    # 基础偏移 1%，根据信心最高加成到 5%
+                    offset = 0.01 + (confidence * 0.04)
+                    
+                    if side == "BUY":
+                        order_price = last_price * (1.0 + offset)
+                    else:
+                        order_price = last_price * (1.0 - offset)
+
+                    print(f"[CommonBotEmergency:delivery] Bot {target_cohort.account_id} submitting {side} at {order_price:.2f} (last: {last_price:.2f}, offset: {offset:.2%}, conf: {confidence:.2f})")
+                    
+                    _order_id, matches = submit_limit_order(
+                        account_id=target_cohort.account_id,
+                        symbol=symbol,
+                        side=side,
+                        price=float(order_price),
+                        quantity=float(trade_json.payload.get("size") or 1.0),
+                    )
+                    for m in matches:
+                        ev = m.executed_event.model_dump()
+                        await hub.broadcast_json("events", ev)
+                except Exception as e:
+                    print(f"[CommonBotEmergency:delivery] Order failed: {e}")
+
+        return emitted
 
     @staticmethod
     def _is_news_broadcasted(event_type: str) -> bool:

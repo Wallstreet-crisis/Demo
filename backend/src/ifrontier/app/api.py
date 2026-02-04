@@ -46,9 +46,43 @@ _contract_agent = ContractAgent()
 _chat_service = ChatService(event_store=_event_store)
 _news_service = NewsService(_driver, _event_store)
 _news_tick_engine = NewsTickEngine(_driver, _event_store, _news_service)
-_commonbot_emergency_runner = CommonBotEmergencyRunner(news=_news_service, event_store=_event_store)
+_commonbot_emergency_runner = CommonBotEmergencyRunner(
+    news=_news_service,
+    event_store=_event_store,
+    market_data_provider=lambda symbols: get_market_trends(symbols=symbols)
+)
 
 _hosting_scheduler: HostingScheduler | None = None
+
+def _news_debug_enabled() -> bool:
+    """检查新闻调试是否开启"""
+    return str(os.getenv("IF_NEWS_DEBUG") or "0").strip().lower() in {"1", "true", "yes"}
+
+def get_market_trends(symbols: List[str]) -> CommonBotMarketTrends:
+    from ifrontier.services.commonbot_context import CommonBotMarketTrends
+    from ifrontier.services.market_session import get_market_session
+    from ifrontier.services.game_time import load_game_time_config_from_env
+    from ifrontier.services.market_analytics import get_quote
+    from ifrontier.infra.sqlite.market import get_price_series
+
+    trends = CommonBotMarketTrends()
+    cfg = load_game_time_config_from_env()
+    session = get_market_session(cfg=cfg)
+    trends.market_phase = session.phase.value
+
+    for s in symbols:
+        q = get_quote(s)
+        trends.market_quotes[s] = {
+            "symbol": q.symbol,
+            "last_price": q.last_price,
+            "prev_price": q.prev_price,
+            "change_pct": q.change_pct,
+            "ma_5": q.ma_5,
+            "ma_20": q.ma_20,
+            "vol_20": q.vol_20,
+        }
+        trends.symbol_price_series[s] = get_price_series(symbol=s, limit=200)
+    return trends
 
 @router.get("/health")
 def health() -> Dict[str, str]:
@@ -1998,6 +2032,15 @@ class NewsStorePurchaseRequest(BaseModel):
     seed: int = 1
     correlation_id: UUID | None = None
 
+
+class NewsStorePurchaseResponse(BaseModel):
+    kind: str
+    buyer_user_id: str
+    card_id: str | None = None
+    variant_id: str | None = None
+    chain_id: str | None = None
+
+
 @router.post("/news/store/purchase")
 async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchaseResponse:
     from ifrontier.infra.sqlite.securities import list_securities
@@ -2060,26 +2103,34 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # MAJOR_EVENT：购买即创建事件链，T0 延迟广播；不立即投递给所有人
-    if str(req.kind) == "MAJOR_EVENT":
+    # MAJOR_EVENT / WORLD_EVENT：购买即创建事件链，T0 延迟广播；不立即投递给所有人
+    if str(req.kind) in {"MAJOR_EVENT", "WORLD_EVENT"}:
         try:
             t0_at = None
-            if req.t0_at is not None:
-                t0_at = datetime.fromisoformat(req.t0_at)
+            if req.t0_at and str(req.t0_at).strip():
+                try:
+                    t0_at = datetime.fromisoformat(str(req.t0_at).strip())
+                except ValueError:
+                    t0_at = None
+            
+            print(f"[API:Purchase] Starting chain for {req.kind}, t0_at={t0_at}, symbols={req_symbols or symbol_options[:2]}")
+            # v0.1: 对于测试阶段，将默认倒计时从 60s 缩短至 15s，提高反馈速度
+            default_delay = 15 if str(req.kind) == "WORLD_EVENT" else 60
             result = _news_tick_engine.start_chain(
                 kind=req.kind,
                 actor_id=req.buyer_user_id,
-                t0_seconds=req.t0_seconds,
+                t0_seconds=int(req.t0_seconds if req.t0_seconds is not None else default_delay),
                 t0_at=t0_at,
-                omen_interval_seconds=req.omen_interval_seconds,
-                abort_probability=req.abort_probability,
-                grant_count=req.grant_count,
-                seed=req.seed,
-                symbols=req_symbols,
+                omen_interval_seconds=int(req.omen_interval_seconds or 10),
+                abort_probability=float(req.abort_probability if req.abort_probability is not None else 0.3),
+                grant_count=int(req.grant_count if req.grant_count is not None else 2),
+                seed=int(req.seed if req.seed is not None else 1),
+                symbols=req_symbols if req_symbols else symbol_options[:2],
                 correlation_id=req.correlation_id,
             )
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            print(f"[API:Purchase] Failed to start chain: {exc}")
+            raise HTTPException(status_code=400, detail=f"failed to start news chain: {str(exc)}")
 
         major_card_id = str(result["major_card_id"])
         # 购买者获得主事件卡所有权

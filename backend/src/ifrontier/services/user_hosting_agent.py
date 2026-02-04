@@ -139,9 +139,11 @@ class UserHostingAgent:
             ]
 
             system = (
-                "You are a rational and aggressive user-hosting agent. "
+                "You are an elite, aggressive hedge fund manager operating a user-hosting agent. "
+                "Your goal is to dominate the market during this financial crisis. "
                 "You MUST ONLY output JSON. No extra text. "
                 "You can only act via the provided skills. "
+                "Be decisive: if there's a major event, take large positions. Don't be afraid of volatility. "
                 "Return tool calls as: {\"tool_calls\":[{\"name\":...,\"arguments\":{...}}, ...]}."
             )
 
@@ -157,8 +159,16 @@ class UserHostingAgent:
             )
 
             resp = llm.chat_completions(system=system, user=user, temperature=0.2, max_tokens=800)
+            if not resp or "choices" not in resp:
+                print(f"[LLM:HostingAgent] LLM Request failed for user {self.user_id}, falling back to IDLE.")
+                return []
+
             text = extract_first_message_text(resp)
-            calls = reg.parse_tool_calls(raw_json_text=text)
+            try:
+                calls = reg.parse_tool_calls(raw_json_text=text)
+            except Exception as e:
+                print(f"[LLM:HostingAgent] JSON parse error for user {self.user_id}: {e}. Text: {text[:100]}. Falling back to IDLE.")
+                return []
             if calls:
                 action_type = "SKILLS"
                 decision = {"tool_calls": [{"name": c.name, "arguments": c.arguments} for c in calls]}

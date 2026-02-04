@@ -59,8 +59,8 @@ def record_trade(*, symbol: str, price: float, quantity: float, occurred_at: dat
         raise ValueError("symbol is required")
     if price <= 0:
         raise ValueError("price must be positive")
-    if quantity <= 0:
-        raise ValueError("quantity must be positive")
+    if quantity < 0:
+        raise ValueError("quantity must be non-negative")
 
     conn = get_connection()
     ts = occurred_at.astimezone(timezone.utc).isoformat()
@@ -165,6 +165,7 @@ def get_candles(*, symbol: str, interval_seconds: int = 60, limit: int = 200) ->
         prices = [p for p, _q in pts]
         qtys = [q for _p, q in pts]
         vol = float(sum(qtys))
+        # 即使成交量为 0（如创世定标交易），也要计算 VWAP 并允许产生 K 线
         vwap = float(sum(p * q for p, q in pts) / vol) if vol > 0 else float(prices[-1])
         out.append(
             Candle(
@@ -178,6 +179,8 @@ def get_candles(*, symbol: str, interval_seconds: int = 60, limit: int = 200) ->
                 trades=int(len(prices)),
             )
         )
+    
+    print(f"[Market:Candles] {symbol} generated {len(out)} candles (interval={interval_seconds}s)")
 
     if limit > 0:
         out = out[-int(limit) :]

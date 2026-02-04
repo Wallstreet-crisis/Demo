@@ -21,15 +21,31 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
     const minPrice = Math.min(...candles.map(c => c.low))
     const maxPrice = Math.max(...candles.map(c => c.high))
     const maxVol = Math.max(...candles.map(c => c.volume))
-    const priceRange = (maxPrice - minPrice) || 1
+    
+    // 如果最高价和最低价相同（单点数据），增加 10% 的 Padding 确保能看清
+    let priceRange = (maxPrice - minPrice)
+    let displayMin = minPrice
+    let displayMax = maxPrice
+    if (priceRange === 0) {
+      const padding = Math.max(minPrice * 0.05, 1.0)
+      displayMin = minPrice - padding
+      displayMax = maxPrice + padding
+      priceRange = displayMax - displayMin
+    } else {
+      // 正常增加 5% 边距
+      const padding = priceRange * 0.05
+      displayMin -= padding
+      displayMax += padding
+      priceRange = displayMax - displayMin
+    }
     
     const chartAreaHeight = height - margin.top - margin.bottom - volHeight - 10
     const scaleY = (price: number) => 
-      margin.top + chartAreaHeight - ((price - minPrice) / priceRange) * chartAreaHeight
+      margin.top + chartAreaHeight - ((price - displayMin) / priceRange) * chartAreaHeight
     
     // Reverse scaleY: y-coordinate to price
     const invertY = (y: number) => 
-      minPrice + (margin.top + chartAreaHeight - y) / chartAreaHeight * priceRange
+      displayMin + (margin.top + chartAreaHeight - y) / chartAreaHeight * priceRange
     
     const scaleVol = (vol: number) => 
       height - margin.bottom - (vol / (maxVol || 1)) * volHeight
@@ -182,13 +198,14 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
         )}
 
         {/* Volume Bars */}
-        {candles.map((c, i) => {
+        {candles.map((c) => {
           const isUp = c.close >= c.open
           const color = isUp ? '#10b981' : '#ef4444'
-          const x = scaleX(i)
+          const idx = candles.indexOf(c)
+          const x = scaleX(idx)
           const volY = scaleVol(c.volume)
           return (
-            <rect key={`v-${i}`} x={x + barWidth * 0.2} y={volY} width={barWidth * 0.6} height={height - margin.bottom - volY} fill={color} opacity="0.15" />
+            <rect key={`v-${c.bucket_start}`} x={x + barWidth * 0.2} y={volY} width={barWidth * 0.6} height={height - margin.bottom - volY} fill={color} opacity="0.15" />
           )
         })}
 
@@ -207,10 +224,11 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
         />
 
         {/* Candlesticks */}
-        {candles.map((c, i) => {
+        {candles.map((c) => {
           const isUp = c.close >= c.open
           const color = isUp ? '#10b981' : '#ef4444'
-          const x = scaleX(i)
+          const idx = candles.indexOf(c)
+          const x = scaleX(idx)
           const centerX = x + barWidth / 2
           const yHigh = scaleY(c.high)
           const yLow = scaleY(c.low)
@@ -220,7 +238,7 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
           const bodyHeight = Math.max(Math.abs(yOpen - yClose), 1)
 
           return (
-            <g key={`c-${i}`}>
+            <g key={`c-${c.bucket_start}`}>
               <line x1={centerX} y1={yHigh} x2={centerX} y2={yLow} stroke={color} strokeWidth="1" />
               <rect x={x + barWidth * 0.1} y={bodyTop} width={barWidth * 0.8} height={bodyHeight} fill={color} />
             </g>

@@ -486,6 +486,24 @@ class NewsService:
             )
         return [str(r["card_id"]) for r in rows]
 
+    def ensure_bot_users(self, bot_ids: List[str]) -> None:
+        """确保内置机器人在 Neo4j 中拥有 User 节点"""
+        with self._driver.session() as session:
+            session.execute_write(
+                self._ensure_users_tx,
+                {"user_ids": bot_ids}
+            )
+
+    @staticmethod
+    def _ensure_users_tx(tx, params: Dict[str, Any]) -> None:
+        tx.run(
+            """
+            UNWIND $user_ids AS uid
+            MERGE (u:User {user_id: uid})
+            """,
+            **params
+        )
+
     def init_news_seed_data(self) -> None:
         """初始化预设的新闻卡牌组"""
         with self._driver.session() as session:

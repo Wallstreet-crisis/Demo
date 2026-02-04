@@ -272,7 +272,7 @@ class NewsTickEngine:
                 rnd.shuffle(users)
                 for u in users[: min(effective_grant_count, len(users))]:
                     to_player_id = str(u)
-                    self._news.deliver_variant(
+                    _deliv_id, deliv_ev = self._news.deliver_variant(
                         variant_id=omen_variant_id,
                         to_player_id=to_player_id,
                         from_actor_id="system",
@@ -281,6 +281,9 @@ class NewsTickEngine:
                         correlation_id=None,
                     )
                     delivered_to.append(to_player_id)
+                    
+                    # 立即触发机器人对该投递的反应（如果是机器人）
+                    await self._commonbot_emergency_runner.react_to_delivery(delivery_event=deliv_ev)
 
             next_omen_at2 = now + timedelta(seconds=omen_interval_seconds)
             with self._driver.session() as session:
@@ -375,7 +378,7 @@ class NewsTickEngine:
             broadcast_event: EventEnvelopeJson | None = None
             emergency_events: List[EventEnvelopeJson] = []
             # v0：重大事件在 T0 强制全局广播（内容一致）
-            if kind in {"MAJOR_EVENT", "EARNINGS", "DISCLOSURE"}:
+            if kind in {"MAJOR_EVENT", "EARNINGS", "DISCLOSURE", "WORLD_EVENT"}:
                 broadcasted, broadcast_event = self._news.broadcast_variant(
                     variant_id=final_variant_id,
                     channel="GLOBAL_MANDATORY",

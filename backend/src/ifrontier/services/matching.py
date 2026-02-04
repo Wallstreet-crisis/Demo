@@ -206,6 +206,14 @@ def submit_market_order(
             event_id=str(event_json.event_id),
         )
 
+        record_trade(
+            symbol=symbol,
+            price=float(trade_price),
+            quantity=float(trade_qty),
+            occurred_at=event_json.occurred_at,
+            event_id=str(event_json.event_id),
+        )
+
         _event_store.append(event_json)
         matches.append(MatchResult(executed_event=event_json))
 

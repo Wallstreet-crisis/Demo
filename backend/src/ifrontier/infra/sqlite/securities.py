@@ -45,12 +45,30 @@ def init_securities_schema() -> None:
         ("BIO_SYNTH", "HEALTHCARE", 95.0),
         ("ORBIT_LOG", "LOGISTICS", 65.0),
     ]
+    from ifrontier.infra.sqlite.market import record_trade
+    from datetime import datetime, timezone
+    from uuid import uuid4
+
     with conn:
         for sym, sec, price in default_symbols:
+            # 1) 插入证券定义
             conn.execute(
                 "INSERT OR IGNORE INTO securities(symbol, sector, seed_price) VALUES (?, ?, ?)",
                 (sym, sec, float(price))
             )
+            
+            # 2) 检查是否已经有成交记录
+            row = conn.execute("SELECT 1 FROM market_trades WHERE symbol = ? LIMIT 1", (sym,)).fetchone()
+            if row is None:
+                # 如果没有成交记录，记录一笔创世交易用于定标
+                print(f"[Securities:Init] Recording genesis trade for {sym} at {price}")
+                record_trade(
+                    symbol=sym,
+                    price=float(price),
+                    quantity=0.0,
+                    occurred_at=datetime.now(timezone.utc),
+                    event_id=f"genesis:{uuid4()}"
+                )
 
 
 def upsert_security(*, symbol: str, sector: str = "", status: str = "TRADABLE", seed_price: float = 1.0) -> None:

@@ -53,11 +53,12 @@ def init_schema() -> None:
     # 订单簿（LIMIT 订单入簿，MARKET 订单由撮合引擎吃单实现）
     init_order_schema()
 
+    # 市场成交记录/价格序列（用于 K 线等）
+    # 必须在 init_securities_schema 之前，因为后者会记录创世交易
+    init_market_schema()
+
     init_securities_schema()
     load_securities_pool_from_env()
-
-    # 市场成交记录/价格序列（用于 K 线等）
-    init_market_schema()
 
     init_contract_agent_schema()
 
