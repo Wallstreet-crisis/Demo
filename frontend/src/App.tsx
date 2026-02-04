@@ -3,7 +3,6 @@ import './App.css'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import Layout from './app/Layout'
-import { AppSessionProvider } from './app/context'
 import DashboardPage from './pages/DashboardPage'
 import AccountPage from './pages/AccountPage'
 import ChatPage from './pages/ChatPage'
@@ -57,7 +56,7 @@ function App() {
   }, [playerId, casteId])
 
   return (
-    <AppSessionProvider>
+    <>
       {bootstrapErr ? (
         <div style={{ padding: 12, background: '#fff1f0', border: '1px solid #ffccc7', borderRadius: 8 }}>
           <strong>Bootstrap error:</strong> {bootstrapErr}
@@ -83,7 +82,7 @@ function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
-    </AppSessionProvider>
+    </>
   )
 }
 
