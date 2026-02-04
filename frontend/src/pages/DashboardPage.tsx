@@ -9,20 +9,70 @@ import AccountWidget from '../components/AccountWidget'
 import ContractsWidget from '../components/ContractsWidget'
 import PropagandaWidget from '../components/PropagandaWidget'
 import NewsBroadcastWidget from '../components/NewsBroadcastWidget'
-import { WsClient, type NewsFeedItem } from '../api'
+import { Api, WsClient, type NewsFeedItem } from '../api'
+import { useAppSession } from '../app/context'
 
 export default function DashboardPage() {
   const [focusWidget, setFocusWidget] = useState<string | null>(null)
   const [systemLoad, setSystemLoad] = useState(72)
   const [netSync, setNetSync] = useState(12)
+  const [logs, setLogs] = useState<{ id: string; text: string; type: 'info' | 'warn' | 'err' }[]>([])
+  const [aiHosting, setAiHosting] = useState(false)
+  const { playerId } = useAppSession()
   
   // News Popup State
   const [activePopupNews, setActivePopupNews] = useState<NewsFeedItem | null>(null)
 
+  // Fetch AI Hosting status
   useEffect(() => {
+    if (!playerId) return
+    Api.hostingStatus(`user:${playerId}`).then(res => {
+      setAiHosting(res.enabled)
+    }).catch(e => console.error('Failed to fetch hosting status', e))
+  }, [playerId])
+
+  const toggleAiHosting = async () => {
+    if (!playerId) return
+    const targetState = !aiHosting
+    try {
+      if (targetState) {
+        await Api.hostingEnable(`user:${playerId}`)
+        setLogs(prev => [{ id: Math.random().toString(36).slice(2, 9), text: 'AI_PROXY_PROTOCOL_ENGAGED', type: 'info' as const }, ...prev].slice(0, 8))
+      } else {
+        await Api.hostingDisable(`user:${playerId}`)
+        setLogs(prev => [{ id: Math.random().toString(36).slice(2, 9), text: 'AI_PROXY_PROTOCOL_TERMINATED', type: 'warn' as const }, ...prev].slice(0, 8))
+      }
+      setAiHosting(targetState)
+    } catch (e) {
+      console.error('Failed to toggle AI hosting', e)
+      setLogs(prev => [{ id: Math.random().toString(36).slice(2, 9), text: 'AI_PROXY_SYNCHRONIZATION_ERROR', type: 'err' as const }, ...prev].slice(0, 8))
+    }
+  }
+
+  useEffect(() => {
+    const logPool = [
+      { text: 'QUANTUM_LINK_ESTABLISHED', type: 'info' },
+      { text: 'DECRYPTING_NEWS_PACKET_722', type: 'info' },
+      { text: 'MARKET_DATA_SYNC_COMPLETED', type: 'info' },
+      { text: 'NEURAL_INTERFACE_STABLE', type: 'info' },
+      { text: 'ENCRYPTED_THREAD_OPENED', type: 'info' },
+      { text: 'SUBSYSTEM_LATENCY_NOMINAL', type: 'info' },
+      { text: 'HEURISTIC_DRAFTING_ACTIVE', type: 'info' },
+      { text: 'INFLUENCE_ARRAY_SCANNING', type: 'info' },
+      { text: 'ANOMALY_DETECTED_IN_SECTOR_4', type: 'warn' },
+      { text: 'BUFFER_OVERFLOW_PREVENTED', type: 'warn' },
+      { text: 'CORE_TEMPERATURE_INCREASING', type: 'warn' },
+    ] as const;
+
     const timer = setInterval(() => {
       setSystemLoad(prev => Math.min(99, Math.max(40, prev + (Math.random() * 10 - 5))))
       setNetSync(Math.floor(Math.random() * 5 + 10))
+      
+      // Randomly add a log
+      if (Math.random() > 0.6) {
+        const item = logPool[Math.floor(Math.random() * logPool.length)];
+        setLogs(prev => [{ id: Math.random().toString(36).slice(2, 9), ...item }, ...prev].slice(0, 8));
+      }
     }, 3000)
     return () => clearInterval(timer)
   }, [])
@@ -41,9 +91,10 @@ export default function DashboardPage() {
   // Subscribe to news for auto-popup
   useEffect(() => {
     const ws = new WsClient()
-    ws.connect('events', (data: any) => {
-      if (data?.event_type === 'NEWS_VARIANT_EMITTED' || data?.event_type === 'NEWS_BROADCASTED') {
-        const item = data.payload as NewsFeedItem
+    ws.connect('events', (data: unknown) => {
+      const ev = data as { event_type: string; payload: NewsFeedItem };
+      if (ev?.event_type === 'NEWS_VARIANT_EMITTED' || ev?.event_type === 'NEWS_BROADCASTED') {
+        const item = ev.payload;
         // If it's a major event or has an image, show popup
         if (item && (item.kind === 'MAJOR_EVENT' || item.kind === 'WORLD_EVENT' || item.image_uri)) {
           setActivePopupNews(item)
@@ -53,7 +104,11 @@ export default function DashboardPage() {
     return () => ws.close()
   }, [])
 
-  const renderWidget = (id: string, Component: React.ComponentType<any>, props = {}) => {
+  const renderWidget = <P extends { isFocused?: boolean }>(
+    id: string, 
+    Component: React.ComponentType<P>, 
+    props: Omit<P, 'isFocused'> = {} as Omit<P, 'isFocused'>
+  ) => {
     const isFocused = focusWidget === id
     
     const widgetContent = (
@@ -64,13 +119,14 @@ export default function DashboardPage() {
           const interactiveTags = ['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'A', 'LABEL'];
           
           const rect = e.currentTarget.getBoundingClientRect();
-          const isResizeHandle = (e.clientX > rect.right - 20) && (e.clientY > rect.bottom - 20);
+          // Detect if clicking on the resize handle (bottom-right 24x24 area)
+          const isResizeHandle = (e.clientX > rect.right - 24) && (e.clientY > rect.bottom - 24);
 
           if (!isFocused && !interactiveTags.includes(target.tagName) && !target.closest('.cyber-button') && !isResizeHandle) {
             setFocusWidget(id);
           }
         }}
-        className="custom-scrollbar"
+        className="custom-scrollbar cockpit-panel"
         style={{ 
           position: isFocused ? 'fixed' : 'relative',
           top: isFocused ? '50%' : 'auto',
@@ -93,6 +149,16 @@ export default function DashboardPage() {
           cursor: isFocused ? 'default' : 'zoom-in',
         }}
       >
+        {!isFocused && (
+          <div style={{ 
+            position: 'absolute', bottom: '2px', right: '2px', 
+            width: '12px', height: '12px', 
+            borderRight: '2px solid rgba(59, 130, 246, 0.4)', 
+            borderBottom: '2px solid rgba(59, 130, 246, 0.4)', 
+            pointerEvents: 'none',
+            zIndex: 10
+          }} />
+        )}
         {isFocused && (
           <div style={{ 
             position: 'absolute', 
@@ -119,7 +185,7 @@ export default function DashboardPage() {
             overflow: 'hidden'
           }}
         >
-          <Component {...props} isFocused={isFocused} />
+          <Component {...({ ...(props as Omit<P, 'isFocused'>), isFocused } as P)} />
         </div>
       </div>
     )
@@ -230,18 +296,81 @@ export default function DashboardPage() {
         fontFamily: 'monospace',
         color: 'var(--terminal-info)',
         display: 'flex',
+        alignItems: 'center',
         gap: '20px',
         zIndex: 10,
         background: 'rgba(15, 23, 42, 0.8)',
         padding: '2px 15px',
         borderRadius: '0 0 10px 10px',
         border: '1px solid rgba(59, 130, 246, 0.2)',
-        borderTop: 'none'
+        borderTop: 'none',
+        backdropFilter: 'blur(4px)'
       }}>
         <span className="neon-text">SYS_LOAD: {systemLoad.toFixed(1)}%</span>
         <span>NET_SYNC: {netSync}ms</span>
+        
+        {/* AI Proxy Toggle */}
+        <div 
+          onClick={toggleAiHosting}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px', 
+            cursor: 'pointer',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            background: aiHosting ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${aiHosting ? 'var(--terminal-info)' : 'rgba(255,255,255,0.1)'}`,
+            transition: 'all 0.2s'
+          }}
+        >
+          <div style={{ 
+            width: '6px', height: '6px', borderRadius: '50%', 
+            background: aiHosting ? 'var(--terminal-info)' : '#475569',
+            boxShadow: aiHosting ? '0 0 8px var(--terminal-info)' : 'none',
+            animation: aiHosting ? 'blink-anim 1s step-end infinite' : 'none'
+          }} />
+          <span style={{ color: aiHosting ? '#fff' : '#64748b', fontWeight: 'bold' }}>AI_PROXY: {aiHosting ? 'ACTIVE' : 'OFF'}</span>
+        </div>
+
         <span style={{ color: 'var(--terminal-warn)' }}>THREAT: NOMINAL</span>
       </div>
+
+      {/* Tactical Log Overlay */}
+      <div style={{
+        position: 'absolute',
+        top: '40px',
+        left: '10px',
+        zIndex: 5,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+        pointerEvents: 'none',
+        opacity: focusWidget ? 0.1 : 0.8,
+        transition: 'opacity 0.3s'
+      }}>
+        {logs.map(log => (
+          <div key={log.id} style={{ 
+            fontSize: '8px', 
+            fontFamily: 'monospace',
+            color: log.type === 'warn' ? 'var(--terminal-warn)' : (log.type === 'err' ? 'var(--terminal-error)' : 'var(--terminal-info)'),
+            textShadow: '0 0 5px currentColor',
+            background: 'rgba(0,0,0,0.3)',
+            padding: '2px 6px',
+            borderLeft: `2px solid ${log.type === 'warn' ? 'var(--terminal-warn)' : (log.type === 'err' ? 'var(--terminal-error)' : 'var(--terminal-info)')}`,
+            animation: 'slide-in-left 0.3s ease-out forwards'
+          }}>
+            [{new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}] {log.text}
+          </div>
+        ))}
+      </div>
+
+      <style>{`
+        @keyframes slide-in-left {
+          from { transform: translateX(-20px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
 
       {/* Column 1: Left - Market & Account */}
       <div style={{ gridColumn: '1', gridRow: '1 / span 5' }}>
@@ -259,7 +388,7 @@ export default function DashboardPage() {
         {renderWidget('market', MarketWidget)}
       </div>
       <div style={{ gridColumn: '2', gridRow: '7 / span 3' }}>
-        {renderWidget('broadcast', NewsBroadcastWidget)}
+        {renderWidget('broadcast', NewsBroadcastWidget, { onShowNews: setActivePopupNews })}
       </div>
       <div style={{ gridColumn: '2', gridRow: '10 / span 2', display: 'flex', gap: '10px' }}>
         <div style={{ flex: 1 }}>{renderWidget('trade', TradeWidget)}</div>

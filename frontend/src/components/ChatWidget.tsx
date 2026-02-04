@@ -27,6 +27,7 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
   const [showMentionList, setShowMentionList] = useState(false)
   const [mentionType, setMentionType] = useState<'PLAYER' | 'CONTRACT' | null>(null)
   const [mentionQuery, setMentionQuery] = useState('')
+  const [mentionIndex, setMentionIndex] = useState(0)
   const [players, setPlayers] = useState<string[]>([])
   const [contracts, setContracts] = useState<ContractBriefResponse[]>([])
 
@@ -106,6 +107,7 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
       if (!query.includes(' ')) {
         setMentionType('PLAYER')
         setMentionQuery(query)
+        setMentionIndex(0)
         setShowMentionList(true)
         return
       }
@@ -118,6 +120,7 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
       if (!query.includes(' ')) {
         setMentionType('CONTRACT')
         setMentionQuery(query)
+        setMentionIndex(0)
         setShowMentionList(true)
         return
       }
@@ -125,6 +128,15 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
 
     setShowMentionList(false)
   }
+
+  const filteredItems = useMemo(() => {
+    if (mentionType === 'PLAYER') {
+      return players.filter(p => p.toLowerCase().includes(mentionQuery.toLowerCase()));
+    } else if (mentionType === 'CONTRACT') {
+      return contracts.filter(c => c.title.toLowerCase().includes(mentionQuery.toLowerCase()) || c.contract_id.includes(mentionQuery));
+    }
+    return [];
+  }, [mentionType, players, contracts, mentionQuery]);
 
   const selectMention = (item: string | ContractBriefResponse) => {
     const cursor = inputRef.current?.selectionStart || 0
@@ -385,17 +397,40 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
                     }}>
                       {m.content}
                       {payload?.referenced_contract_id && (
-                        <div style={{ 
-                          marginTop: '8px', 
-                          padding: '6px', 
-                          background: 'rgba(0,0,0,0.3)', 
-                          border: '1px dashed var(--terminal-info)',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          color: 'var(--terminal-info)',
-                          cursor: 'pointer'
-                        }} onClick={() => window.open(`/contracts/${payload.referenced_contract_id}`, '_blank')}>
-                          [ATTACHED_CONTRACT: {payload.referenced_contract_id.slice(0,8)}]
+                        <div 
+                          style={{ 
+                            marginTop: '10px', 
+                            padding: '10px', 
+                            background: 'rgba(15, 23, 42, 0.6)', 
+                            border: '1px solid rgba(59, 130, 246, 0.4)',
+                            borderLeft: '4px solid var(--terminal-info)',
+                            borderRadius: '4px', 
+                            fontSize: '12px',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                          }} 
+                          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--terminal-info)'}
+                          onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)'}
+                          onClick={() => window.open(`/contracts/${payload.referenced_contract_id}`, '_blank')}
+                        >
+                          <div style={{ 
+                            width: '24px', height: '24px', 
+                            background: 'rgba(59, 130, 246, 0.2)', 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            borderRadius: '4px', fontSize: '14px'
+                          }}>📜</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '9px', color: 'var(--terminal-info)', fontWeight: 'bold', letterSpacing: '1px' }}>CERTIFIED_CONTRACT</div>
+                            <div style={{ fontFamily: 'monospace', opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              ID: {payload.referenced_contract_id.substring(0, 12)}...
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '10px', opacity: 0.5, flexShrink: 0 }}>DETAILS »</div>
                         </div>
                       )}
                     </div>
@@ -446,64 +481,82 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
                   SELECT_{mentionType === 'PLAYER' ? 'TARGET_IDENTITY' : 'CONTRACT_REFERENCE'}
                 </div>
                 {mentionType === 'PLAYER' ? (
-                  players.filter(p => p.toLowerCase().includes(mentionQuery.toLowerCase())).map(p => (
-                    <div 
-                      key={p} 
-                      onClick={() => selectMention(p)}
-                      style={{ 
-                        padding: '10px 15px', 
-                        cursor: 'pointer', 
-                        borderBottom: '1px solid rgba(255,255,255,0.05)',
-                        fontSize: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        color: '#cbd5e1'
-                      }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
-                        e.currentTarget.style.color = '#fff';
-                      }}
-                      onMouseOut={e => {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = '#cbd5e1';
-                      }}
-                    >
-                      <span style={{ color: 'var(--terminal-info)' }}>@</span>
-                      <span>{p}</span>
-                    </div>
-                  ))
+                  (filteredItems as string[]).map((p, idx) => {
+                    const isSelected = mentionIndex === idx;
+                    return (
+                      <div 
+                        key={p} 
+                        onClick={() => selectMention(p)}
+                        style={{ 
+                          padding: '10px 15px', 
+                          cursor: 'pointer', 
+                          borderBottom: '1px solid rgba(59, 130, 246, 0.1)',
+                          fontSize: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          background: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                          color: isSelected ? '#fff' : '#cbd5e1',
+                          position: 'relative',
+                          transition: 'all 0.1s'
+                        }}
+                      >
+                        {isSelected && (
+                          <div style={{ 
+                            position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', 
+                            background: 'var(--terminal-info)',
+                            boxShadow: '0 0 10px var(--terminal-info)'
+                          }} />
+                        )}
+                        <div style={{ 
+                          width: '8px', height: '8px', borderRadius: '50%', 
+                          background: isSelected ? 'var(--terminal-info)' : 'rgba(59, 130, 246, 0.3)',
+                          boxShadow: isSelected ? '0 0 5px var(--terminal-info)' : 'none'
+                        }} />
+                        <span style={{ fontFamily: 'monospace', fontWeight: isSelected ? 'bold' : 'normal' }}>{p}</span>
+                        {isSelected && <span style={{ marginLeft: 'auto', fontSize: '9px', opacity: 0.5 }}>[ENTER_TO_SELECT]</span>}
+                      </div>
+                    );
+                  })
                 ) : (
-                  contracts.filter(c => c.title.toLowerCase().includes(mentionQuery.toLowerCase()) || c.contract_id.includes(mentionQuery)).map(c => (
-                    <div 
-                      key={c.contract_id} 
-                      onClick={() => selectMention(c)}
-                      style={{ 
-                        padding: '10px 15px', 
-                        cursor: 'pointer', 
-                        borderBottom: '1px solid rgba(255,255,255,0.05)',
-                        color: '#cbd5e1'
-                      }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
-                        e.currentTarget.style.color = '#fff';
-                      }}
-                      onMouseOut={e => {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = '#cbd5e1';
-                      }}
-                    >
-                      <div style={{ fontWeight: 'bold', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ color: 'var(--terminal-warn)' }}>#</span>
-                        {c.title}
+                  (filteredItems as ContractBriefResponse[]).map((c, idx) => {
+                    const isSelected = mentionIndex === idx;
+                    return (
+                      <div 
+                        key={c.contract_id} 
+                        onClick={() => selectMention(c)}
+                        style={{ 
+                          padding: '10px 15px', 
+                          cursor: 'pointer', 
+                          borderBottom: '1px solid rgba(59, 130, 246, 0.1)',
+                          background: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                          color: isSelected ? '#fff' : '#cbd5e1',
+                          position: 'relative',
+                          transition: 'all 0.1s'
+                        }}
+                      >
+                        {isSelected && (
+                          <div style={{ 
+                            position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', 
+                            background: 'var(--terminal-warn)',
+                            boxShadow: '0 0 10px var(--terminal-warn)'
+                          }} />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 'bold', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: isSelected ? 'var(--terminal-warn)' : '#64748b' }}>#</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</span>
+                          </div>
+                          <div style={{ fontSize: '9px', opacity: 0.5, marginTop: '2px', fontFamily: 'monospace', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>ID: {c.contract_id.slice(0, 12)}...</span>
+                            <span style={{ color: c.status === 'ACTIVE' ? 'var(--terminal-success)' : 'inherit' }}>{c.status}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ fontSize: '9px', opacity: 0.5, marginTop: '2px', fontFamily: 'monospace' }}>
-                        ID: {c.contract_id.slice(0, 12)}... | STATUS: {c.status}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
-                {(mentionType === 'PLAYER' ? players : contracts).length === 0 && (
+                {filteredItems.length === 0 && (
                   <div style={{ padding: '20px', textAlign: 'center', opacity: 0.5, fontSize: '11px' }}>
                     NO_MATCHES_FOUND
                   </div>
@@ -518,14 +571,25 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
                 value={text}
                 onChange={handleInputChange}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    if (showMentionList) {
-                      setShowMentionList(false)
-                    } else {
-                      send()
+                  if (showMentionList && filteredItems.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setMentionIndex(prev => (prev + 1) % filteredItems.length);
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setMentionIndex(prev => (prev - 1 + filteredItems.length) % filteredItems.length);
+                    } else if (e.key === 'Enter' || e.key === 'Tab') {
+                      e.preventDefault();
+                      selectMention(filteredItems[mentionIndex]);
+                    } else if (e.key === 'Escape') {
+                      setShowMentionList(false);
                     }
+                    return;
                   }
-                  if (e.key === 'Escape') setShowMentionList(false)
+
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    send()
+                  }
                 }}
                 placeholder={activeThread === 'global' ? "在此发送全服广播 (@玩家, #契约)..." : "输入加密私信..."}
                 style={{ 

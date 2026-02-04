@@ -1,12 +1,15 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useState } from 'react'
+import type { CasteId } from './constants'
 
 export type AppSession = {
   playerId: string
   setPlayerId: (v: string) => void
-  casteId: string
-  setCasteId: (v: string) => void
+  casteId: CasteId | ''
+  setCasteId: (v: CasteId | '') => void
   symbol: string
   setSymbol: (v: string) => void
+  aiHosting: boolean
+  setAiHosting: (v: boolean) => void
 }
 
 const Ctx = createContext<AppSession | null>(null)
@@ -17,4 +20,37 @@ export function useAppSession(): AppSession {
   return v
 }
 
-export const AppSessionProvider = Ctx.Provider
+export function AppSessionProvider({ children }: { children: React.ReactNode }) {
+  const [playerId, setPlayerIdState] = useState<string>(() => localStorage.getItem('if_player_id') || '')
+  const [casteId, setCasteIdState] = useState<CasteId | ''>(() => (localStorage.getItem('if_caste_id') as CasteId) || '')
+  const [symbol, setSymbolState] = useState<string>(() => localStorage.getItem('if_symbol') || 'WST')
+  const [aiHosting, setAiHostingState] = useState<boolean>(false)
+
+  const setPlayerId = (v: string) => {
+    setPlayerIdState(v)
+    if (v) localStorage.setItem('if_player_id', v)
+    else localStorage.removeItem('if_player_id')
+  }
+
+  const setCasteId = (v: CasteId | '') => {
+    setCasteIdState(v)
+    if (v) localStorage.setItem('if_caste_id', v)
+    else localStorage.removeItem('if_caste_id')
+  }
+
+  const setSymbol = (v: string) => {
+    setSymbolState(v)
+    if (v) localStorage.setItem('if_symbol', v)
+    else localStorage.removeItem('if_symbol')
+  }
+
+  const setAiHosting = (v: boolean) => {
+    setAiHostingState(v)
+  }
+
+  return (
+    <Ctx.Provider value={{ playerId, setPlayerId, casteId, setCasteId, symbol, setSymbol, aiHosting, setAiHosting }}>
+      {children}
+    </Ctx.Provider>
+  )
+}

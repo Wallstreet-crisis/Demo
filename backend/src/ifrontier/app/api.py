@@ -916,16 +916,17 @@ async def create_player(req: CreatePlayerRequest) -> CreatePlayerResponse:
     # 如果提供 caste_id, 优先使用阶级配置; 否则回退到显式 initial_cash 或 0
     initial_cash = 0.0
     positions: Dict[str, float] = {}
+    caste_id = req.caste_id
 
-    if req.caste_id is not None:
-        cfg = get_caste_config(req.caste_id)
+    if caste_id is not None:
+        cfg = get_caste_config(caste_id)
         if cfg is not None:
             initial_cash = cfg.initial_cash
             positions = cfg.initial_positions
     if req.initial_cash is not None:
         initial_cash = req.initial_cash
 
-    create_account(account_id, owner_type="user", initial_cash=float(initial_cash))
+    create_account(account_id, owner_type="user", initial_cash=float(initial_cash), caste_id=caste_id)
 
     if positions:
         conn = get_connection()
@@ -1014,6 +1015,7 @@ class PlayerAccountResponse(BaseModel):
     account_id: str
     cash: float
     positions: Dict[str, float]
+    caste_id: str | None = None
 
 
 class PlayerBootstrapRequest(BaseModel):
@@ -1026,19 +1028,41 @@ class PlayerBootstrapRequest(BaseModel):
 async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountResponse:
     # 幂等：如果已存在则返回现有数据，不报错也不重复发放初始资产
     account_id = f"user:{req.player_id}"
+    
+    # 检查是否已存在
+    try:
+        snap = get_snapshot(account_id)
+        # 如果已存在但数据库中没有阶级信息（旧账号），且请求中提供了阶级，则补全它
+        if snap.caste_id is None and req.caste_id is not None:
+            conn = get_connection()
+            with conn:
+                conn.execute("UPDATE accounts SET caste_id = ? WHERE account_id = ?", (req.caste_id, account_id))
+            snap = get_snapshot(account_id)
+            
+        return PlayerAccountResponse(
+            account_id=snap.account_id, 
+            cash=snap.cash, 
+            positions=snap.positions,
+            caste_id=snap.caste_id
+        )
+    except ValueError:
+        # 不存在则创建
+        pass
+
     # 如果提供 caste_id, 优先使用阶级配置; 否则回退到显式 initial_cash 或 0
     initial_cash = 0.0
     positions: Dict[str, float] = {}
+    caste_id = req.caste_id
 
-    if req.caste_id is not None:
-        cfg = get_caste_config(req.caste_id)
+    if caste_id is not None:
+        cfg = get_caste_config(caste_id)
         if cfg is not None:
             initial_cash = cfg.initial_cash
             positions = cfg.initial_positions
     if req.initial_cash is not None:
         initial_cash = req.initial_cash
 
-    create_account(account_id, owner_type="user", initial_cash=float(initial_cash))
+    create_account(account_id, owner_type="user", initial_cash=float(initial_cash), caste_id=caste_id)
 
     if positions:
         conn = get_connection()
@@ -1058,14 +1082,24 @@ async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountRespons
         pass
 
     snap = get_snapshot(account_id)
-    return PlayerAccountResponse(account_id=snap.account_id, cash=snap.cash, positions=snap.positions)
+    return PlayerAccountResponse(
+        account_id=snap.account_id, 
+        cash=snap.cash, 
+        positions=snap.positions,
+        caste_id=snap.caste_id
+    )
 
 
 @router.get("/players/{player_id}/account")
 async def get_player_account(player_id: str) -> PlayerAccountResponse:
     account_id = f"user:{player_id}"
     snap = get_snapshot(account_id)
-    return PlayerAccountResponse(account_id=snap.account_id, cash=snap.cash, positions=snap.positions)
+    return PlayerAccountResponse(
+        account_id=snap.account_id, 
+        cash=snap.cash, 
+        positions=snap.positions,
+        caste_id=snap.caste_id
+    )
 
 
 class ContractCreateRequest(BaseModel):
@@ -1400,14 +1434,32 @@ class PlayerListResponse(BaseModel):
 @router.get("/players")
 async def list_players(limit: int = 100) -> PlayerListResponse:
     """列出所有活跃玩家 ID，用于聊天 @ 提醒"""
-    from ifrontier.infra.sqlite.accounts import list_accounts
-    users = list_accounts() # 这里假设我们有一个能列出所有账号的方法
-    # 如果没有 list_accounts，我们先用 Neo4j 的查询
     try:
-        users_from_news = _news_service.list_users(limit=limit)
-        return PlayerListResponse(items=users_from_news)
-    except:
-        return PlayerListResponse(items=[])
+        conn = get_connection()
+        rows = conn.execute(
+            "SELECT account_id FROM accounts WHERE owner_type = 'user' LIMIT ?",
+            (int(limit),),
+        ).fetchall()
+        items: List[str] = []
+        for r in rows:
+            try:
+                account_id = str(r["account_id"])  # type: ignore[index]
+            except Exception:
+                account_id = str(r[0])
+            if account_id.startswith("user:"):
+                items.append(account_id[len("user:") :])
+            else:
+                items.append(account_id)
+        return PlayerListResponse(items=items)
+    except Exception:
+        # 兜底：尝试从 Neo4j 用户网络中取（可能为空）
+        try:
+            users_from_news = _news_service.list_users(limit=int(limit))
+            # 返回 raw user_id（可能是 user:xxx），这里做一次归一化
+            norm = [u[len("user:") :] if str(u).startswith("user:") else str(u) for u in users_from_news]
+            return PlayerListResponse(items=norm)
+        except Exception:
+            return PlayerListResponse(items=[])
 
 
 class ContractBriefResponse(BaseModel):
@@ -1424,11 +1476,49 @@ class ContractListResponse(BaseModel):
 @router.get("/contracts/list")
 async def list_contracts(actor_id: str | None = None, limit: int = 50) -> ContractListResponse:
     """列出当前玩家相关的契约，用于聊天引用"""
-    # 简单的 mock，后续需要完善 service 层查询
+    aid = actor_id
+    if aid is not None:
+        aid = str(aid)
+        if ":" not in aid:
+            aid = f"user:{aid}"
+
     try:
-        # 这里暂时返回一个空列表或基础查询
-        return ContractListResponse(items=[])
-    except:
+        with _driver.session() as session:
+            records = session.execute_read(
+                lambda tx, params: list(
+                    tx.run(
+                        """
+                        MATCH (c:Contract)
+                        WHERE $actor_id IS NULL
+                           OR $actor_id IN coalesce(c.parties, [])
+                           OR $actor_id IN coalesce(c.required_signers, [])
+                           OR $actor_id IN coalesce(c.invited_parties, [])
+                        RETURN c.contract_id AS contract_id,
+                               c.title AS title,
+                               c.kind AS kind,
+                               c.status AS status,
+                               c.created_at AS created_at
+                        ORDER BY created_at DESC
+                        LIMIT $limit
+                        """,
+                        **params,
+                    )
+                ),
+                {"actor_id": aid, "limit": int(limit)},
+            )
+
+        items = [
+            ContractBriefResponse(
+                contract_id=str(r.get("contract_id") or ""),
+                title=str(r.get("title") or ""),
+                kind=str(r.get("kind") or ""),
+                status=str(r.get("status") or ""),
+            )
+            for r in records
+            if (r.get("contract_id") is not None)
+        ]
+        return ContractListResponse(items=items)
+    except Exception:
         return ContractListResponse(items=[])
 
 

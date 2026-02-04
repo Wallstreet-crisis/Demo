@@ -19,6 +19,7 @@ def init_schema() -> None:
         CREATE TABLE IF NOT EXISTS accounts (
             account_id TEXT PRIMARY KEY,
             owner_type TEXT NOT NULL,
+            caste_id TEXT,
             cash REAL NOT NULL DEFAULT 0
         );
 
@@ -48,7 +49,16 @@ def init_schema() -> None:
         """
     )
 
-    conn.commit()
+    # 迁移逻辑：确保 accounts 表包含 caste_id 字段
+    cur.execute("PRAGMA table_info(accounts)")
+    columns = [row[1] for row in cur.fetchall()]
+    if "caste_id" not in columns:
+        try:
+            cur.execute("ALTER TABLE accounts ADD COLUMN caste_id TEXT")
+            conn.commit()
+            print("[DB] Migrated accounts table: added caste_id column")
+        except Exception as e:
+            print(f"[DB] Migration failed (caste_id): {e}")
 
     # 订单簿（LIMIT 订单入簿，MARKET 订单由撮合引擎吃单实现）
     init_order_schema()

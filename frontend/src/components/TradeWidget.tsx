@@ -4,7 +4,8 @@ import { useAppSession } from '../app/context'
 import { useNotification } from '../app/NotificationContext'
 import CyberWidget from './CyberWidget'
 
-export default function TradeWidget() {
+export default function TradeWidget({ isFocused }: { isFocused?: boolean }) {
+  void isFocused
   const { playerId, symbol } = useAppSession()
   const { notify } = useNotification()
   const [err, setErr] = useState<string>('')
@@ -17,6 +18,8 @@ export default function TradeWidget() {
   const [orderType, setOrderType] = useState<'LIMIT' | 'MARKET'>('LIMIT')
   const [price, setPrice] = useState<string>('')
   const [quantity, setQuantity] = useState<string>('1')
+  const [aiSuggestion, setAiSuggestion] = useState<{ action: string; confidence: number; reason: string } | null>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
 
   const refreshData = useCallback(async () => {
     try {
@@ -39,6 +42,21 @@ export default function TradeWidget() {
     const t = setInterval(refreshData, 3000)
     return () => clearInterval(t)
   }, [refreshData])
+
+  useEffect(() => {
+    if (!symbol) return
+    setIsAnalyzing(true)
+    const timer = setTimeout(() => {
+      const rand = Math.random()
+      setAiSuggestion({
+        action: rand > 0.5 ? 'STRONGLY_BUY' : 'CAUTIOUS_SELL',
+        confidence: Math.floor(70 + Math.random() * 25),
+        reason: rand > 0.5 ? 'BULLISH_SENTIMENT_DETECTED' : 'RESISTANCE_LEVEL_APPROACHING'
+      })
+      setIsAnalyzing(false)
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [symbol, quote?.last_price])
 
   const availableCash = val?.cash ?? 0
   const availablePos = val?.positions ? (val.positions[symbol] ?? 0) : 0
@@ -191,6 +209,37 @@ export default function TradeWidget() {
             </span>
           </div>
         </div>
+
+        {isFocused && (
+          <div style={{ 
+            marginTop: '5px', 
+            padding: '10px', 
+            background: 'rgba(59, 130, 246, 0.05)', 
+            border: '1px solid rgba(59, 130, 246, 0.2)', 
+            borderRadius: '4px' 
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '9px', color: 'var(--terminal-info)', fontWeight: 'bold' }}>NEURAL_TRADE_ADVISOR</span>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isAnalyzing ? 'var(--terminal-warn)' : 'var(--terminal-success)', animation: isAnalyzing ? 'blink-anim 0.5s step-end infinite' : 'none' }} />
+            </div>
+            
+            {isAnalyzing ? (
+              <div style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>ANALYZING_MARKET_VECTORS...</div>
+            ) : aiSuggestion ? (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '11px', color: aiSuggestion.action.includes('BUY') ? 'var(--terminal-success)' : 'var(--terminal-error)', fontWeight: 'bold' }}>
+                    {aiSuggestion.action}
+                  </span>
+                  <span style={{ fontSize: '10px', color: '#fff', fontFamily: 'monospace' }}>{aiSuggestion.confidence}%_CONF</span>
+                </div>
+                <div style={{ fontSize: '9px', color: '#94a3b8', fontFamily: 'monospace', fontStyle: 'italic' }}>
+                  {aiSuggestion.reason}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
 
         <button 
           className="cyber-button"

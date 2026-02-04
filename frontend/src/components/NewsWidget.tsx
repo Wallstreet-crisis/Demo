@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Api, type NewsInboxResponse, type NewsInboxResponseItem } from '../api'
+import { Api, type NewsFeedItem, type NewsInboxResponse, type NewsInboxResponseItem } from '../api'
 import { useAppSession } from '../app/context'
 import { WsClient } from '../api'
 import CyberWidget from './CyberWidget'
@@ -17,7 +17,8 @@ function formatTime(s: string): string {
   return d.toLocaleTimeString()
 }
 
-export default function NewsWidget({ onShowNews }: { onShowNews?: (item: any) => void }) {
+export default function NewsWidget({ onShowNews, isFocused }: { onShowNews?: (item: NewsFeedItem) => void, isFocused?: boolean }) {
+  void isFocused
   const { playerId } = useAppSession()
   const [inbox, setInbox] = useState<NewsInboxResponse | null>(null)
   const [selectedItem, setSelectedItem] = useState<NewsInboxResponseItem | null>(null)
@@ -38,7 +39,7 @@ export default function NewsWidget({ onShowNews }: { onShowNews?: (item: any) =>
   useEffect(() => {
     refreshInbox()
     
-    ws.connect('events', (payload) => {
+    ws.connect('events', (payload: unknown) => {
       const t = getEventType(payload)
       if (typeof t === 'string' && t.startsWith('NEWS_')) {
         if (refreshTimerRef.current === null) {
@@ -64,11 +65,15 @@ export default function NewsWidget({ onShowNews }: { onShowNews?: (item: any) =>
       actions={<button className="cyber-button" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={refreshInbox}>SYNC</button>}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        {inbox?.items?.map((it) => (
+        {(isFocused ? (inbox?.items || []) : (inbox?.items || []).slice(0, 5)).map((it) => (
           <div
             key={it.delivery_id}
             onClick={() => {
               if (onShowNews) {
+                const truth = (it.truth_payload && typeof it.truth_payload === 'object')
+                  ? (it.truth_payload as Record<string, unknown>)
+                  : null
+                const imageUri = truth && typeof truth.image_uri === 'string' ? truth.image_uri : null
                 // Prepare feed-like item for the popup
                 onShowNews({
                   variant_id: it.variant_id,
@@ -76,7 +81,7 @@ export default function NewsWidget({ onShowNews }: { onShowNews?: (item: any) =>
                   kind: it.kind,
                   author_id: it.from_actor_id,
                   text: it.text,
-                  image_uri: (it.truth_payload as any)?.image_uri || null,
+                  image_uri: imageUri,
                   created_at: it.delivered_at,
                   symbols: it.symbols || [],
                   tags: it.tags || []

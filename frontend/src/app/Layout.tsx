@@ -1,13 +1,9 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAppSession } from './context'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Api, type HostingStatusResponse, type MarketSessionResponse } from '../api'
+import { Api, type MarketSessionResponse } from '../api'
 
-const CASTES = [
-  { id: 'ELITE', label: '精英阶层 (Elite)', color: '#ff4d4f', weight: 0.1, desc: '掌控巨量原始资本，拥有信息溯源权' },
-  { id: 'MIDDLE', label: '中产阶层 (Middle)', color: '#1890ff', weight: 0.3, desc: '拥有稳健的起步资金' },
-  { id: 'WORKING', label: '工薪阶层 (Working)', color: '#52c41a', weight: 0.6, desc: '白手起家，依赖社交网络获取信息' },
-]
+import { CASTES } from './constants'
 
 function NavItem(props: { to: string; label: string }) {
   const loc = useLocation()
@@ -81,7 +77,6 @@ export default function Layout() {
   const [cash, setCash] = useState<number | null>(null)
   const [totalValue, setTotalValue] = useState<number | null>(null)
   const [valuationOk, setValuationOk] = useState<boolean>(true)
-  const [hostingStatus, setHostingStatus] = useState<HostingStatusResponse | null>(null)
   const [hostingLoading, setHostingLoading] = useState(false)
   const [marketSession, setMarketSession] = useState<MarketSessionResponse | null>(null)
 
@@ -96,12 +91,12 @@ export default function Layout() {
         Api.hostingStatus(`user:${sess.playerId}`),
         Api.marketSession()
       ])
-      setHostingStatus(hRes)
+      sess.setAiHosting(hRes.enabled)
       setMarketSession(mRes)
     } catch (e) {
       console.error('Failed to fetch status', e)
     }
-  }, [sess.playerId])
+  }, [sess])
 
   useEffect(() => {
     fetchStatus()
@@ -113,12 +108,13 @@ export default function Layout() {
     if (!sess.playerId || hostingLoading) return
     setHostingLoading(true)
     try {
-      if (hostingStatus?.enabled) {
-        await Api.hostingDisable(`user:${sess.playerId}`)
-      } else {
+      const targetState = !sess.aiHosting
+      if (targetState) {
         await Api.hostingEnable(`user:${sess.playerId}`)
+      } else {
+        await Api.hostingDisable(`user:${sess.playerId}`)
       }
-      await fetchStatus()
+      sess.setAiHosting(targetState)
     } catch (e) {
       console.error('Failed to toggle hosting', e)
     } finally {
@@ -245,7 +241,7 @@ export default function Layout() {
               <button 
                 onClick={toggleHosting}
                 disabled={hostingLoading}
-                className={`cyber-button ${hostingStatus?.enabled ? 'active' : ''}`}
+                className={`cyber-button ${sess.aiHosting ? 'active' : ''}`}
                 style={{ 
                   fontSize: '10px', 
                   height: '28px', 
@@ -253,18 +249,18 @@ export default function Layout() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  borderColor: hostingStatus?.enabled ? 'var(--terminal-success)' : 'var(--terminal-border)',
-                  color: hostingStatus?.enabled ? 'var(--terminal-success)' : '#94a3b8'
+                  borderColor: sess.aiHosting ? 'var(--terminal-success)' : 'var(--terminal-border)',
+                  color: sess.aiHosting ? 'var(--terminal-success)' : '#94a3b8'
                 }}
               >
                 <div style={{ 
                   width: '8px', 
                   height: '8px', 
                   borderRadius: '50%', 
-                  background: hostingStatus?.enabled ? 'var(--terminal-success)' : '#475569',
-                  boxShadow: hostingStatus?.enabled ? '0 0 8px var(--terminal-success)' : 'none'
+                  background: sess.aiHosting ? 'var(--terminal-success)' : '#475569',
+                  boxShadow: sess.aiHosting ? '0 0 8px var(--terminal-success)' : 'none'
                 }} />
-                {hostingStatus?.enabled ? 'AI_ACTIVE' : 'START_AI'}
+                {sess.aiHosting ? 'AI_ACTIVE' : 'START_AI'}
               </button>
 
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center', color: '#94a3b8' }}>

@@ -113,7 +113,7 @@ export default function CandlestickChart({ candles }: CandlestickChartProps) {
   const currentHoverPrice = (mouseY !== null && mouseY >= margin.top && mouseY <= margin.top + chartAreaHeight) ? invertY(mouseY) : null
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
       {/* Legend for MA */}
       <div style={{ 
         position: 'absolute', 
@@ -121,8 +121,9 @@ export default function CandlestickChart({ candles }: CandlestickChartProps) {
         left: margin.left + 5, 
         fontSize: '9px', 
         display: 'flex', 
-        gap: '10px',
-        pointerEvents: 'none'
+        gap: '10px', 
+        pointerEvents: 'none',
+        zIndex: 10
       }}>
         <span style={{ color: '#fbbf24' }}>MA5: {lastCandle && ma5[candles.length - 1] != null ? ma5[candles.length - 1]?.toFixed(2) : '--'}</span>
         <span style={{ color: '#8b5cf6' }}>MA20: {lastCandle && ma20[candles.length - 1] != null ? ma20[candles.length - 1]?.toFixed(2) : '--'}</span>
@@ -165,10 +166,17 @@ export default function CandlestickChart({ candles }: CandlestickChartProps) {
       )}
 
       <svg 
-        width="100%" 
-        height={height} 
+        style={{ 
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          overflow: 'visible', 
+          cursor: 'crosshair' 
+        }}
         viewBox={`0 0 ${width} ${height}`} 
-        style={{ overflow: 'visible', cursor: 'crosshair' }}
+        preserveAspectRatio="none"
         onMouseMove={handleMouseMove}
         onMouseLeave={() => { setHoveredCandle(null); setMouseX(null); setMouseY(null); }}
       >
@@ -183,14 +191,13 @@ export default function CandlestickChart({ candles }: CandlestickChartProps) {
                 y1={y} 
                 x2={width - margin.right} 
                 y2={y} 
-                stroke="#1e293b" 
+                stroke="rgba(30, 41, 59, 0.5)" 
                 strokeWidth="0.5" 
-                strokeDasharray="2 4" 
               />
               <text 
                 x={width - margin.right + 8} 
                 y={y + 3} 
-                fill="#475569" 
+                fill="#64748b" 
                 fontSize="10" 
                 fontFamily="monospace"
               >
@@ -198,6 +205,28 @@ export default function CandlestickChart({ candles }: CandlestickChartProps) {
               </text>
             </g>
           )
+        })}
+
+        {/* Vertical Grid & Time Labels */}
+        {candles.length > 0 && Array.from(new Set([0, Math.floor(candles.length / 2), candles.length - 1])).map(idx => {
+          const c = candles[idx];
+          if (!c) return null;
+          const x = scaleX(idx) + barWidth / 2;
+          return (
+            <g key={`v-grid-${c.bucket_start}-${idx}`}>
+              <line 
+                x1={x} 
+                y1={margin.top} 
+                x2={x} 
+                y2={margin.top + chartAreaHeight} 
+                stroke="rgba(30, 41, 59, 0.5)" 
+                strokeWidth="0.5" 
+              />
+              <text x={x} y={height - 5} fill="#64748b" fontSize="9" fontFamily="monospace" textAnchor="middle">
+                {new Date(c.bucket_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </text>
+            </g>
+          );
         })}
 
         {/* Current Price Line */}
@@ -257,18 +286,20 @@ export default function CandlestickChart({ candles }: CandlestickChartProps) {
         {/* Volume Bars */}
         {candles.map((c, idx) => {
           const isUp = c.close >= c.open
-          const color = isUp ? '#26a69a' : '#ef5350'
+          const color = isUp ? 'rgba(38, 166, 154, 0.2)' : 'rgba(239, 83, 80, 0.2)'
           const x = scaleX(idx)
           const volY = scaleVol(c.volume)
+          const barH = Math.max(height - margin.bottom - volY, 1)
           return (
             <rect 
               key={`v-${c.bucket_start}-${idx}`} 
               x={x + (barWidth - bodyWidth) / 2} 
               y={volY} 
               width={bodyWidth} 
-              height={Math.max(height - margin.bottom - volY, 1)} 
-              fill={color} 
-              opacity={hoveredCandle === c ? "0.3" : "0.1"} 
+              height={barH} 
+              fill={color}
+              stroke={isUp ? 'rgba(38, 166, 154, 0.4)' : 'rgba(239, 83, 80, 0.4)'}
+              strokeWidth="0.5"
             />
           )
         })}
@@ -292,7 +323,7 @@ export default function CandlestickChart({ candles }: CandlestickChartProps) {
         {/* Candlesticks */}
         {candles.map((c, idx) => {
           const isUp = c.close >= c.open
-          const color = isUp ? '#26a69a' : '#ef5350' // More professional colors
+          const color = isUp ? '#26a69a' : '#ef5350'
           const x = scaleX(idx)
           const centerX = x + barWidth / 2
           const yHigh = scaleY(c.high)
@@ -303,7 +334,7 @@ export default function CandlestickChart({ candles }: CandlestickChartProps) {
           const bodyHeight = Math.max(Math.abs(yOpen - yClose), 1.5)
 
           return (
-            <g key={`c-${c.bucket_start}-${idx}`}>
+            <g key={`c-${c.bucket_start}-${idx}`} style={{ filter: hoveredCandle === c ? 'drop-shadow(0 0 4px rgba(255,255,255,0.3))' : 'none' }}>
               {/* Wick */}
               <line 
                 x1={centerX} 
@@ -311,7 +342,7 @@ export default function CandlestickChart({ candles }: CandlestickChartProps) {
                 x2={centerX} 
                 y2={yLow} 
                 stroke={color} 
-                strokeWidth="0.8" 
+                strokeWidth="1" 
               />
               {/* Body */}
               <rect 
@@ -319,37 +350,14 @@ export default function CandlestickChart({ candles }: CandlestickChartProps) {
                 y={bodyTop} 
                 width={bodyWidth} 
                 height={bodyHeight} 
-                fill={color} 
+                fill={isUp ? 'transparent' : color} 
                 stroke={color}
-                strokeWidth="0.5"
-                fillOpacity={isUp ? "0.8" : "1"}
+                strokeWidth="1"
               />
             </g>
           )
         })}
 
-        {/* Time Labels & Vertical Grid */}
-        {candles.length > 0 && Array.from(new Set([0, Math.floor(candles.length / 2), candles.length - 1])).filter(idx => idx >= 0 && idx < candles.length).map(idx => {
-          const c = candles[idx];
-          if (!c) return null;
-          const x = scaleX(idx) + barWidth / 2;
-          return (
-            <g key={`v-grid-${c.bucket_start}-${idx}`}>
-              <line 
-                x1={x} 
-                y1={margin.top} 
-                x2={x} 
-                y2={margin.top + chartAreaHeight + volHeight + 10} 
-                stroke="#1e293b" 
-                strokeWidth="0.5" 
-                strokeDasharray="2 4"
-              />
-              <text x={x} y={height - 10} fill="#475569" fontSize="9" fontFamily="monospace" textAnchor="middle">
-                {new Date(c.bucket_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </text>
-            </g>
-          );
-        })}
       </svg>
     </div>
   )

@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Api, ApiError, WsClient, type AccountValuationResponse, type PlayerAccountResponse } from '../api'
 import { useAppSession } from '../app/context'
+import { CASTES } from '../app/constants'
 import CyberWidget from './CyberWidget'
 
-export default function AccountWidget() {
+export default function AccountWidget({ isFocused }: { isFocused?: boolean }) {
+  void isFocused
   const { playerId } = useAppSession()
   const [err, setErr] = useState<string>('')
   const [snap, setSnap] = useState<PlayerAccountResponse | null>(null)
@@ -60,6 +62,11 @@ export default function AccountWidget() {
   const equityValue = val?.equity_value ?? 0
   const totalValue = val?.total_value ?? 0
 
+  const playerCaste = useMemo(() => {
+    if (!snap?.caste_id) return null;
+    return CASTES.find(c => c.id === snap.caste_id);
+  }, [snap]);
+
   const positions = snap?.positions ?? {}
   const positionItems = Object.entries(positions)
     .map(([symbol, qty]) => {
@@ -78,6 +85,20 @@ export default function AccountWidget() {
     >
       {err && <div style={{ color: 'var(--terminal-error)', fontSize: '12px', marginBottom: '10px', background: 'rgba(239, 68, 68, 0.1)', padding: '8px', borderLeft: '3px solid var(--terminal-error)' }}>[ERR]: {err}</div>}
       
+      {playerCaste && (
+        <div style={{ 
+          marginBottom: '15px', 
+          padding: '8px 12px', 
+          background: `${playerCaste.color}15`, 
+          borderLeft: `3px solid ${playerCaste.color}`,
+          borderRadius: '2px'
+        }}>
+          <div style={{ fontSize: '9px', color: playerCaste.color, fontWeight: 'bold', letterSpacing: '1px' }}>SOCIAL_CLASS_PROFILE</div>
+          <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginTop: '2px' }}>{playerCaste.label}</div>
+          <div style={{ fontSize: '9px', color: '#94a3b8', marginTop: '4px', fontStyle: 'italic' }}>{playerCaste.desc}</div>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
         <div style={{ padding: '10px', border: '1px solid var(--terminal-border)', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
           <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>CASH_LIQUID</div>
@@ -101,7 +122,7 @@ export default function AccountWidget() {
               </tr>
             </thead>
             <tbody>
-              {positionItems.map((p) => (
+              {(isFocused ? positionItems : positionItems.slice(0, 3)).map((p) => (
                 <tr key={p.symbol} style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.3)', transition: 'background 0.1s' }}>
                   <td style={{ padding: '8px', fontWeight: '600' }}>{p.symbol}</td>
                   <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{p.qty.toFixed(2)}</td>

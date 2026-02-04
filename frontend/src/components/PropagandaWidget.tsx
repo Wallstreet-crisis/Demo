@@ -4,7 +4,8 @@ import { useAppSession } from '../app/context'
 import { useNotification } from '../app/NotificationContext'
 import CyberWidget from './CyberWidget'
 
-export default function PropagandaWidget() {
+export default function PropagandaWidget({ isFocused }: { isFocused?: boolean }) {
+  void isFocused
   const { playerId } = useAppSession()
   const { notify } = useNotification()
   
@@ -129,8 +130,10 @@ export default function PropagandaWidget() {
   const handleSuppress = async (item: NewsInboxResponseItem) => {
     // Current API newsSuppress requires chain_id
     // We try to extract it from truth_payload if present
-    const truth = item.truth_payload as any
-    const chainId = truth?.chain_id
+    const truth = (item.truth_payload && typeof item.truth_payload === 'object')
+      ? (item.truth_payload as Record<string, unknown>)
+      : null
+    const chainId = truth && typeof truth.chain_id === 'string' ? truth.chain_id : null
     
     if (!chainId) {
       notify('error', 'SUPPRESSION_FAILED: NO_ACTIVE_CHAIN')
@@ -174,72 +177,80 @@ export default function PropagandaWidget() {
     >
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '8px' }}>
         
-        {/* Global Settings */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '10px', 
-          padding: '6px 8px', 
-          background: 'rgba(0,0,0,0.2)', 
-          border: '1px solid var(--terminal-border)',
-          borderRadius: '2px'
-        }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '8px', color: '#64748b', marginBottom: '2px' }}>OP_BUDGET</div>
-            <input 
-              className="cyber-input"
-              type="number"
-              value={propSpendCash}
-              onChange={e => setPropSpendCash(e.target.value)}
-              style={{ fontSize: '10px', width: '100%', height: '22px' }}
-            />
+        {/* Global Settings - Only show when focused */}
+        {isFocused && (
+          <div style={{ 
+            display: 'flex', 
+            gap: '10px', 
+            padding: '6px 8px', 
+            background: 'rgba(0,0,0,0.2)', 
+            border: '1px solid var(--terminal-border)',
+            borderRadius: '2px'
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '8px', color: '#64748b', marginBottom: '2px' }}>OP_BUDGET</div>
+              <input 
+                className="cyber-input"
+                type="number"
+                value={propSpendCash}
+                onChange={e => setPropSpendCash(e.target.value)}
+                style={{ fontSize: '10px', width: '100%', height: '22px' }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '8px', color: '#64748b', marginBottom: '2px' }}>TARGET_REACH</div>
+              <input 
+                className="cyber-input"
+                type="number"
+                value={propLimit}
+                onChange={e => setPropLimit(Number(e.target.value))}
+                style={{ fontSize: '10px', width: '100%', height: '22px' }}
+              />
+            </div>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '8px', color: '#64748b', marginBottom: '2px' }}>TARGET_REACH</div>
-            <input 
-              className="cyber-input"
-              type="number"
-              value={propLimit}
-              onChange={e => setPropLimit(Number(e.target.value))}
-              style={{ fontSize: '10px', width: '100%', height: '22px' }}
-            />
-          </div>
-        </div>
+        )}
 
         {activeTab === 'INVENTORY' && (
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }} className="custom-scrollbar">
             {sortedInboxItems.length === 0 && (
               <div style={{ opacity: 0.3, textAlign: 'center', padding: '20px', fontSize: '11px' }}>VOID_INVENTORY</div>
             )}
-            {sortedInboxItems.map(item => (
-              <div key={item.delivery_id} style={{ 
-                background: 'rgba(30, 41, 49, 0.5)', 
-                border: '1px solid var(--terminal-border)',
-                padding: '8px',
-                borderRadius: '2px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', marginBottom: '4px', opacity: 0.7 }}>
-                  <span>[{item.kind}] {new Date(item.delivered_at).toLocaleTimeString()}</span>
-                  <span>ID: {item.variant_id.slice(0,8)}</span>
+            {(isFocused ? sortedInboxItems : sortedInboxItems.slice(0, 3)).map(item => {
+              const truth = (item.truth_payload && typeof item.truth_payload === 'object')
+                ? (item.truth_payload as Record<string, unknown>)
+                : null
+              const itemChainId = truth && typeof truth.chain_id === 'string' ? truth.chain_id : null
+              return (
+                <div key={item.delivery_id} style={{ 
+                  background: 'rgba(30, 41, 49, 0.5)', 
+                  border: '1px solid var(--terminal-border)',
+                  padding: '8px',
+                  borderRadius: '2px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', marginBottom: '4px', opacity: 0.7 }}>
+                    <span>[{item.kind}] {new Date(item.delivered_at).toLocaleTimeString()}</span>
+                    <span>ID: {item.variant_id.slice(0,8)}</span>
+                  </div>
+                  <div style={{ fontSize: '11px', lineHeight: '1.3', marginBottom: '8px', color: '#cbd5e1' }}>
+                    {item.text.length > 120 ? item.text.substring(0, 120) + '...' : item.text}
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button 
+                      className="cyber-button" 
+                      onClick={() => handleBoost(item.variant_id)}
+                      disabled={loading}
+                      style={{ flex: 1, fontSize: '9px', padding: '2px 0', borderColor: 'var(--terminal-success)', color: 'var(--terminal-success)' }}
+                    >BOOST</button>
+                    <button 
+                      className="cyber-button" 
+                      onClick={() => handleSuppress(item)}
+                      disabled={loading || !itemChainId}
+                      style={{ flex: 1, fontSize: '9px', padding: '2px 0', borderColor: 'var(--terminal-error)', color: 'var(--terminal-error)' }}
+                    >SUPPRESS</button>
+                  </div>
                 </div>
-                <div style={{ fontSize: '11px', lineHeight: '1.3', marginBottom: '8px', color: '#cbd5e1' }}>
-                  {item.text.length > 120 ? item.text.substring(0, 120) + '...' : item.text}
-                </div>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <button 
-                    className="cyber-button" 
-                    onClick={() => handleBoost(item.variant_id)}
-                    disabled={loading}
-                    style={{ flex: 1, fontSize: '9px', padding: '2px 0', borderColor: 'var(--terminal-success)', color: 'var(--terminal-success)' }}
-                  >BOOST</button>
-                  <button 
-                    className="cyber-button" 
-                    onClick={() => handleSuppress(item)}
-                    disabled={loading || !(item.truth_payload as any)?.chain_id}
-                    style={{ flex: 1, fontSize: '9px', padding: '2px 0', borderColor: 'var(--terminal-error)', color: 'var(--terminal-error)' }}
-                  >SUPPRESS</button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 

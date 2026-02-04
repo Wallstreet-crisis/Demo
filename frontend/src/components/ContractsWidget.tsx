@@ -4,7 +4,8 @@ import { useAppSession } from '../app/context'
 import { useNotification } from '../app/NotificationContext'
 import CyberWidget from './CyberWidget'
 
-export default function ContractsWidget() {
+export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) {
+  void isFocused
   const { playerId } = useAppSession()
   const { notify } = useNotification()
   const [loading, setLoading] = useState(false)
@@ -78,33 +79,42 @@ export default function ContractsWidget() {
           className="cyber-input"
           style={{ 
             width: '100%', 
-            minHeight: '100px', 
+            minHeight: isFocused ? '120px' : '60px', 
             fontSize: '12px', 
             background: 'var(--terminal-bg)',
             resize: 'none',
             border: '1px solid var(--terminal-border)',
-            padding: '10px'
+            padding: '10px',
+            transition: 'height 0.3s'
           }}
           placeholder="DESCRIBE_TERMS: e.g. 'Bet 1000 cash with user:bob on BLUEGOLD > 150'"
           value={naturalLanguage}
           onChange={e => setNaturalLanguage(e.target.value)}
         />
         
-        <button 
-          className="cyber-button"
-          onClick={handleDraft} 
-          disabled={loading || !naturalLanguage.trim()}
-          style={{ 
-            fontSize: '12px', 
-            padding: '10px',
-            background: 'var(--terminal-info)',
-            borderColor: 'var(--terminal-info)',
-            color: '#fff',
-            fontWeight: '600'
-          }}
-        >
-          {loading ? 'ANALYZING_PROTOCOL...' : 'GENERATE_LEGAL_DRAFT'}
-        </button>
+        {isFocused && (
+          <button 
+            className="cyber-button"
+            onClick={handleDraft} 
+            disabled={loading || !naturalLanguage.trim()}
+            style={{ 
+              fontSize: '12px', 
+              padding: '10px',
+              background: 'var(--terminal-info)',
+              borderColor: 'var(--terminal-info)',
+              color: '#fff',
+              fontWeight: '600'
+            }}
+          >
+            {loading ? 'ANALYZING_PROTOCOL...' : 'GENERATE_LEGAL_DRAFT'}
+          </button>
+        )}
+
+        {!isFocused && !draft && (
+          <div style={{ fontSize: '10px', color: '#64748b', textAlign: 'center', opacity: 0.6 }}>
+            [ZOOM_TO_ENGAGE_AI_DRAFTING]
+          </div>
+        )}
 
         {draft && (
           <div style={{ 

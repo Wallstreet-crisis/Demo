@@ -2,14 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Api, ApiError } from '../api'
 import { useAppSession } from '../app/context'
+import { CASTES, type CasteId } from '../app/constants'
 
 const PLAYER_ID_RE = /^[a-zA-Z0-9_]{3,20}$/
-
-const CASTES = [
-  { id: 'ELITE', label: '精英阶层 (Elite)', color: '#ff4d4f', weight: 0.1, desc: '掌控巨量原始资本，拥有信息溯源权' },
-  { id: 'MIDDLE', label: '中产阶层 (Middle)', color: '#1890ff', weight: 0.3, desc: '拥有稳健的起步资金' },
-  { id: 'WORKING', label: '工薪阶层 (Working)', color: '#52c41a', weight: 0.6, desc: '白手起家，依赖社交网络获取信息' },
-]
 
 export default function OnboardingPage() {
   const nav = useNavigate()
@@ -20,7 +15,7 @@ export default function OnboardingPage() {
   const [isRolling, setIsRolling] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncProgress, setSyncSyncProgress] = useState(0)
-  const [resultCaste, setResultCaste] = useState<typeof CASTES[0] | null>(null)
+  const [resultCaste, setResultCaste] = useState<(typeof CASTES)[number] | null>(null)
   const [rollIndex, setRollIndex] = useState(0)
 
   useEffect(() => {
@@ -65,24 +60,38 @@ export default function OnboardingPage() {
 
     // 模拟抽取过程
     setTimeout(async () => {
-      setIsRolling(false)
-      
-      // 随机抽取阶级
-      const rand = Math.random()
-      let cumulative = 0
-      let selected = CASTES[CASTES.length - 1]
-      for (const c of CASTES) {
-        cumulative += c.weight
-        if (rand < cumulative) {
-          selected = c
-          break
-        }
-      }
-      setResultCaste(selected)
-      setIsSyncing(true)
-      setSyncSyncProgress(0)
-      
       try {
+        // 先尝试获取现有玩家信息
+        const existing = await Api.playerAccount(playerId).catch(() => null)
+        
+        if (existing && existing.caste_id) {
+          const found = CASTES.find(c => c.id === existing.caste_id)
+          if (found) {
+            setIsRolling(false)
+            setResultCaste(found)
+            setGlobalPlayerId(playerId)
+            setGlobalCasteId(found.id as CasteId)
+            return
+          }
+        }
+
+        setIsRolling(false)
+        
+        // 随机抽取阶级
+        const rand = Math.random()
+        let cumulative = 0
+        let selected = CASTES[CASTES.length - 1]
+        for (const c of CASTES) {
+          cumulative += c.weight
+          if (rand < cumulative) {
+            selected = c
+            break
+          }
+        }
+        setResultCaste(selected)
+        setIsSyncing(true)
+        setSyncSyncProgress(0)
+        
         await Api.playersBootstrap({
           player_id: playerId,
           caste_id: selected.id,
@@ -91,14 +100,15 @@ export default function OnboardingPage() {
         // 等待进度条走完
         setTimeout(() => {
           setGlobalPlayerId(playerId)
-          setGlobalCasteId(selected.id)
+          setGlobalCasteId(selected.id as CasteId)
         }, 1500)
       } catch (e) {
+        setIsRolling(false)
         setIsSyncing(false)
         if (e instanceof ApiError) setErr(`GATEWAY_ERROR_${e.status}: ${e.message}`)
         else setErr(e instanceof Error ? e.message : String(e))
       }
-    }, 2500)
+    }, 2000)
   }
 
   function enterGame() {

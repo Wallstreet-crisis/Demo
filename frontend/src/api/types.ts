@@ -58,6 +58,7 @@ export type PlayerAccountResponse = {
   account_id: string
   cash: number
   positions: Record<string, number>
+  caste_id?: string | null
 }
 
 export type PlayerListResponse = {

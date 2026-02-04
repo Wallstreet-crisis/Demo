@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Api, type NewsFeedItem, WsClient } from '../api'
 import CyberWidget from './CyberWidget'
 
-export default function NewsBroadcastWidget() {
+export default function NewsBroadcastWidget({ isFocused, onShowNews }: { isFocused?: boolean, onShowNews?: (item: NewsFeedItem) => void }) {
+  void isFocused
   const [feed, setFeed] = useState<NewsFeedItem[]>([])
   const [currentIndex, setCurrentItemIndex] = useState(0)
+  const [isGlitching, setIsGlitching] = useState(false)
   const ws = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
   
   const refreshFeed = async () => {
@@ -39,10 +41,26 @@ export default function NewsBroadcastWidget() {
   useEffect(() => {
     if (feed.length === 0) return
     const timer = setInterval(() => {
-      setCurrentItemIndex((prev) => (prev + 1) % feed.length)
+      setIsGlitching(true)
+      setTimeout(() => {
+        setCurrentItemIndex((prev) => (prev + 1) % feed.length)
+        setIsGlitching(false)
+      }, 150)
     }, 8000)
     return () => clearInterval(timer)
   }, [feed])
+
+  const handleManualNav = (dir: 'next' | 'prev') => {
+    setIsGlitching(true)
+    setTimeout(() => {
+      if (dir === 'next') {
+        setCurrentItemIndex((prev) => (prev + 1) % feed.length)
+      } else {
+        setCurrentItemIndex((prev) => (prev - 1 + feed.length) % feed.length)
+      }
+      setIsGlitching(false)
+    }, 150)
+  }
 
   const activeItem = feed[currentIndex]
 
@@ -51,12 +69,21 @@ export default function NewsBroadcastWidget() {
       title="GLOBAL_BROADCAST" 
       subtitle="LIVE_NEURAL_FEED"
       style={{ background: '#000', border: '2px solid var(--terminal-warn)' }}
+      actions={
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button className="cyber-button" style={{ fontSize: '10px', padding: '2px 6px' }} onClick={() => handleManualNav('prev')}>◄</button>
+          <button className="cyber-button" style={{ fontSize: '10px', padding: '2px 6px' }} onClick={() => handleManualNav('next')}>►</button>
+        </div>
+      }
     >
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+      <div 
+        onClick={() => activeItem && onShowNews?.(activeItem)}
+        style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', cursor: onShowNews ? 'pointer' : 'default' }}
+      >
         {/* Main Broadcast Area */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '10px', paddingBottom: '30px' }}>
           {activeItem ? (
-            <div key={activeItem.variant_id} className="news-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div key={activeItem.variant_id} className={`news-fade-in ${isGlitching ? 'glitch-effect' : ''}`} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               {activeItem.image_uri && (
                 <div style={{ 
                   width: '100%', 
@@ -192,6 +219,18 @@ export default function NewsBroadcastWidget() {
         }
         @keyframes blink-anim {
           50% { opacity: 0; }
+        }
+        .glitch-effect {
+          animation: glitch 0.2s linear infinite;
+          filter: hue-rotate(90deg) contrast(150%);
+        }
+        @keyframes glitch {
+          0% { transform: translate(0); }
+          20% { transform: translate(-2px, 2px); }
+          40% { transform: translate(-2px, -2px); }
+          60% { transform: translate(2px, 2px); }
+          80% { transform: translate(2px, -2px); }
+          100% { transform: translate(0); }
         }
       `}</style>
     </CyberWidget>

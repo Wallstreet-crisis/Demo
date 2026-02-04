@@ -13,6 +13,7 @@ class AccountSnapshot:
     account_id: str
     cash: float
     positions: Dict[str, float]
+    caste_id: str | None = None
 
 
 @dataclass
@@ -24,12 +25,12 @@ class ContractTransfer:
     quantity: float
 
 
-def create_account(account_id: str, owner_type: str, initial_cash: float = 0.0) -> None:
+def create_account(account_id: str, owner_type: str, initial_cash: float = 0.0, caste_id: str | None = None) -> None:
     conn = get_connection()
     with conn:
         conn.execute(
-            "INSERT OR IGNORE INTO accounts(account_id, owner_type, cash) VALUES (?, ?, ?)",
-            (account_id, owner_type, initial_cash),
+            "INSERT OR IGNORE INTO accounts(account_id, owner_type, cash, caste_id) VALUES (?, ?, ?, ?)",
+            (account_id, owner_type, initial_cash, caste_id),
         )
 
 
@@ -38,19 +39,20 @@ def get_snapshot(account_id: str) -> AccountSnapshot:
     cur = conn.cursor()
 
     row = cur.execute(
-        "SELECT cash FROM accounts WHERE account_id = ?", (account_id,)
+        "SELECT cash, caste_id FROM accounts WHERE account_id = ?", (account_id,)
     ).fetchone()
     if row is None:
         raise ValueError(f"account {account_id} does not exist")
 
     cash = float(row["cash"])
+    caste_id = row["caste_id"]
     positions: Dict[str, float] = {}
     for prow in cur.execute(
         "SELECT symbol, quantity FROM positions WHERE account_id = ?", (account_id,)
     ):
         positions[str(prow["symbol"])] = float(prow["quantity"])
 
-    return AccountSnapshot(account_id=account_id, cash=cash, positions=positions)
+    return AccountSnapshot(account_id=account_id, cash=cash, positions=positions, caste_id=caste_id)
 
 
 def apply_trade_executed(

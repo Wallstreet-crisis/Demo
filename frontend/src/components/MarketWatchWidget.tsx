@@ -3,7 +3,8 @@ import { Api, WsClient, type MarketQuoteResponse } from '../api'
 import { useAppSession } from '../app/context'
 import CyberWidget from './CyberWidget'
 
-export default function MarketWatchWidget() {
+export default function MarketWatchWidget({ isFocused }: { isFocused?: boolean }) {
+  void isFocused
   const { symbol, setSymbol } = useAppSession()
   const [symbols, setSymbols] = useState<string[]>([])
   const [quotes, setQuotes] = useState<Record<string, MarketQuoteResponse>>({})
@@ -75,7 +76,7 @@ export default function MarketWatchWidget() {
             </tr>
           </thead>
           <tbody>
-            {symbols.map(s => {
+            {(isFocused ? symbols : symbols.slice(0, 6)).map(s => {
               const q = quotes[s]
               const isSelected = symbol === s
               const changePct = q?.change_pct ?? 0

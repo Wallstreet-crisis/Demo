@@ -17,32 +17,12 @@ import TradePage from './pages/TradePage'
 
 import { useEffect, useState } from 'react'
 import { Api, ApiError } from './api'
+import { useAppSession } from './app/context'
 
 function App() {
   const [bootstrapErr, setBootstrapErr] = useState<string>('')
 
-  const [playerId, setPlayerId] = useState<string>(() => {
-    return window.localStorage.getItem('if.playerId') ?? ''
-  })
-  const [casteId, setCasteId] = useState<string>(() => {
-    return window.localStorage.getItem('if.casteId') ?? ''
-  })
-  const [symbol, setSymbol] = useState<string>(() => {
-    return window.localStorage.getItem('if.symbol') ?? 'BLUEGOLD'
-  })
-
-  useEffect(() => {
-    if (playerId) window.localStorage.setItem('if.playerId', playerId)
-  }, [playerId])
-
-  useEffect(() => {
-    if (casteId) window.localStorage.setItem('if.casteId', casteId)
-    else window.localStorage.removeItem('if.casteId')
-  }, [casteId])
-
-  useEffect(() => {
-    if (symbol) window.localStorage.setItem('if.symbol', symbol)
-  }, [symbol])
+  const { playerId, casteId } = useAppSession()
 
   useEffect(() => {
     let canceled = false
@@ -53,7 +33,6 @@ function App() {
       }
     }
 
-    const casteId = window.localStorage.getItem('if.casteId')
     const initialCashRaw = window.localStorage.getItem('if.initialCash')
     const initialCash = initialCashRaw ? Number(initialCashRaw) : undefined
 
@@ -75,10 +54,10 @@ function App() {
     return () => {
       canceled = true
     }
-  }, [playerId])
+  }, [playerId, casteId])
 
   return (
-    <AppSessionProvider value={{ playerId, setPlayerId, casteId, setCasteId, symbol, setSymbol }}>
+    <AppSessionProvider>
       {bootstrapErr ? (
         <div style={{ padding: 12, background: '#fff1f0', border: '1px solid #ffccc7', borderRadius: 8 }}>
           <strong>Bootstrap error:</strong> {bootstrapErr}
