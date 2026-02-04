@@ -34,7 +34,7 @@ export default function ContractsWidget() {
     if (!draft) return
     setLoading(true)
     try {
-      await Api.contractCreate({
+      const res = await Api.contractCreate({
         actor_id: `user:${playerId}`,
         kind: draft.contract_create.kind as string,
         title: draft.contract_create.title as string,
@@ -45,6 +45,19 @@ export default function ContractsWidget() {
         invited_parties: draft.contract_create.invited_parties as string[] || null,
       })
       notify('success', 'CONTRACT_ESTABLISHED')
+      
+      // Auto-share to chat if established
+      try {
+        await Api.chatPublicSend({
+          sender_id: `user:${playerId}`,
+          message_type: 'TEXT',
+          content: `建立新契约: #${res.contract_id} (${draft.contract_create.title})`,
+          payload: { referenced_contract_id: res.contract_id }
+        })
+      } catch (e) {
+        console.error('Failed to auto-share contract to chat', e)
+      }
+
       setDraft(null)
       setNaturalLanguage('')
     } catch (e) {

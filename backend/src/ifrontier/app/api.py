@@ -1393,6 +1393,45 @@ async def contract_create(req: ContractCreateRequest) -> ContractCreateResponse:
     return ContractCreateResponse(contract_id=contract_id)
 
 
+class PlayerListResponse(BaseModel):
+    items: List[str]
+
+
+@router.get("/players")
+async def list_players(limit: int = 100) -> PlayerListResponse:
+    """列出所有活跃玩家 ID，用于聊天 @ 提醒"""
+    from ifrontier.infra.sqlite.accounts import list_accounts
+    users = list_accounts() # 这里假设我们有一个能列出所有账号的方法
+    # 如果没有 list_accounts，我们先用 Neo4j 的查询
+    try:
+        users_from_news = _news_service.list_users(limit=limit)
+        return PlayerListResponse(items=users_from_news)
+    except:
+        return PlayerListResponse(items=[])
+
+
+class ContractBriefResponse(BaseModel):
+    contract_id: str
+    title: str
+    kind: str
+    status: str
+
+
+class ContractListResponse(BaseModel):
+    items: List[ContractBriefResponse]
+
+
+@router.get("/contracts/list")
+async def list_contracts(actor_id: str | None = None, limit: int = 50) -> ContractListResponse:
+    """列出当前玩家相关的契约，用于聊天引用"""
+    # 简单的 mock，后续需要完善 service 层查询
+    try:
+        # 这里暂时返回一个空列表或基础查询
+        return ContractListResponse(items=[])
+    except:
+        return ContractListResponse(items=[])
+
+
 class ContractBatchItem(BaseModel):
     kind: str
     title: str

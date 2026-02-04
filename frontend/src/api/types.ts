@@ -60,6 +60,21 @@ export type PlayerAccountResponse = {
   positions: Record<string, number>
 }
 
+export type PlayerListResponse = {
+  items: string[]
+}
+
+export type ContractBriefResponse = {
+  contract_id: string
+  title: string
+  kind: string
+  status: string
+}
+
+export type ContractListResponse = {
+  items: ContractBriefResponse[]
+}
+
 export type PlayerBootstrapRequest = {
   player_id: string
   initial_cash?: number | null

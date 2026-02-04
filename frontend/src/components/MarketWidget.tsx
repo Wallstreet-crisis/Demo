@@ -11,8 +11,9 @@ interface TradeExecutedEvent {
   };
 }
 
-export default function MarketWidget() {
-  const { symbol } = useAppSession()
+export default function MarketWidget({ isFocused }: { isFocused?: boolean }) {
+  const { symbol, setSymbol } = useAppSession()
+  const [symbols, setSymbols] = useState<string[]>([])
   const [err, setErr] = useState<string>('')
   const [quote, setQuote] = useState<MarketQuoteResponse | null>(null)
   const [flashColor, setFlashColor] = useState<'up' | 'down' | null>(null)
@@ -27,11 +28,13 @@ export default function MarketWidget() {
   const refresh = useCallback(async (): Promise<void> => {
     setErr('')
     try {
-      const [q, c, sess] = await Promise.all([
+      const [q, c, sess, syms] = await Promise.all([
         Api.marketQuote(symbol),
         Api.marketCandles(symbol, candleInterval, candleLimit),
         Api.marketSession(),
+        Api.marketSymbols(),
       ])
+      setSymbols(syms)
       setQuote((prevQuote) => {
         if (prevQuote && q.last_price !== null && prevQuote.last_price !== null) {
           if (q.last_price > prevQuote.last_price) {
@@ -102,88 +105,114 @@ export default function MarketWidget() {
 
   return (
     <CyberWidget 
-      title={`SYMBOL_DETAILS: ${symbol}`} 
-      subtitle="PRECISION_MARKET_MONITOR"
+      title={isFocused ? `MARKET_ANALYSIS: ${symbol}` : symbol} 
+      subtitle={isFocused ? "DEEP_QUANTUM_DATA_STREAM" : "REALTIME_FEED"}
       actions={
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* 明确的股票选择器 */}
           <select 
-            className="cyber-input" 
-            style={{ fontSize: '11px', padding: '2px 4px', height: '24px' }}
-            value={candleInterval}
-            onChange={e => setCandleInterval(Number(e.target.value))}
+            className="cyber-input"
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value)}
+            style={{ fontSize: '11px', padding: '2px 4px', height: '24px', minWidth: '100px' }}
           >
-            <option value={60}>1M</option>
-            <option value={300}>5M</option>
-            <option value={900}>15M</option>
+            {symbols.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
+
+          {isFocused && (
+            <select 
+              className="cyber-input" 
+              style={{ fontSize: '11px', padding: '2px 4px', height: '24px' }}
+              value={candleInterval}
+              onChange={e => setCandleInterval(Number(e.target.value))}
+            >
+              <option value={60}>1M</option>
+              <option value={300}>5M</option>
+              <option value={900}>15M</option>
+            </select>
+          )}
           <button className="cyber-button" style={{ fontSize: '11px', padding: '0 8px', height: '24px' }} onClick={refresh}>SYNC</button>
         </div>
       }
     >
       {err && <div style={{ color: 'var(--terminal-error)', fontSize: '12px', marginBottom: '10px' }}>[ERR]: {err}</div>}
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px', padding: '0 5px' }}>
-        <div style={{ display: 'flex', gap: '30px' }}>
-          <div>
-            <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '2px' }}>LAST_PRICE</div>
-            <div style={{ 
-              fontSize: '28px', 
-              fontWeight: '800', 
-              color: flashColor === 'up' ? 'var(--terminal-success)' : (flashColor === 'down' ? 'var(--terminal-error)' : '#fff'),
-              fontFamily: 'monospace'
-            }}>
-              ${last?.toFixed(2) ?? '--'}
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', padding: '0 5px' }}>
+          <div style={{ display: 'flex', gap: '20px' }}>
+            <div>
+              <div style={{ fontSize: '9px', color: '#64748b', marginBottom: '2px' }}>LAST</div>
+              <div style={{ 
+                fontSize: isFocused ? '28px' : '22px', 
+                fontWeight: '800', 
+                color: flashColor === 'up' ? 'var(--terminal-success)' : (flashColor === 'down' ? 'var(--terminal-error)' : '#fff'),
+                fontFamily: 'monospace',
+                lineHeight: 1
+              }}>
+                ${last?.toFixed(2) ?? '--'}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '9px', color: '#64748b', marginBottom: '2px' }}>CHANGE</div>
+              <div style={{ fontSize: isFocused ? '18px' : '14px', fontWeight: '700', color: changeColor, marginTop: isFocused ? '8px' : '4px' }}>
+                {changePct !== undefined && changePct !== null && (changePct >= 0 ? '▲ ' : '▼ ')}
+                {changeText}
+              </div>
             </div>
           </div>
-          <div>
-            <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '2px' }}>24H_CHANGE</div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: changeColor, marginTop: '8px' }}>
-              {changePct !== undefined && changePct !== null && (changePct >= 0 ? '▲ ' : '▼ ')}
-              {changeText}
+
+          {isFocused && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 20px', textAlign: 'right' }}>
+              <div>
+                <div style={{ fontSize: '9px', color: '#64748b' }}>HIGH_24H</div>
+                <div style={{ fontSize: '12px', color: '#fff', fontWeight: '600' }}>{quote?.high_24h?.toFixed(2) ?? '--'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '9px', color: '#64748b' }}>LOW_24H</div>
+                <div style={{ fontSize: '12px', color: '#fff', fontWeight: '600' }}>{quote?.low_24h?.toFixed(2) ?? '--'}</div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'x 20px', textAlign: 'right' }}>
-          <div>
-            <div style={{ fontSize: '9px', color: '#64748b' }}>HIGH_24H</div>
-            <div style={{ fontSize: '12px', color: '#fff', fontWeight: '600' }}>{quote?.high_24h?.toFixed(2) ?? '--'}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '9px', color: '#64748b' }}>LOW_24H</div>
-            <div style={{ fontSize: '12px', color: '#fff', fontWeight: '600' }}>{quote?.low_24h?.toFixed(2) ?? '--'}</div>
-          </div>
-          <div style={{ marginTop: '4px' }}>
-            <div style={{ fontSize: '9px', color: '#64748b' }}>OPEN_24H</div>
-            <div style={{ fontSize: '12px', color: '#cbd5e1' }}>{quote?.prev_price?.toFixed(2) ?? '--'}</div>
-          </div>
-          <div style={{ marginTop: '4px' }}>
-            <div style={{ fontSize: '9px', color: '#64748b' }}>VOLUME_24H</div>
-            <div style={{ fontSize: '12px', color: '#cbd5e1' }}>{quote?.volume_24h?.toLocaleString() ?? '--'}</div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '2px', padding: '10px', border: '1px solid var(--terminal-border)' }}>
-        <CandlestickChart candles={candles?.candles || []} height={280} />
-      </div>
-
-      {session && (
         <div style={{ 
-          marginTop: '12px', 
-          fontSize: '10px', 
-          padding: '4px 10px', 
-          background: 'rgba(51, 65, 85, 0.2)',
+          flex: 1,
+          background: 'rgba(0,0,0,0.15)', 
+          borderRadius: '2px', 
+          padding: '5px', 
           border: '1px solid var(--terminal-border)',
-          color: '#94a3b8',
+          minHeight: 0,
+          position: 'relative',
           display: 'flex',
-          justifyContent: 'space-between'
+          flexDirection: 'column'
         }}>
-          <span>STATUS: <span style={{ color: session.phase === 'TRADING' ? 'var(--terminal-success)' : 'var(--terminal-error)', fontWeight: 'bold' }}>{session.phase}</span></span>
-          <span>GAME_DAY: {session.game_day_index}</span>
-          <span>SYMBOL: {symbol}</span>
+          <div style={{ flex: 1 }}>
+            <CandlestickChart candles={candles?.candles || []} />
+          </div>
         </div>
-      )}
+
+        {(isFocused || !!session) && (
+          <div style={{ 
+            marginTop: '8px', 
+            fontSize: '9px', 
+            padding: '4px 8px', 
+            background: 'rgba(51, 65, 85, 0.2)',
+            border: '1px solid var(--terminal-border)',
+            color: '#94a3b8',
+            display: 'flex',
+            justifyContent: 'space-between',
+            flexShrink: 0
+          }}>
+            {session && (
+              <>
+                <span>STATUS: <span style={{ color: session.phase === 'TRADING' ? 'var(--terminal-success)' : 'var(--terminal-error)', fontWeight: 'bold' }}>{session.phase}</span></span>
+                <span>GAME_DAY: {session.game_day_index}</span>
+              </>
+            )}
+            <span>SYMBOL: {symbol}</span>
+          </div>
+        )}
+      </div>
     </CyberWidget>
   )
 }

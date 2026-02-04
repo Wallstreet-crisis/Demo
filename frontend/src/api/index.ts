@@ -74,6 +74,8 @@ import type {
   WealthPublicResponse,
   DebugEmitEventRequest,
   DebugEmitEventResponse,
+  PlayerListResponse,
+  ContractListResponse,
 } from './types'
 
 const api = new ApiClient()
@@ -93,6 +95,10 @@ export const Api = {
     }),
   marketSession: () => api.get<MarketSessionResponse>('/market/session'),
   marketSummary: () => api.get<MarketSummaryResponse>('/market/summary'),
+
+  listPlayers: (limit = 100) => api.get<PlayerListResponse>('/players', { limit }),
+  listContracts: (actor_id?: string, limit = 50) =>
+    api.get<ContractListResponse>('/contracts/list', { actor_id, limit }),
 
   submitLimitOrder: (req: PlayerLimitOrderRequest) => api.post<PlayerOrderResponse>('/orders/limit', req),
   submitMarketOrder: async (req: PlayerMarketOrderRequest) => {

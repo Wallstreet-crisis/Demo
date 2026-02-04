@@ -17,7 +17,7 @@ function formatTime(s: string): string {
   return d.toLocaleTimeString()
 }
 
-export default function NewsWidget() {
+export default function NewsWidget({ onShowNews }: { onShowNews?: (item: any) => void }) {
   const { playerId } = useAppSession()
   const [inbox, setInbox] = useState<NewsInboxResponse | null>(null)
   const [selectedItem, setSelectedItem] = useState<NewsInboxResponseItem | null>(null)
@@ -67,7 +67,24 @@ export default function NewsWidget() {
         {inbox?.items?.map((it) => (
           <div
             key={it.delivery_id}
-            onClick={() => setSelectedItem(it === selectedItem ? null : it)}
+            onClick={() => {
+              if (onShowNews) {
+                // Prepare feed-like item for the popup
+                onShowNews({
+                  variant_id: it.variant_id,
+                  card_id: it.card_id,
+                  kind: it.kind,
+                  author_id: it.from_actor_id,
+                  text: it.text,
+                  image_uri: (it.truth_payload as any)?.image_uri || null,
+                  created_at: it.delivered_at,
+                  symbols: it.symbols || [],
+                  tags: it.tags || []
+                });
+              } else {
+                setSelectedItem(it === selectedItem ? null : it);
+              }
+            }}
             style={{
               borderBottom: '1px solid rgba(51, 65, 85, 0.3)',
               padding: '10px 8px',

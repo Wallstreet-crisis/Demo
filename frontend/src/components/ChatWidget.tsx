@@ -5,6 +5,7 @@ import {
   type ChatListMessagesResponse,
   type ChatMessageResponse,
   type ChatThreadResponse,
+  type ContractBriefResponse,
 } from '../api'
 import { useAppSession } from '../app/context'
 import CyberWidget from './CyberWidget'
@@ -14,7 +15,7 @@ interface ChatWsEvent {
   payload?: Record<string, unknown>;
 }
 
-export default function ChatWidget() {
+export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
   const { playerId } = useAppSession()
   const [activeThread, setActiveThread] = useState<'global' | ChatThreadResponse>('global')
   const [messages, setMessages] = useState<ChatMessageResponse[]>([])
@@ -22,8 +23,16 @@ export default function ChatWidget() {
   const [text, setText] = useState<string>('')
   const [loading, setLoading] = useState(false)
 
+  // Mentions state
+  const [showMentionList, setShowMentionList] = useState(false)
+  const [mentionType, setMentionType] = useState<'PLAYER' | 'CONTRACT' | null>(null)
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [players, setPlayers] = useState<string[]>([])
+  const [contracts, setContracts] = useState<ContractBriefResponse[]>([])
+
   const ws = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const refreshMessages = useCallback(async () => {
     try {
@@ -49,9 +58,25 @@ export default function ChatWidget() {
     }
   }, [playerId])
 
+  const fetchMentionsData = useCallback(async () => {
+    try {
+      const [pRes, cRes] = await Promise.all([
+        Api.listPlayers(50),
+        Api.listContracts(playerId, 50)
+      ])
+      setPlayers(pRes.items)
+      setContracts(cRes.items)
+    } catch (e) {
+      console.error('Mention data fetch failed', e)
+    }
+  }, [playerId])
+
   useEffect(() => {
     refreshMessages()
-    if (playerId) refreshThreads()
+    if (playerId) {
+      refreshThreads()
+      fetchMentionsData()
+    }
 
     const channel = activeThread === 'global' ? 'chat.public.global' : `chat.pm.${activeThread.thread_id}`
     ws.connect(channel, (payload) => {
@@ -61,7 +86,7 @@ export default function ChatWidget() {
       }
     })
     return () => ws.close()
-  }, [activeThread, refreshMessages, refreshThreads, playerId, ws])
+  }, [activeThread, refreshMessages, refreshThreads, fetchMentionsData, playerId, ws])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -69,15 +94,75 @@ export default function ChatWidget() {
     }
   }, [messages])
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    const cursor = e.target.selectionStart || 0
+    setText(val)
+
+    // Detect @ for players
+    const lastAt = val.lastIndexOf('@', cursor - 1)
+    if (lastAt !== -1 && (lastAt === 0 || val[lastAt - 1] === ' ')) {
+      const query = val.slice(lastAt + 1, cursor)
+      if (!query.includes(' ')) {
+        setMentionType('PLAYER')
+        setMentionQuery(query)
+        setShowMentionList(true)
+        return
+      }
+    }
+
+    // Detect # for contracts
+    const lastHash = val.lastIndexOf('#', cursor - 1)
+    if (lastHash !== -1 && (lastHash === 0 || val[lastHash - 1] === ' ')) {
+      const query = val.slice(lastHash + 1, cursor)
+      if (!query.includes(' ')) {
+        setMentionType('CONTRACT')
+        setMentionQuery(query)
+        setShowMentionList(true)
+        return
+      }
+    }
+
+    setShowMentionList(false)
+  }
+
+  const selectMention = (item: string | ContractBriefResponse) => {
+    const cursor = inputRef.current?.selectionStart || 0
+    let replacement = ''
+    let startIdx = 0
+
+    if (mentionType === 'PLAYER') {
+      replacement = `@${item} `
+      startIdx = text.lastIndexOf('@', cursor - 1)
+    } else {
+      const c = item as ContractBriefResponse
+      replacement = `#${c.contract_id} `
+      startIdx = text.lastIndexOf('#', cursor - 1)
+    }
+
+    const newVal = text.slice(0, startIdx) + replacement + text.slice(cursor)
+    setText(newVal)
+    setShowMentionList(false)
+    inputRef.current?.focus()
+  }
+
   async function send() {
     if (!text.trim() || !playerId) return
     setLoading(true)
     try {
+      const payload: Record<string, unknown> = {}
+      // Basic detection of contract ID in message to add to payload
+      const contractMatch = text.match(/#([a-f0-9-]{36})/i)
+      if (contractMatch) {
+        payload.referenced_contract_id = contractMatch[1]
+      }
+
       if (activeThread === 'global') {
         await Api.chatPublicSend({
           sender_id: `user:${playerId}`,
           message_type: 'TEXT',
           content: text,
+          payload
         })
       } else {
         await Api.chatPmSend({
@@ -85,10 +170,10 @@ export default function ChatWidget() {
           sender_id: `user:${playerId}`,
           message_type: 'TEXT',
           content: text,
+          payload
         })
       }
       setText('')
-      // Small delay to allow backend to process and WS to trigger
       setTimeout(refreshMessages, 100)
     } catch (e) {
       console.error('Failed to send message', e)
@@ -117,7 +202,6 @@ export default function ChatWidget() {
       }
     } catch (e: unknown) {
       console.error('Failed to open DM', e)
-      // Enhanced error reporting for wealth gap / intro fee
       const err = e as { response?: { data?: { detail?: string } }, message?: string }
       const detail = err?.response?.data?.detail || err?.message || 'SECURE_LINE_FAILED'
       setMessages(prev => [...prev, {
@@ -134,10 +218,10 @@ export default function ChatWidget() {
   }
 
   const getAvatarColor = (id: string, caste?: string) => {
-    if (caste === 'ELITE' || caste === 'BOT_INSTITUTION') return '#facc15'; // Gold for elite
-    if (caste === 'MIDDLE') return '#3b82f6'; // Blue for middle
-    if (caste === 'WORKING' || caste === 'BOT_RETAIL') return '#10b981'; // Green for working
-    if (caste === 'SYSTEM') return '#ef4444'; // Red for system
+    if (caste === 'ELITE' || caste === 'BOT_INSTITUTION') return '#facc15';
+    if (caste === 'MIDDLE') return '#3b82f6';
+    if (caste === 'WORKING' || caste === 'BOT_RETAIL') return '#10b981';
+    if (caste === 'SYSTEM') return '#ef4444';
     
     const colors = ['#94a3b8', '#64748b', '#475569', '#334155'];
     let hash = 0;
@@ -153,72 +237,74 @@ export default function ChatWidget() {
       subtitle={activeThread === 'global' ? "UNENCRYPTED_GLOBAL_BROADCAST" : "P2P_ENCRYPTED_SESSION"}
     >
       <div style={{ display: 'flex', height: '100%', position: 'relative' }}>
-        {/* Thread Sidebar */}
-        <div style={{ 
-          width: '60px', 
-          borderRight: '1px solid var(--terminal-border)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          padding: '10px 0',
-          gap: '12px',
-          background: 'rgba(0,0,0,0.2)'
-        }}>
-          <div 
-            onClick={() => setActiveThread('global')}
-            title="Global Comms"
-            style={{ 
-              width: '36px', 
-              height: '36px', 
-              borderRadius: '8px', 
-              background: activeThread === 'global' ? '#3b82f6' : 'rgba(51, 65, 85, 0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: '18px',
-              border: activeThread === 'global' ? '2px solid #fff' : '1px solid transparent',
-              transition: 'all 0.2s'
-            }}
-          >
-            🌐
+        {/* Thread Sidebar - Hidden if not focused and sidebar is wide */}
+        {(!isFocused) ? null : (
+          <div style={{ 
+            width: '60px', 
+            borderRight: '1px solid var(--terminal-border)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '10px 0',
+            gap: '12px',
+            background: 'rgba(0,0,0,0.2)'
+          }}>
+            <div 
+              onClick={() => setActiveThread('global')}
+              title="Global Comms"
+              style={{ 
+                width: '36px', 
+                height: '36px', 
+                borderRadius: '8px', 
+                background: activeThread === 'global' ? '#3b82f6' : 'rgba(51, 65, 85, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '18px',
+                border: activeThread === 'global' ? '2px solid #fff' : '1px solid transparent',
+                transition: 'all 0.2s'
+              }}
+            >
+              🌐
+            </div>
+            
+            <div style={{ width: '30px', height: '1px', background: 'var(--terminal-border)' }} />
+            
+            {threads.map(t => {
+              const color = getAvatarColor(t.participant_b);
+              const isActive = typeof activeThread !== 'string' && activeThread.thread_id === t.thread_id;
+              return (
+                <div 
+                  key={t.thread_id}
+                  onClick={() => setActiveThread(t)}
+                  title={`DM: ${t.participant_b}`}
+                  style={{ 
+                    width: '36px', 
+                    height: '36px', 
+                    borderRadius: '18px', 
+                    background: color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: '#000',
+                    border: isActive ? '2px solid #fff' : '1px solid rgba(255,255,255,0.2)',
+                    transition: 'all 0.2s',
+                    boxShadow: isActive ? `0 0 100px ${color}` : 'none'
+                  }}
+                >
+                  {t.participant_b[0].toUpperCase()}
+                </div>
+              );
+            })}
           </div>
-          
-          <div style={{ width: '30px', height: '1px', background: 'var(--terminal-border)' }} />
-          
-          {threads.map(t => {
-            const color = getAvatarColor(t.participant_b);
-            const isActive = typeof activeThread !== 'string' && activeThread.thread_id === t.thread_id;
-            return (
-              <div 
-                key={t.thread_id}
-                onClick={() => setActiveThread(t)}
-                title={`DM: ${t.participant_b}`}
-                style={{ 
-                  width: '36px', 
-                  height: '36px', 
-                  borderRadius: '18px', 
-                  background: color,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  color: '#000',
-                  border: isActive ? '2px solid #fff' : '1px solid rgba(255,255,255,0.2)',
-                  transition: 'all 0.2s',
-                  boxShadow: isActive ? `0 0 10px ${color}` : 'none'
-                }}
-              >
-                {t.participant_b[0].toUpperCase()}
-              </div>
-            );
-          })}
-        </div>
+        )}
 
         {/* Chat Area */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0 }}>
           <div 
             ref={scrollRef}
             style={{ 
@@ -233,7 +319,7 @@ export default function ChatWidget() {
           >
             {messages.map((m) => {
               const isMine = m.sender_id === `user:${playerId}`
-              const payload = m.payload as { sender_caste?: string }
+              const payload = m.payload as { sender_caste?: string, referenced_contract_id?: string }
               const senderCaste = payload?.sender_caste || 'UNKNOWN'
               const color = getAvatarColor(m.sender_id || 'system', senderCaste)
               return (
@@ -263,13 +349,13 @@ export default function ChatWidget() {
                         cursor: 'pointer',
                         flexShrink: 0,
                         border: `2px solid ${color === '#facc15' ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)'}`,
-                        boxShadow: color === '#facc15' ? '0 0 10px rgba(250, 204, 21, 0.4)' : 'none'
+                        boxShadow: color === '#facc15' ? '0 0 100px rgba(250, 204, 21, 0.4)' : 'none'
                       }}
                     >
                       {m.sender_display[0]}
                     </div>
                   )}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', minWidth: 0 }}>
                     <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '2px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{ color: color }}>{m.sender_display}</span>
                       {senderCaste !== 'UNKNOWN' && (
@@ -298,6 +384,20 @@ export default function ChatWidget() {
                       position: 'relative'
                     }}>
                       {m.content}
+                      {payload?.referenced_contract_id && (
+                        <div style={{ 
+                          marginTop: '8px', 
+                          padding: '6px', 
+                          background: 'rgba(0,0,0,0.3)', 
+                          border: '1px dashed var(--terminal-info)',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          color: 'var(--terminal-info)',
+                          cursor: 'pointer'
+                        }} onClick={() => window.open(`/contracts/${payload.referenced_contract_id}`, '_blank')}>
+                          [ATTACHED_CONTRACT: {payload.referenced_contract_id.slice(0,8)}]
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -314,15 +414,120 @@ export default function ChatWidget() {
           <div style={{ 
             padding: '12px', 
             borderTop: '1px solid var(--terminal-border)',
-            background: 'rgba(0,0,0,0.2)'
+            background: 'rgba(0,0,0,0.2)',
+            position: 'relative'
           }}>
+            {/* Mention List UI */}
+            {showMentionList && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: '12px',
+                right: '12px',
+                background: 'rgba(10, 15, 25, 0.98)',
+                border: '1px solid var(--terminal-info)',
+                boxShadow: '0 -5px 25px rgba(59, 130, 246, 0.4)',
+                zIndex: 2000,
+                maxHeight: '200px',
+                overflowY: 'auto',
+                marginBottom: '8px',
+                borderRadius: '4px',
+                backdropFilter: 'blur(8px)'
+              }} className="custom-scrollbar">
+                <div style={{ 
+                  padding: '6px 12px', 
+                  fontSize: '9px', 
+                  background: 'rgba(59, 130, 246, 0.2)', 
+                  color: 'var(--terminal-info)', 
+                  fontWeight: 'bold',
+                  letterSpacing: '1px',
+                  borderBottom: '1px solid rgba(59, 130, 246, 0.3)'
+                }}>
+                  SELECT_{mentionType === 'PLAYER' ? 'TARGET_IDENTITY' : 'CONTRACT_REFERENCE'}
+                </div>
+                {mentionType === 'PLAYER' ? (
+                  players.filter(p => p.toLowerCase().includes(mentionQuery.toLowerCase())).map(p => (
+                    <div 
+                      key={p} 
+                      onClick={() => selectMention(p)}
+                      style={{ 
+                        padding: '10px 15px', 
+                        cursor: 'pointer', 
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        color: '#cbd5e1'
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
+                        e.currentTarget.style.color = '#fff';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = '#cbd5e1';
+                      }}
+                    >
+                      <span style={{ color: 'var(--terminal-info)' }}>@</span>
+                      <span>{p}</span>
+                    </div>
+                  ))
+                ) : (
+                  contracts.filter(c => c.title.toLowerCase().includes(mentionQuery.toLowerCase()) || c.contract_id.includes(mentionQuery)).map(c => (
+                    <div 
+                      key={c.contract_id} 
+                      onClick={() => selectMention(c)}
+                      style={{ 
+                        padding: '10px 15px', 
+                        cursor: 'pointer', 
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        color: '#cbd5e1'
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
+                        e.currentTarget.style.color = '#fff';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = '#cbd5e1';
+                      }}
+                    >
+                      <div style={{ fontWeight: 'bold', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ color: 'var(--terminal-warn)' }}>#</span>
+                        {c.title}
+                      </div>
+                      <div style={{ fontSize: '9px', opacity: 0.5, marginTop: '2px', fontFamily: 'monospace' }}>
+                        ID: {c.contract_id.slice(0, 12)}... | STATUS: {c.status}
+                      </div>
+                    </div>
+                  ))
+                )}
+                {(mentionType === 'PLAYER' ? players : contracts).length === 0 && (
+                  <div style={{ padding: '20px', textAlign: 'center', opacity: 0.5, fontSize: '11px' }}>
+                    NO_MATCHES_FOUND
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '8px' }}>
               <input 
+                ref={inputRef}
                 className="cyber-input"
                 value={text}
-                onChange={e => setText(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
-                placeholder={activeThread === 'global' ? "在此发送全服广播..." : "输入加密私信..."}
+                onChange={handleInputChange}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    if (showMentionList) {
+                      setShowMentionList(false)
+                    } else {
+                      send()
+                    }
+                  }
+                  if (e.key === 'Escape') setShowMentionList(false)
+                }}
+                placeholder={activeThread === 'global' ? "在此发送全服广播 (@玩家, #契约)..." : "输入加密私信..."}
                 style={{ 
                   flex: 1, 
                   height: '36px', 

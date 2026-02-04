@@ -7,9 +7,10 @@ interface CandlestickChartProps {
   width?: number
 }
 
-export default function CandlestickChart({ candles, height = 300 }: CandlestickChartProps) {
+export default function CandlestickChart({ candles }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [chartWidth, setChartWidth] = useState(600)
+  const [chartHeight, setChartHeight] = useState(300)
   const [hoveredCandle, setHoveredCandle] = useState<MarketCandleItem | null>(null)
   const [mouseX, setMouseX] = useState<number | null>(null)
   const [mouseY, setMouseY] = useState<number | null>(null)
@@ -19,34 +20,35 @@ export default function CandlestickChart({ candles, height = 300 }: CandlestickC
     const obs = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setChartWidth(entry.contentRect.width)
+        setChartHeight(entry.contentRect.height)
       }
     })
     obs.observe(containerRef.current)
     return () => obs.disconnect()
   }, [])
 
-  const margin = useMemo(() => ({ top: 20, right: 60, bottom: 40, left: 10 }), [])
-  const volHeight = 50 // Volume bars height
+  const margin = useMemo(() => ({ top: 20, right: 60, bottom: 30, left: 10 }), [])
+  const volHeight = 40 // Volume bars height
   
   const chartData = useMemo(() => {
     if (!candles || candles.length === 0) return null
     const width = chartWidth
+    const height = chartHeight
     
     const minPrice = Math.min(...candles.map(c => c.low))
     const maxPrice = Math.max(...candles.map(c => c.high))
     const maxVol = Math.max(...candles.map(c => c.volume))
     
-    // Improve price range calculation to avoid extreme scaling
     const rawPriceRange = maxPrice - minPrice
-    const minRange = minPrice * 0.02 // At least 2% range
+    const minRange = minPrice * 0.01 
     const effectivePriceRange = Math.max(rawPriceRange, minRange)
-    const pricePadding = effectivePriceRange * 0.1 // 10% padding
+    const pricePadding = effectivePriceRange * 0.1 
     
     const displayMin = minPrice - pricePadding
     const displayMax = maxPrice + pricePadding
     const priceRange = displayMax - displayMin
     
-    const chartAreaHeight = height - margin.top - margin.bottom - volHeight - 10
+    const chartAreaHeight = Math.max(height - margin.top - margin.bottom - volHeight - 5, 50)
     const scaleY = (price: number) => 
       margin.top + chartAreaHeight - ((price - displayMin) / (priceRange || 1)) * chartAreaHeight
     
@@ -56,11 +58,10 @@ export default function CandlestickChart({ candles, height = 300 }: CandlestickC
     const scaleVol = (vol: number) => 
       height - margin.bottom - (vol / (maxVol || 1)) * volHeight
     
-    // Calculate optimal bar width with constraints
     const availableWidth = width - margin.left - margin.right
     const rawBarWidth = availableWidth / Math.max(candles.length, 1)
-    const barWidth = Math.min(rawBarWidth, 14) // Limit max width further
-    const gap = barWidth * 0.35 // 35% gap for better separation
+    const barWidth = Math.min(rawBarWidth, 20) 
+    const gap = Math.max(barWidth * 0.2, 1)
     const bodyWidth = Math.max(barWidth - gap, 1)
     
     const scaleX = (index: number) => {
@@ -75,7 +76,6 @@ export default function CandlestickChart({ candles, height = 300 }: CandlestickC
       return Math.floor((x - margin.left - offset) / barWidth)
     }
     
-    // MA calculations
     const calculateMA = (data: MarketCandleItem[], period: number) => {
       return data.map((_, idx) => {
         if (idx < period - 1) return null
@@ -87,12 +87,12 @@ export default function CandlestickChart({ candles, height = 300 }: CandlestickC
     const ma5 = calculateMA(candles, 5)
     const ma20 = calculateMA(candles, 20)
     
-    return { width, scaleY, invertY, scaleX, getIdxFromX, scaleVol, barWidth, bodyWidth, gap, displayMin, displayMax, maxVol, ma5, ma20, chartAreaHeight }
-  }, [candles, height, chartWidth, margin])
+    return { width, height, scaleY, invertY, scaleX, getIdxFromX, scaleVol, barWidth, bodyWidth, gap, displayMin, displayMax, maxVol, ma5, ma20, chartAreaHeight }
+  }, [candles, chartWidth, chartHeight, margin])
 
-  if (!chartData || chartWidth < 50) return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '12px' }}>NO_MARKET_DATA</div>
+  if (!chartData || chartWidth < 50) return <div ref={containerRef} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '12px' }}>NO_MARKET_DATA</div>
 
-  const { width, scaleY, invertY, scaleX, getIdxFromX, scaleVol, barWidth, bodyWidth, ma5, ma20, chartAreaHeight, displayMin, displayMax } = chartData
+  const { width, height, scaleY, invertY, scaleX, getIdxFromX, scaleVol, barWidth, bodyWidth, ma5, ma20, chartAreaHeight, displayMin, displayMax } = chartData
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -113,7 +113,7 @@ export default function CandlestickChart({ candles, height = 300 }: CandlestickC
   const currentHoverPrice = (mouseY !== null && mouseY >= margin.top && mouseY <= margin.top + chartAreaHeight) ? invertY(mouseY) : null
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
       {/* Legend for MA */}
       <div style={{ 
         position: 'absolute', 

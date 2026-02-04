@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAppSession } from './context'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Api, type HostingStatusResponse } from '../api'
+import { Api, type HostingStatusResponse, type MarketSessionResponse } from '../api'
 
 const CASTES = [
   { id: 'ELITE', label: '精英阶层 (Elite)', color: '#ff4d4f', weight: 0.1, desc: '掌控巨量原始资本，拥有信息溯源权' },
@@ -83,26 +83,31 @@ export default function Layout() {
   const [valuationOk, setValuationOk] = useState<boolean>(true)
   const [hostingStatus, setHostingStatus] = useState<HostingStatusResponse | null>(null)
   const [hostingLoading, setHostingLoading] = useState(false)
+  const [marketSession, setMarketSession] = useState<MarketSessionResponse | null>(null)
 
   const caste = useMemo(() => {
     return CASTES.find(c => c.id === sess.casteId)
   }, [sess.casteId])
 
-  const fetchHostingStatus = useCallback(async () => {
+  const fetchStatus = useCallback(async () => {
     if (!sess.playerId) return
     try {
-      const res = await Api.hostingStatus(`user:${sess.playerId}`)
-      setHostingStatus(res)
+      const [hRes, mRes] = await Promise.all([
+        Api.hostingStatus(`user:${sess.playerId}`),
+        Api.marketSession()
+      ])
+      setHostingStatus(hRes)
+      setMarketSession(mRes)
     } catch (e) {
-      console.error('Failed to fetch hosting status', e)
+      console.error('Failed to fetch status', e)
     }
   }, [sess.playerId])
 
   useEffect(() => {
-    fetchHostingStatus()
-    const t = setInterval(fetchHostingStatus, 10000)
+    fetchStatus()
+    const t = setInterval(fetchStatus, 10000)
     return () => clearInterval(t)
-  }, [fetchHostingStatus])
+  }, [fetchStatus])
 
   const toggleHosting = async () => {
     if (!sess.playerId || hostingLoading) return
@@ -113,7 +118,7 @@ export default function Layout() {
       } else {
         await Api.hostingEnable(`user:${sess.playerId}`)
       }
-      await fetchHostingStatus()
+      await fetchStatus()
     } catch (e) {
       console.error('Failed to toggle hosting', e)
     } finally {
@@ -193,6 +198,39 @@ export default function Layout() {
           <div style={{ fontWeight: '800', fontSize: '14px', color: '#fff' }}>
             TERMINAL_<span style={{ color: '#3b82f6' }}>IF</span>
           </div>
+          {marketSession && (
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              padding: '0 12px', 
+              borderLeft: '1px solid var(--terminal-border)',
+              fontFamily: 'monospace',
+              fontSize: '11px'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ color: '#64748b', fontSize: '9px' }}>MARKET_STATUS</span>
+                <span style={{ 
+                  color: marketSession.phase === 'TRADING' ? 'var(--terminal-success)' : 'var(--terminal-error)',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <div style={{ 
+                    width: '6px', height: '6px', borderRadius: '50%', 
+                    background: marketSession.phase === 'TRADING' ? 'var(--terminal-success)' : 'var(--terminal-error)',
+                    boxShadow: marketSession.phase === 'TRADING' ? '0 0 5px var(--terminal-success)' : 'none'
+                  }} />
+                  {marketSession.phase}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ color: '#64748b', fontSize: '9px' }}>GAME_DAY</span>
+                <span style={{ color: '#fff' }}>D{marketSession.game_day_index}</span>
+              </div>
+            </div>
+          )}
           <nav style={{ display: 'flex', gap: '4px' }}>
             <NavItem to="/dashboard" label="DASHBOARD" />
             <NavItem to="/news" label="INTELLIGENCE" />
