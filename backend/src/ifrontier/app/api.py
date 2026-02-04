@@ -218,6 +218,29 @@ async def news_store_catalog() -> NewsStoreCatalogResponse:
 
     return NewsStoreCatalogResponse(items=out)
 
+class NewsInboxResponseItem(BaseModel):
+    delivery_id: str
+    card_id: str
+    variant_id: str
+    kind: str
+    from_actor_id: str
+    visibility_level: str
+    delivery_reason: str
+    created_at: str
+    text: str
+    symbols: List[str] = []
+    tags: List[str] = []
+    truth_payload: Optional[Dict[str, Any]] = None
+    owns_card: bool = False
+
+class NewsInboxResponse(BaseModel):
+    items: List[NewsInboxResponseItem]
+
+@router.get("/news/inbox/{player_id}")
+async def news_inbox(player_id: str, limit: int = 50) -> NewsInboxResponse:
+    items = _news_service.list_inbox(player_id=player_id, limit=limit)
+    return NewsInboxResponse(items=[NewsInboxResponseItem(**it) for it in items])
+
 class NewsFeedItem(BaseModel):
     variant_id: str
     card_id: str
@@ -1102,12 +1125,16 @@ async def get_player_account(player_id: str) -> PlayerAccountResponse:
     )
 
 
+class ContractParty(BaseModel):
+    party_id: str
+    role: str
+
 class ContractCreateRequest(BaseModel):
     actor_id: str
     kind: str
     title: str
     terms: Dict[str, Any]
-    parties: list[str]
+    parties: List[ContractParty]
     required_signers: list[str]
     participation_mode: str | None = None
     invited_parties: list[str] | None = None
@@ -1412,11 +1439,18 @@ async def wealth_public_get(user_id: str) -> WealthPublicResponse:
 @router.post("/contracts/create")
 async def contract_create(req: ContractCreateRequest) -> ContractCreateResponse:
     try:
+        # Convert List[ContractParty] back to the format expected by ContractService
+        # ContractService.create_contract expects List[str] for parties in some versions, 
+        # or it might handle the new structure if updated.
+        # Let's check backend/src/ifrontier/services/contracts.py
+        
+        party_ids = [p.party_id for p in req.parties]
+        
         contract_id = _contract_service.create_contract(
             kind=req.kind,
             title=req.title,
             terms=req.terms,
-            parties=req.parties,
+            parties=party_ids,
             required_signers=req.required_signers,
             participation_mode=req.participation_mode,
             invited_parties=req.invited_parties,
@@ -1526,10 +1560,10 @@ class ContractBatchItem(BaseModel):
     kind: str
     title: str
     terms: Dict[str, Any]
-    parties: list[str]
-    required_signers: list[str]
+    parties: List[ContractParty]
+    required_signers: List[str]
     participation_mode: str | None = None
-    invited_parties: list[str] | None = None
+    invited_parties: List[str] | None = None
 
 
 class ContractBatchCreateRequest(BaseModel):
@@ -1554,7 +1588,7 @@ async def contract_batch_create(req: ContractBatchCreateRequest) -> ContractBatc
                 "kind": c.kind,
                 "title": c.title,
                 "terms": c.terms,
-                "parties": c.parties,
+                "parties": [p.party_id for p in c.parties],
                 "required_signers": c.required_signers,
                 "participation_mode": c.participation_mode,
                 "invited_parties": c.invited_parties,

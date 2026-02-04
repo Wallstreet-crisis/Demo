@@ -21,7 +21,10 @@ def create_app() -> FastAPI:
         # 复用 app.api 中已初始化的 driver/service
         from ifrontier.app import api as api_module
         from ifrontier.app.ws import hub
-        from ifrontier.infra.sqlite.bots import default_bot_profiles
+        from ifrontier.infra.sqlite.bots import default_bot_profiles, init_bot_accounts
+
+        # 初始化机器人及做市商账户资金
+        init_bot_accounts()
 
         # 同步内置机器人及系统账号到 Neo4j 用户池，确保新闻传播有目标
         bots = default_bot_profiles()

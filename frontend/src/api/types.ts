@@ -479,12 +479,17 @@ export type ContractAgentContextResponse = {
   context: Record<string, unknown>
 }
 
+export type ContractParty = {
+  party_id: string
+  role: string
+}
+
 export type ContractCreateRequest = {
   actor_id: string
   kind: string
   title: string
   terms: Record<string, unknown>
-  parties: string[]
+  parties: ContractParty[]
   required_signers: string[]
   participation_mode?: string | null
   invited_parties?: string[] | null
@@ -498,7 +503,7 @@ export type ContractBatchItem = {
   kind: string
   title: string
   terms: Record<string, unknown>
-  parties: string[]
+  parties: ContractParty[]
   required_signers: string[]
   participation_mode?: string | null
   invited_parties?: string[] | null

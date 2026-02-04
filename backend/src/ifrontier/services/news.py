@@ -796,10 +796,11 @@ class NewsService:
                    d.from_actor_id AS from_actor_id,
                    d.visibility_level AS visibility_level,
                    d.delivery_reason AS delivery_reason,
-                   d.delivered_at AS delivered_at,
+                   d.delivered_at AS created_at,
                    v.text AS text,
                    c.symbols AS symbols,
                    c.tags AS tags,
+                   CASE WHEN r IS NOT NULL THEN true ELSE false END AS owns_card,
                    CASE WHEN r IS NOT NULL THEN c.truth_payload_json ELSE NULL END AS truth_payload_json
             ORDER BY d.delivered_at DESC
             LIMIT $limit

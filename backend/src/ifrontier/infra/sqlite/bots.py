@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import List
 
@@ -19,14 +20,14 @@ class BotProfile:
 def default_bot_profiles() -> List[BotProfile]:
     # 机构：巨头级别，掌控大量筹码和现金
     inst = [
-        BotProfile(account_id="bot:inst:1", owner_type="bot_institution", initial_cash=10_000_000.0),
-        BotProfile(account_id="bot:inst:2", owner_type="bot_institution", initial_cash=10_000_000.0),
-        BotProfile(account_id="bot:inst:3", owner_type="bot_institution", initial_cash=5_000_000.0),
+        BotProfile(account_id="bot:inst:1", owner_type="bot_institution", initial_cash=100_000_000.0),
+        BotProfile(account_id="bot:inst:2", owner_type="bot_institution", initial_cash=100_000_000.0),
+        BotProfile(account_id="bot:inst:3", owner_type="bot_institution", initial_cash=50_000_000.0),
     ]
 
     # 散户大户/游资：极具攻击性，现金充足
     retail = [
-        BotProfile(account_id=f"bot:ret:{i}", owner_type="bot_retail", initial_cash=200_000.0)
+        BotProfile(account_id=f"bot:ret:{i}", owner_type="bot_retail", initial_cash=2_000_000.0)
         for i in range(1, 11)
     ]
     return inst + retail
@@ -38,6 +39,17 @@ def init_bot_accounts() -> None:
     symbols = [s.symbol for s in securities]
 
     with conn:
+        # 确保做市商账号也存在（如果不在 profile 里）
+        # 做市商 mm:1 的初始化在 market_maker 服务中，但这里我们也给它充值
+        row = conn.execute("SELECT 1 FROM accounts WHERE account_id = ?", ("mm:1",)).fetchone()
+        if not row:
+            create_account("mm:1", owner_type="market_maker", initial_cash=500_000_000.0)
+        else:
+            conn.execute(
+                "UPDATE accounts SET cash = ? WHERE account_id = ?",
+                (500_000_000.0, "mm:1")
+            )
+
         for p in default_bot_profiles():
             # 强制重置/同步机器人账户资金
             row = conn.execute("SELECT 1 FROM accounts WHERE account_id = ?", (p.account_id,)).fetchone()

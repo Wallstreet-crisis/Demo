@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import random
+import random as py_random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -263,15 +263,15 @@ class NewsTickEngine:
         # 1) 小新闻投放 (每 60s 触发)
         if self._last_small_news_at is None or (now - self._last_small_news_at).total_seconds() >= 60:
             self._last_small_news_at = now
-            kind = random.choice(["RUMOR", "LEAK", "ANALYST_REPORT"])
+            kind = py_random.choice(["RUMOR", "LEAK", "ANALYST_REPORT"])
             from ifrontier.infra.sqlite.securities import list_securities
             secs = [s.symbol for s in list_securities(status="TRADABLE")]
             if secs:
-                target_symbol = random.choice(secs)
+                target_symbol = py_random.choice(secs)
                 text = self._news.get_preset_template(kind=kind, symbols=[target_symbol])
                 
                 # 随机生成一个利好或利空倾向
-                impact_direction = random.choice(["UP", "DOWN", "STABLE"])
+                impact_direction = py_random.choice(["UP", "DOWN", "STABLE"])
                 
                 # 增加 kind 信息，方便机器人识别新闻类型
                 truth_payload = {
@@ -300,7 +300,7 @@ class NewsTickEngine:
                 users = self._news.list_users(limit=5000)
                 if users:
                     # 随机挑选 1-5 个幸运玩家投递
-                    lucky_ones = random.sample(users, min(len(users), random.randint(1, 5)))
+                    lucky_ones = py_random.sample(users, min(len(users), py_random.randint(1, 5)))
                     for uid in lucky_ones:
                         _deliv_id, deliv_ev = self._news.deliver_variant(
                             variant_id=variant_id,
@@ -321,7 +321,7 @@ class NewsTickEngine:
         # 2) 重大事件链投放 (每 600s 触发)
         if self._last_chain_at is None or (now - self._last_chain_at).total_seconds() >= 600:
             self._last_chain_at = now
-            kind = random.choice(["MAJOR_EVENT", "WORLD_EVENT"])
+            kind = py_random.choice(["MAJOR_EVENT", "WORLD_EVENT"])
             from ifrontier.infra.sqlite.securities import list_securities
             from ifrontier.domain.assets.profile import get_profile
             
@@ -334,7 +334,7 @@ class NewsTickEngine:
                 # 4. ENERGY_SHORTAGE (能源荒) -> ENERGY (UP), LOGISTICS/TECH (DOWN), CONSUMER (DOWN)
                 # 5. BIO_HAZARD (生化危机) -> HEALTHCARE (UP), CONSUMER/LOGISTICS (DOWN), TECH (STABLE)
                 
-                theme = random.choice(["WAR", "TECH_BREAKTHROUGH", "FINANCIAL_CRISIS", "ENERGY_SHORTAGE", "BIO_HAZARD"])
+                theme = py_random.choice(["WAR", "TECH_BREAKTHROUGH", "FINANCIAL_CRISIS", "ENERGY_SHORTAGE", "BIO_HAZARD"])
                 target_symbols = []
                 impact_map = {} # symbol -> direction
                 
@@ -387,22 +387,22 @@ class NewsTickEngine:
                                 target_symbols.append(s.symbol)
                 
                 if not target_symbols:
-                    target_symbols = [random.choice(all_secs).symbol]
-                    impact_map[target_symbols[0]] = random.choice(["UP", "DOWN"])
+                    target_symbols = [py_random.choice(all_secs).symbol]
+                    impact_map[target_symbols[0]] = py_random.choice(["UP", "DOWN"])
 
                 # 限制参与标的数量，避免刷屏，但增加到 6 个以体现连锁反应
-                target_symbols = random.sample(target_symbols, min(len(target_symbols), 6))
+                target_symbols = py_random.sample(target_symbols, min(len(target_symbols), 6))
                 final_impact_map = {s: impact_map[s] for s in target_symbols}
 
                 print(f"[NewsTick:Spawn] Starting system chain: {kind} ({theme}) for {target_symbols}")
                 res = self.start_chain(
                     kind=kind,
                     actor_id="system",
-                    t0_seconds=random.randint(60, 300), # 1-5 分钟后爆发
-                    omen_interval_seconds=random.randint(20, 45),
+                    t0_seconds=py_random.randint(60, 300), # 1-5 分钟后爆发
+                    omen_interval_seconds=py_random.randint(20, 45),
                     abort_probability=0.15,
-                    grant_count=random.randint(3, 8),
-                    seed=random.randint(1, 1000000),
+                    grant_count=py_random.randint(3, 8),
+                    seed=py_random.randint(1, 1000000),
                     symbols=target_symbols,
                     extra_truth={"theme": theme, "impact_map": final_impact_map}
                 )
@@ -424,7 +424,7 @@ class NewsTickEngine:
         seed = int(chain["seed"])
         symbols = chain.get("symbols") or []
 
-        rnd = random.Random(f"{chain_id}:{seed}")
+        rnd = py_random.Random(f"{chain_id}:{seed}")
 
         out: Dict[str, Any] = {"chain_id": chain_id, "actions": []}
 

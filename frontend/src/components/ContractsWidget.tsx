@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Api, ApiError, type ContractAgentDraftResponse } from '../api'
+import { Api, ApiError, type ContractAgentDraftResponse, type ContractParty } from '../api'
 import { useAppSession } from '../app/context'
 import { useNotification } from '../app/NotificationContext'
 import CyberWidget from './CyberWidget'
@@ -35,12 +35,16 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
     if (!draft) return
     setLoading(true)
     try {
+      const parties: ContractParty[] = Array.isArray(draft.contract_create.parties) 
+        ? draft.contract_create.parties.map((p: string | ContractParty) => typeof p === 'string' ? { party_id: p, role: 'PARTY' } : p)
+        : []
+
       const res = await Api.contractCreate({
         actor_id: `user:${playerId}`,
         kind: draft.contract_create.kind as string,
         title: draft.contract_create.title as string,
         terms: draft.contract_create.terms as Record<string, unknown>,
-        parties: draft.contract_create.parties as string[],
+        parties: parties,
         required_signers: draft.contract_create.required_signers as string[],
         participation_mode: draft.contract_create.participation_mode as string || null,
         invited_parties: draft.contract_create.invited_parties as string[] || null,
