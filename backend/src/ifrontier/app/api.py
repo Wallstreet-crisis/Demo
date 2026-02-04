@@ -1825,17 +1825,16 @@ class NewsMutateVariantResponse(BaseModel):
 
 @router.post("/news/variants/mutate")
 async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVariantResponse:
-    # v0.1：按字计费（现金），并把成本写入 influence_cost 做审计。
-    # 可用 spend_cash 覆盖（策划/脚本显式指定花费）。
-    unit_cash = float(os.getenv("IF_NEWS_MUTATE_CASH_PER_CHAR") or "0.1")
+    # 篡改消息(Mutate)固定售价：50,000 + 按字计费
+    base_mutate_price = 50000.0
+    unit_cash = float(os.getenv("IF_NEWS_MUTATE_CASH_PER_CHAR") or "10.0")
     char_count = len(req.new_text or "")
-    cash_cost = float(req.spend_cash) if req.spend_cash is not None else float(char_count) * float(unit_cash)
+    cash_cost = base_mutate_price + (float(char_count) * float(unit_cash))
 
-    if cash_cost > 0:
-        try:
-            spend_cash(account_id=req.editor_id, amount=float(cash_cost), event_id=str(uuid4()))
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        spend_cash(account_id=req.editor_id, amount=float(cash_cost), event_id=str(uuid4()))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     try:
         new_variant_id, event_json = _news_service.mutate_variant(
@@ -1846,7 +1845,6 @@ async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVarian
             risk_roll=req.risk_roll,
             correlation_id=req.correlation_id,
         )
-
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -1889,17 +1887,15 @@ async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
         ctx = _news_service.get_variant_context(variant_id=req.variant_id) or {}
         depth = int(ctx.get("mutation_depth") or 0)
 
-        unit_per_delivery = float(os.getenv("IF_NEWS_PROPAGATE_CASH_PER_DELIVERY") or "1.0")
-        depth_multiplier = float(os.getenv("IF_NEWS_PROPAGATE_MUTATION_MULT") or "0.5")
-        multiplier = 1.0 + float(depth) * float(depth_multiplier)
-
-        per_delivery_cost = float(unit_per_delivery) * float(multiplier)
+        # 基础传播单价上调，并引入指数增长逻辑
+        # 基础价格 500，每增加一层深度价格翻倍
+        base_unit = float(os.getenv("IF_NEWS_PROPAGATE_CASH_PER_DELIVERY") or "500.0")
+        per_delivery_cost = base_unit * (2.0 ** depth)
+        
         budget = float(req.spend_cash)
         if budget <= 0:
             raise HTTPException(status_code=400, detail="spend_cash must be > 0")
-        if per_delivery_cost <= 0:
-            raise HTTPException(status_code=400, detail="invalid propagate cost config")
-
+        
         affordable = int(budget // per_delivery_cost)
         if affordable < 0:
             affordable = 0
@@ -1962,165 +1958,6 @@ async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
     return NewsPropagateResponse(delivered=len(delivered_events), correlation_id=correlation_id)
 
 
-class NewsInboxResponseItem(BaseModel):
-    delivery_id: str
-    card_id: str
-    variant_id: str
-    kind: str  # 新增 kind 字段
-    from_actor_id: str
-    visibility_level: str
-    delivery_reason: str
-    delivered_at: datetime
-    text: str
-    symbols: List[str] = []
-    tags: List[str] = []
-    truth_payload: Optional[Dict[str, Any]] = None
-
-
-class NewsInboxResponse(BaseModel):
-    items: list[NewsInboxResponseItem]
-
-
-@router.get("/news/inbox/{player_id}")
-async def news_inbox(player_id: str, limit: int = 50) -> NewsInboxResponse:
-    items = _news_service.list_inbox(player_id=player_id, limit=limit)
-    return NewsInboxResponse(items=[NewsInboxResponseItem(**x) for x in items])
-
-
-class NewsBroadcastRequest(BaseModel):
-    variant_id: str
-    actor_id: str
-    channel: str = "GLOBAL_MANDATORY"
-    visibility_level: str = "NORMAL"
-    limit_users: int = 5000
-    correlation_id: UUID | None = None
-
-
-class NewsBroadcastResponse(BaseModel):
-    delivered: int
-    event_id: UUID
-    correlation_id: UUID | None
-
-
-@router.post("/news/broadcast")
-async def news_broadcast(req: NewsBroadcastRequest) -> NewsBroadcastResponse:
-    try:
-        delivered, event_json = _news_service.broadcast_variant(
-            variant_id=req.variant_id,
-            channel=req.channel,
-            visibility_level=req.visibility_level,
-            actor_id=req.actor_id,
-            limit_users=req.limit_users,
-            correlation_id=req.correlation_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(EventType.NEWS_BROADCASTED), event_json.model_dump())
-
-    emergency_events = await _commonbot_emergency_runner.maybe_react(broadcast_event=event_json)
-    for ev in emergency_events:
-        await hub.broadcast_json("events", ev.model_dump())
-        await hub.broadcast_json(str(ev.event_type), ev.model_dump())
-
-    return NewsBroadcastResponse(
-        delivered=delivered,
-        event_id=event_json.event_id,
-        correlation_id=event_json.correlation_id,
-    )
-
-
-class NewsChainStartRequest(BaseModel):
-    kind: str
-    actor_id: str
-    t0_seconds: int = 60
-    t0_at: str | None = None
-    omen_interval_seconds: int = 10
-    abort_probability: float = 0.3
-    grant_count: int = 2
-    seed: int = 1
-    correlation_id: UUID | None = None
-
-
-class NewsChainStartResponse(BaseModel):
-    chain_id: str
-    major_card_id: str
-    t0_at: str
-
-
-@router.post("/news/chains/start")
-async def news_chain_start(req: NewsChainStartRequest) -> NewsChainStartResponse:
-    try:
-        t0_at = None
-        if req.t0_at is not None:
-            t0_at = datetime.fromisoformat(req.t0_at)
-        result = _news_tick_engine.start_chain(
-            kind=req.kind,
-            actor_id=req.actor_id,
-            t0_seconds=req.t0_seconds,
-            t0_at=t0_at,
-            omen_interval_seconds=req.omen_interval_seconds,
-            abort_probability=req.abort_probability,
-            grant_count=req.grant_count,
-            seed=req.seed,
-            correlation_id=req.correlation_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    # 广播链启动相关事件（card_created + chain_started）
-    await hub.broadcast_json("events", result["card_created_event"].model_dump())
-    await hub.broadcast_json(str(EventType.NEWS_CARD_CREATED), result["card_created_event"].model_dump())
-    await hub.broadcast_json("events", result["chain_started_event"].model_dump())
-    await hub.broadcast_json(str(EventType.NEWS_CHAIN_STARTED), result["chain_started_event"].model_dump())
-
-    return NewsChainStartResponse(
-        chain_id=str(result["chain_id"]),
-        major_card_id=str(result["major_card_id"]),
-        t0_at=str(result["t0_at"].isoformat()),
-    )
-
-
-class NewsTickRequest(BaseModel):
-    now_iso: str | None = None
-    limit: int = 50
-
-
-class NewsTickResponse(BaseModel):
-    now: str
-    chains: list[Dict[str, Any]]
-
-
-@router.post("/news/tick")
-async def news_tick(req: NewsTickRequest) -> NewsTickResponse:
-    now = None
-    if req.now_iso is not None:
-        now = datetime.fromisoformat(req.now_iso)
-    result = await _news_tick_engine.tick(now=now, limit=req.limit)
-
-    # 将 tick 内产生的事件推送到 WS
-    for chain in result.get("chains", []):
-        for action in (chain or {}).get("actions", []):
-            for ev in (action or {}).get("events", []) or []:
-                if not ev:
-                    continue
-                if isinstance(ev, dict):
-                    await hub.broadcast_json("events", ev)
-                    ev_type = ev.get("event_type")
-                    if ev_type:
-                        await hub.broadcast_json(str(ev_type), ev)
-            for ev in (action or {}).get("emergency_events", []) or []:
-                if not ev:
-                    continue
-                if isinstance(ev, dict):
-                    await hub.broadcast_json("events", ev)
-                    ev_type = ev.get("event_type")
-                    if ev_type:
-                        await hub.broadcast_json(str(ev_type), ev)
-    return NewsTickResponse(now=str(result["now"]), chains=list(result["chains"]))
-
-
 class NewsSuppressRequest(BaseModel):
     actor_id: str
     chain_id: str
@@ -2137,13 +1974,18 @@ class NewsSuppressResponse(BaseModel):
 
 @router.post("/news/suppress")
 async def news_suppress(req: NewsSuppressRequest) -> NewsSuppressResponse:
+    # 压制消息固定售价：100,000
+    suppress_price = 100000.0
+    try:
+        spend_cash(account_id=req.actor_id, amount=suppress_price, event_id=str(uuid4()))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Insufficient funds for suppression: {str(exc)}")
+
     try:
         event_json = _news_tick_engine.suppress_propagation(
             actor_id=req.actor_id,
             chain_id=req.chain_id,
             spend_influence=req.spend_influence,
-            signal_class=req.signal_class,
-            scope=req.scope,
             correlation_id=req.correlation_id,
         )
     except ValueError as exc:
