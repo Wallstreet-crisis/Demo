@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { type MarketCandleItem } from '../api'
 
 interface CandlestickChartProps {
@@ -7,51 +7,73 @@ interface CandlestickChartProps {
   width?: number
 }
 
-export default function CandlestickChart({ candles, height = 300, width = 600 }: CandlestickChartProps) {
+export default function CandlestickChart({ candles, height = 300 }: CandlestickChartProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [chartWidth, setChartWidth] = useState(600)
   const [hoveredCandle, setHoveredCandle] = useState<MarketCandleItem | null>(null)
   const [mouseX, setMouseX] = useState<number | null>(null)
   const [mouseY, setMouseY] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const obs = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setChartWidth(entry.contentRect.width)
+      }
+    })
+    obs.observe(containerRef.current)
+    return () => obs.disconnect()
+  }, [])
 
   const margin = useMemo(() => ({ top: 20, right: 60, bottom: 40, left: 10 }), [])
   const volHeight = 50 // Volume bars height
   
   const chartData = useMemo(() => {
     if (!candles || candles.length === 0) return null
+    const width = chartWidth
     
     const minPrice = Math.min(...candles.map(c => c.low))
     const maxPrice = Math.max(...candles.map(c => c.high))
     const maxVol = Math.max(...candles.map(c => c.volume))
     
-    // 如果最高价和最低价相同（单点数据），增加 10% 的 Padding 确保能看清
-    let priceRange = (maxPrice - minPrice)
-    let displayMin = minPrice
-    let displayMax = maxPrice
-    if (priceRange === 0) {
-      const padding = Math.max(minPrice * 0.05, 1.0)
-      displayMin = minPrice - padding
-      displayMax = maxPrice + padding
-      priceRange = displayMax - displayMin
-    } else {
-      // 正常增加 5% 边距
-      const padding = priceRange * 0.05
-      displayMin -= padding
-      displayMax += padding
-      priceRange = displayMax - displayMin
-    }
+    // Improve price range calculation to avoid extreme scaling
+    const rawPriceRange = maxPrice - minPrice
+    const minRange = minPrice * 0.02 // At least 2% range
+    const effectivePriceRange = Math.max(rawPriceRange, minRange)
+    const pricePadding = effectivePriceRange * 0.1 // 10% padding
+    
+    const displayMin = minPrice - pricePadding
+    const displayMax = maxPrice + pricePadding
+    const priceRange = displayMax - displayMin
     
     const chartAreaHeight = height - margin.top - margin.bottom - volHeight - 10
     const scaleY = (price: number) => 
-      margin.top + chartAreaHeight - ((price - displayMin) / priceRange) * chartAreaHeight
+      margin.top + chartAreaHeight - ((price - displayMin) / (priceRange || 1)) * chartAreaHeight
     
-    // Reverse scaleY: y-coordinate to price
     const invertY = (y: number) => 
       displayMin + (margin.top + chartAreaHeight - y) / chartAreaHeight * priceRange
     
     const scaleVol = (vol: number) => 
       height - margin.bottom - (vol / (maxVol || 1)) * volHeight
     
-    const barWidth = (width - margin.left - margin.right) / Math.max(candles.length, 1)
-    const scaleX = (index: number) => margin.left + index * barWidth
+    // Calculate optimal bar width with constraints
+    const availableWidth = width - margin.left - margin.right
+    const rawBarWidth = availableWidth / Math.max(candles.length, 1)
+    const barWidth = Math.min(rawBarWidth, 20) // Limit max width
+    const gap = Math.max(barWidth * 0.2, 1) // 20% gap
+    const bodyWidth = Math.max(barWidth - gap, 1)
+    
+    const scaleX = (index: number) => {
+      const centerOffset = (availableWidth - (candles.length * barWidth)) / 2
+      const offset = centerOffset > 0 ? centerOffset : 0
+      return margin.left + offset + index * barWidth
+    }
+    
+    const getIdxFromX = (x: number) => {
+      const centerOffset = (availableWidth - (candles.length * barWidth)) / 2
+      const offset = centerOffset > 0 ? centerOffset : 0
+      return Math.floor((x - margin.left - offset) / barWidth)
+    }
     
     // MA calculations
     const calculateMA = (data: MarketCandleItem[], period: number) => {
@@ -65,12 +87,12 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
     const ma5 = calculateMA(candles, 5)
     const ma20 = calculateMA(candles, 20)
     
-    return { scaleY, invertY, scaleX, scaleVol, barWidth, minPrice, maxPrice, maxVol, ma5, ma20, chartAreaHeight }
-  }, [candles, height, width, margin])
+    return { width, scaleY, invertY, scaleX, getIdxFromX, scaleVol, barWidth, bodyWidth, gap, displayMin, displayMax, maxVol, ma5, ma20, chartAreaHeight }
+  }, [candles, height, chartWidth, margin])
 
-  if (!chartData) return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '12px' }}>NO_MARKET_DATA</div>
+  if (!chartData || chartWidth < 50) return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '12px' }}>NO_MARKET_DATA</div>
 
-  const { scaleY, invertY, scaleX, scaleVol, barWidth, minPrice, maxPrice, ma5, ma20, chartAreaHeight } = chartData
+  const { width, scaleY, invertY, scaleX, getIdxFromX, scaleVol, barWidth, bodyWidth, ma5, ma20, chartAreaHeight, displayMin, displayMax } = chartData
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -79,7 +101,7 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
     setMouseX(x)
     setMouseY(y)
     
-    const idx = Math.floor((x - margin.left) / barWidth)
+    const idx = getIdxFromX(x)
     if (idx >= 0 && idx < candles.length) {
       setHoveredCandle(candles[idx])
     } else {
@@ -91,7 +113,7 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
   const currentHoverPrice = (mouseY !== null && mouseY >= margin.top && mouseY <= margin.top + chartAreaHeight) ? invertY(mouseY) : null
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       {/* Legend for MA */}
       <div style={{ 
         position: 'absolute', 
@@ -106,28 +128,39 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
         <span style={{ color: '#8b5cf6' }}>MA20: {lastCandle ? ma20[candles.length - 1]?.toFixed(2) : '--'}</span>
       </div>
 
-      {/* Tooltip Overlay */}
-      {hoveredCandle && (
+      {/* Floating Tooltip */}
+      {hoveredCandle && mouseX !== null && mouseY !== null && (
         <div style={{ 
           position: 'absolute', 
-          top: 20, 
-          left: margin.left, 
+          top: mouseY - 80 < 0 ? mouseY + 20 : mouseY - 100, 
+          left: mouseX + 150 > chartWidth ? mouseX - 160 : mouseX + 20, 
           pointerEvents: 'none',
-          fontSize: '10px',
+          fontSize: '11px',
           color: '#cbd5e1',
-          background: 'rgba(15, 23, 42, 0.9)',
-          padding: '4px 8px',
+          background: 'rgba(15, 23, 42, 0.95)',
+          padding: '8px 12px',
           border: '1px solid #334155',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
           display: 'flex',
-          gap: '10px',
-          zIndex: 10,
-          borderRadius: '2px'
+          flexDirection: 'column',
+          gap: '4px',
+          zIndex: 100,
+          borderRadius: '4px',
+          fontFamily: 'monospace',
+          backdropFilter: 'blur(4px)'
         }}>
-          <span>O: <span style={{ color: '#fff' }}>{hoveredCandle.open.toFixed(2)}</span></span>
-          <span>H: <span style={{ color: '#fff' }}>{hoveredCandle.high.toFixed(2)}</span></span>
-          <span>L: <span style={{ color: '#fff' }}>{hoveredCandle.low.toFixed(2)}</span></span>
-          <span>C: <span style={{ color: '#fff' }}>{hoveredCandle.close.toFixed(2)}</span></span>
-          <span>V: <span style={{ color: '#fff' }}>{hoveredCandle.volume.toLocaleString()}</span></span>
+          <div style={{ borderBottom: '1px solid #334155', paddingBottom: '4px', marginBottom: '4px', color: '#94a3b8' }}>
+            {new Date(hoveredCandle.bucket_start).toLocaleString()}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'x 15px' }}>
+            <span>O: <span style={{ color: '#fff' }}>{hoveredCandle.open.toFixed(2)}</span></span>
+            <span>H: <span style={{ color: '#fff' }}>{hoveredCandle.high.toFixed(2)}</span></span>
+            <span>L: <span style={{ color: '#fff' }}>{hoveredCandle.low.toFixed(2)}</span></span>
+            <span>C: <span style={{ color: '#fff', fontWeight: 'bold' }}>{hoveredCandle.close.toFixed(2)}</span></span>
+          </div>
+          <div style={{ marginTop: '2px' }}>
+            VOL: <span style={{ color: '#94a3b8' }}>{hoveredCandle.volume.toLocaleString()}</span>
+          </div>
         </div>
       )}
 
@@ -141,12 +174,28 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
       >
         {/* Horizontal Grid & Price Labels */}
         {[0, 0.25, 0.5, 0.75, 1].map(p => {
-          const price = minPrice + p * (maxPrice - minPrice)
+          const price = displayMin + p * (displayMax - displayMin)
           const y = scaleY(price)
           return (
-            <g key={p}>
-              <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke="#1e293b" strokeWidth="1" strokeDasharray="2 4" />
-              <text x={width - margin.right + 5} y={y + 4} fill="#64748b" fontSize="10" fontFamily="monospace">{price.toFixed(2)}</text>
+            <g key={`grid-${p}`}>
+              <line 
+                x1={margin.left} 
+                y1={y} 
+                x2={width - margin.right} 
+                y2={y} 
+                stroke="#1e293b" 
+                strokeWidth="0.5" 
+                strokeDasharray="4 4" 
+              />
+              <text 
+                x={width - margin.right + 8} 
+                y={y + 3} 
+                fill="#94a3b8" 
+                fontSize="10" 
+                fontFamily="monospace"
+              >
+                {price.toFixed(2)}
+              </text>
             </g>
           )
         })}
@@ -184,8 +233,16 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
         )}
 
         {/* Crosshair X & Y */}
-        {mouseX !== null && mouseX >= margin.left && mouseX <= width - margin.right && (
-          <line x1={mouseX} y1={margin.top} x2={mouseX} y2={height - margin.bottom} stroke="#475569" strokeWidth="1" strokeDasharray="3 3" />
+        {mouseX !== null && hoveredCandle && (
+          <line 
+            x1={scaleX(candles.indexOf(hoveredCandle)) + barWidth / 2} 
+            y1={margin.top} 
+            x2={scaleX(candles.indexOf(hoveredCandle)) + barWidth / 2} 
+            y2={height - margin.bottom} 
+            stroke="#94a3b8" 
+            strokeWidth="0.5" 
+            strokeDasharray="3 3" 
+          />
         )}
         {mouseY !== null && mouseY >= margin.top && mouseY <= margin.top + chartAreaHeight && (
           <g>
@@ -198,14 +255,21 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
         )}
 
         {/* Volume Bars */}
-        {candles.map((c) => {
+        {candles.map((c, idx) => {
           const isUp = c.close >= c.open
-          const color = isUp ? '#10b981' : '#ef4444'
-          const idx = candles.indexOf(c)
+          const color = isUp ? '#26a69a' : '#ef5350'
           const x = scaleX(idx)
           const volY = scaleVol(c.volume)
           return (
-            <rect key={`v-${c.bucket_start}`} x={x + barWidth * 0.2} y={volY} width={barWidth * 0.6} height={height - margin.bottom - volY} fill={color} opacity="0.15" />
+            <rect 
+              key={`v-${c.bucket_start}-${idx}`} 
+              x={x + (barWidth - bodyWidth) / 2} 
+              y={volY} 
+              width={bodyWidth} 
+              height={Math.max(height - margin.bottom - volY, 1)} 
+              fill={color} 
+              opacity={hoveredCandle === c ? "0.4" : "0.15"} 
+            />
           )
         })}
 
@@ -213,21 +277,22 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
         <polyline
           fill="none"
           stroke="#fbbf24"
-          strokeWidth="1"
+          strokeWidth="1.2"
+          opacity="0.8"
           points={ma5.map((val, i) => val !== null ? `${scaleX(i) + barWidth/2},${scaleY(val)}` : '').filter(p => p !== '').join(' ')}
         />
         <polyline
           fill="none"
           stroke="#8b5cf6"
-          strokeWidth="1"
+          strokeWidth="1.2"
+          opacity="0.8"
           points={ma20.map((val, i) => val !== null ? `${scaleX(i) + barWidth/2},${scaleY(val)}` : '').filter(p => p !== '').join(' ')}
         />
 
         {/* Candlesticks */}
-        {candles.map((c) => {
+        {candles.map((c, idx) => {
           const isUp = c.close >= c.open
-          const color = isUp ? '#10b981' : '#ef4444'
-          const idx = candles.indexOf(c)
+          const color = isUp ? '#26a69a' : '#ef5350' // More professional colors
           const x = scaleX(idx)
           const centerX = x + barWidth / 2
           const yHigh = scaleY(c.high)
@@ -235,24 +300,54 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
           const yOpen = scaleY(c.open)
           const yClose = scaleY(c.close)
           const bodyTop = Math.min(yOpen, yClose)
-          const bodyHeight = Math.max(Math.abs(yOpen - yClose), 1)
+          const bodyHeight = Math.max(Math.abs(yOpen - yClose), 1.5)
 
           return (
-            <g key={`c-${c.bucket_start}`}>
-              <line x1={centerX} y1={yHigh} x2={centerX} y2={yLow} stroke={color} strokeWidth="1" />
-              <rect x={x + barWidth * 0.1} y={bodyTop} width={barWidth * 0.8} height={bodyHeight} fill={color} />
+            <g key={`c-${c.bucket_start}-${idx}`}>
+              {/* Wick */}
+              <line 
+                x1={centerX} 
+                y1={yHigh} 
+                x2={centerX} 
+                y2={yLow} 
+                stroke={color} 
+                strokeWidth="1" 
+              />
+              {/* Body */}
+              <rect 
+                x={x + (barWidth - bodyWidth) / 2} 
+                y={bodyTop} 
+                width={bodyWidth} 
+                height={bodyHeight} 
+                fill={color} 
+                stroke={color}
+                strokeWidth="0.5"
+                fillOpacity={isUp ? "0.8" : "1"}
+              />
             </g>
           )
         })}
 
-        {/* Time Labels */}
+        {/* Time Labels & Vertical Grid */}
         {candles.length > 0 && Array.from(new Set([0, Math.floor(candles.length / 2), candles.length - 1])).filter(idx => idx >= 0 && idx < candles.length).map(idx => {
           const c = candles[idx];
           if (!c) return null;
+          const x = scaleX(idx) + barWidth / 2;
           return (
-            <text key={`chart-time-label-${c.bucket_start}-${idx}`} x={scaleX(idx)} y={height - 10} fill="#64748b" fontSize="9" fontFamily="monospace" textAnchor="middle">
-              {new Date(c.bucket_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </text>
+            <g key={`v-grid-${c.bucket_start}-${idx}`}>
+              <line 
+                x1={x} 
+                y1={margin.top} 
+                x2={x} 
+                y2={margin.top + chartAreaHeight} 
+                stroke="#1e293b" 
+                strokeWidth="0.5" 
+                strokeDasharray="2 4"
+              />
+              <text x={x} y={height - 10} fill="#64748b" fontSize="9" fontFamily="monospace" textAnchor="middle">
+                {new Date(c.bucket_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </text>
+            </g>
           );
         })}
       </svg>
