@@ -792,6 +792,7 @@ class NewsService:
             RETURN d.delivery_id AS delivery_id,
                    d.card_id AS card_id,
                    d.variant_id AS variant_id,
+                   c.kind AS kind,
                    d.from_actor_id AS from_actor_id,
                    d.visibility_level AS visibility_level,
                    d.delivery_reason AS delivery_reason,

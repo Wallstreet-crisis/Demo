@@ -206,9 +206,20 @@ class ChatService:
 
         message_id = str(uuid4())
         sender_display = self._compute_sender_display(sender_id=sender_id, anonymous=anonymous, alias=alias)
+        
+        # 提取发送者阶级信息
+        sender_caste = "UNKNOWN"
+        if not anonymous:
+            conn = get_connection()
+            row = conn.execute("SELECT owner_type FROM accounts WHERE account_id = ?", (sender_id,)).fetchone()
+            if row:
+                sender_caste = str(row["owner_type"]).upper()
+
         stored_payload = dict(payload or {})
         stored_payload["anonymous"] = bool(anonymous)
         stored_payload["sender_display"] = sender_display
+        stored_payload["sender_caste"] = sender_caste
+        
         insert_message(
             message_id=message_id,
             thread_id=thread_id,
@@ -223,6 +234,7 @@ class ChatService:
             "thread_id": thread_id,
             "sender_id": None if anonymous else sender_id,
             "sender_display": sender_display,
+            "sender_caste": sender_caste,
             "message_type": message_type,
             "content": content,
             "payload": stored_payload,
@@ -258,9 +270,20 @@ class ChatService:
 
         message_id = str(uuid4())
         sender_display = self._compute_sender_display(sender_id=sender_id, anonymous=anonymous, alias=alias)
+        
+        # 提取发送者阶级信息
+        sender_caste = "UNKNOWN"
+        if not anonymous:
+            conn = get_connection()
+            row = conn.execute("SELECT owner_type FROM accounts WHERE account_id = ?", (sender_id,)).fetchone()
+            if row:
+                sender_caste = str(row["owner_type"]).upper()
+
         stored_payload = dict(payload or {})
         stored_payload["anonymous"] = bool(anonymous)
         stored_payload["sender_display"] = sender_display
+        stored_payload["sender_caste"] = sender_caste
+
         insert_message(
             message_id=message_id,
             thread_id=thread_id,
@@ -275,6 +298,7 @@ class ChatService:
             "thread_id": thread_id,
             "sender_id": None if anonymous else sender_id,
             "sender_display": sender_display,
+            "sender_caste": sender_caste,
             "message_type": message_type,
             "content": content,
             "payload": stored_payload,

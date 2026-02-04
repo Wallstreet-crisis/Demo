@@ -233,6 +233,7 @@ export type NewsInboxResponseItem = {
   delivery_id: string
   card_id: string
   variant_id: string
+  kind: string
   from_actor_id: string
   visibility_level: string
   delivery_reason: string
@@ -283,6 +284,22 @@ export type NewsChainStartResponse = {
 export type NewsTickRequest = {
   now_iso?: string | null
   limit?: number
+}
+
+export type NewsFeedItem = {
+  variant_id: string
+  card_id: string
+  kind: string
+  author_id: string
+  text: string
+  image_uri: string | null
+  created_at: string
+  symbols: string[]
+  tags: string[]
+}
+
+export type NewsFeedResponse = {
+  items: NewsFeedItem[]
 }
 
 export type NewsTickResponse = {

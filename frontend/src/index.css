@@ -92,9 +92,66 @@ body {
 }
 
 /* 滚动条美化 */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--terminal-border);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--terminal-info);
+}
+
+/* 驾驶舱缩放背景遮罩 */
+.zoom-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 999;
+  animation: backdrop-fade-in 0.3s ease-out;
+}
+
+@keyframes backdrop-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 霓虹发光文字 */
+.neon-text {
+  text-shadow: 0 0 5px var(--terminal-info), 0 0 10px var(--terminal-info);
+}
+
+.neon-text-warn {
+  text-shadow: 0 0 5px var(--terminal-warn), 0 0 10px var(--terminal-warn);
+}
+
+@keyframes glitch {
+  0% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(-2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(2px, -2px); }
+  100% { transform: translate(0); }
+}
+
+.cyber-glitch:hover {
+  animation: glitch 0.3s cubic-bezier(.25,.46,.45,.94) both infinite;
+}
+
+.news-ticker-container {
+  mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
 }
 ::-webkit-scrollbar-track {
   background: transparent;

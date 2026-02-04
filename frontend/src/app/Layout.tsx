@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAppSession } from './context'
-import { useEffect, useMemo, useState } from 'react'
-import { Api } from '../api'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Api, type HostingStatusResponse } from '../api'
 
 const CASTES = [
   { id: 'ELITE', label: '精英阶层 (Elite)', color: '#ff4d4f', weight: 0.1, desc: '掌控巨量原始资本，拥有信息溯源权' },
@@ -81,10 +81,45 @@ export default function Layout() {
   const [cash, setCash] = useState<number | null>(null)
   const [totalValue, setTotalValue] = useState<number | null>(null)
   const [valuationOk, setValuationOk] = useState<boolean>(true)
+  const [hostingStatus, setHostingStatus] = useState<HostingStatusResponse | null>(null)
+  const [hostingLoading, setHostingLoading] = useState(false)
 
   const caste = useMemo(() => {
     return CASTES.find(c => c.id === sess.casteId)
   }, [sess.casteId])
+
+  const fetchHostingStatus = useCallback(async () => {
+    if (!sess.playerId) return
+    try {
+      const res = await Api.hostingStatus(`user:${sess.playerId}`)
+      setHostingStatus(res)
+    } catch (e) {
+      console.error('Failed to fetch hosting status', e)
+    }
+  }, [sess.playerId])
+
+  useEffect(() => {
+    fetchHostingStatus()
+    const t = setInterval(fetchHostingStatus, 10000)
+    return () => clearInterval(t)
+  }, [fetchHostingStatus])
+
+  const toggleHosting = async () => {
+    if (!sess.playerId || hostingLoading) return
+    setHostingLoading(true)
+    try {
+      if (hostingStatus?.enabled) {
+        await Api.hostingDisable(`user:${sess.playerId}`)
+      } else {
+        await Api.hostingEnable(`user:${sess.playerId}`)
+      }
+      await fetchHostingStatus()
+    } catch (e) {
+      console.error('Failed to toggle hosting', e)
+    } finally {
+      setHostingLoading(false)
+    }
+  }
 
   useEffect(() => {
     const playerId = sess.playerId
@@ -144,14 +179,14 @@ export default function Layout() {
       
       {/* HUD Header */}
       <header style={{ 
-        padding: '0 20px', 
-        height: '48px',
+        padding: '0 15px', 
+        height: '40px',
         borderBottom: '1px solid var(--terminal-border)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         background: 'var(--header-bg)',
-        fontSize: '13px',
+        fontSize: '12px',
         zIndex: 100
       }}>
         <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
@@ -166,9 +201,34 @@ export default function Layout() {
           </nav>
         </div>
 
-        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
           {sess.playerId && (
             <>
+              <button 
+                onClick={toggleHosting}
+                disabled={hostingLoading}
+                className={`cyber-button ${hostingStatus?.enabled ? 'active' : ''}`}
+                style={{ 
+                  fontSize: '10px', 
+                  height: '28px', 
+                  padding: '0 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: hostingStatus?.enabled ? 'var(--terminal-success)' : 'var(--terminal-border)',
+                  color: hostingStatus?.enabled ? 'var(--terminal-success)' : '#94a3b8'
+                }}
+              >
+                <div style={{ 
+                  width: '8px', 
+                  height: '8px', 
+                  borderRadius: '50%', 
+                  background: hostingStatus?.enabled ? 'var(--terminal-success)' : '#475569',
+                  boxShadow: hostingStatus?.enabled ? '0 0 8px var(--terminal-success)' : 'none'
+                }} />
+                {hostingStatus?.enabled ? 'AI_ACTIVE' : 'START_AI'}
+              </button>
+
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center', color: '#94a3b8' }}>
                 <span>{sess.playerId}</span>
                 {caste && <span style={{ color: caste.color, fontSize: '11px', fontWeight: 'bold' }}>[{caste.id}]</span>}
@@ -205,16 +265,16 @@ export default function Layout() {
         </div>
       )}
 
-      <main style={{ flex: 1, padding: '20px', overflow: 'auto' }}>
+      <main style={{ flex: 1, padding: '5px', overflow: 'hidden' }}>
         <Outlet />
       </main>
 
       {/* Terminal Footer Status Bar */}
       <footer style={{ 
-        padding: '0 20px', 
-        height: '32px',
+        padding: '0 15px', 
+        height: '28px',
         borderTop: '1px solid var(--terminal-border)', 
-        fontSize: '11px',
+        fontSize: '10px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',

@@ -218,6 +218,49 @@ async def news_store_catalog() -> NewsStoreCatalogResponse:
 
     return NewsStoreCatalogResponse(items=out)
 
+class NewsFeedItem(BaseModel):
+    variant_id: str
+    card_id: str
+    kind: str
+    author_id: str
+    text: str
+    image_uri: Optional[str] = None
+    created_at: str
+    symbols: List[str] = []
+    tags: List[str] = []
+
+class NewsFeedResponse(BaseModel):
+    items: List[NewsFeedItem]
+
+@router.get("/news/public/feed")
+async def news_public_feed(limit: int = 20) -> NewsFeedResponse:
+    """获取全服播报的新闻流（包含系统新闻和公开广播的新闻）"""
+    def _tx(tx, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        result = tx.run(
+            """
+            MATCH (v:NewsVariant)
+            MATCH (c:NewsCard)-[:HAS_VARIANT]->(v)
+            RETURN v.variant_id AS variant_id,
+                   c.card_id AS card_id,
+                   c.kind AS kind,
+                   v.author_id AS author_id,
+                   v.text AS text,
+                   c.image_uri AS image_uri,
+                   v.created_at AS created_at,
+                   c.symbols AS symbols,
+                   c.tags AS tags
+            ORDER BY v.created_at DESC
+            LIMIT $limit
+            """,
+            **params
+        )
+        return [dict(r) for r in result]
+
+    with _driver.session() as session:
+        rows = session.execute_read(_tx, {"limit": int(limit)})
+    
+    return NewsFeedResponse(items=[NewsFeedItem(**r) for r in rows])
+
 class DebugNewsChainsResponse(BaseModel):
     items: List[Dict[str, Any]]
 
@@ -1794,14 +1837,15 @@ class NewsInboxResponseItem(BaseModel):
     delivery_id: str
     card_id: str
     variant_id: str
+    kind: str  # 新增 kind 字段
     from_actor_id: str
     visibility_level: str
     delivery_reason: str
-    delivered_at: str
+    delivered_at: datetime
     text: str
-    symbols: list[str] | None = None
-    tags: list[str] | None = None
-    truth_payload: dict[str, Any] | None = None
+    symbols: List[str] = []
+    tags: List[str] = []
+    truth_payload: Optional[Dict[str, Any]] = None
 
 
 class NewsInboxResponse(BaseModel):
