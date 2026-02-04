@@ -55,6 +55,29 @@ class NewsTickEngine:
         self._last_small_news_at: datetime | None = past
         self._last_chain_at: datetime | None = past
 
+        self._ensure_news_chain_extra_truth_schema()
+
+    def _ensure_news_chain_extra_truth_schema(self) -> None:
+        with self._driver.session() as session:
+            session.execute_write(self._ensure_news_chain_extra_truth_schema_tx, {})
+
+    @staticmethod
+    def _ensure_news_chain_extra_truth_schema_tx(tx, params: Dict[str, Any]) -> None:
+        tx.run(
+            """
+            CREATE (t:__SchemaWarmup {extra_truth_json: '{}'})
+            WITH t
+            DELETE t
+            """
+        )
+        tx.run(
+            """
+            MATCH (ch:NewsChain)
+            WHERE ch.extra_truth_json IS NULL
+            SET ch.extra_truth_json = '{}'
+            """
+        )
+
     def suppress_propagation(
         self,
         *,
@@ -629,6 +652,7 @@ class NewsTickEngine:
     @staticmethod
     def _create_chain_tx(tx, params: Dict[str, Any]) -> None:
         # 允许存储额外的真相数据（如 impact_map）
+        import json
         extra_json = json.dumps(params.get("extra_truth") or {}, ensure_ascii=False)
         tx.run(
             """
