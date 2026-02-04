@@ -157,7 +157,7 @@ export default function ContractsPage() {
             {showMentionList && (
               <div style={{
                 position: 'absolute',
-                bottom: '100%',
+                top: '100%',
                 left: 0,
                 right: 20,
                 background: '#fff',
@@ -166,7 +166,7 @@ export default function ContractsPage() {
                 zIndex: 100,
                 maxHeight: '150px',
                 overflowY: 'auto',
-                marginBottom: '5px',
+                marginTop: '5px',
                 borderRadius: '4px'
               }}>
                 {mentionType === 'PLAYER' ? (

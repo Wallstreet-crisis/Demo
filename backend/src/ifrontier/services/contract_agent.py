@@ -24,6 +24,16 @@ class ContractDraftResult:
     risk_rating: str
 
 
+@dataclass(frozen=True)
+class ContractAuditResult:
+    audit_id: str
+    contract_id: str
+    summary: str
+    issues: List[str]
+    questions: List[str]
+    risk_rating: str
+
+
 class ContractAgent:
     @staticmethod
     def _ensure_default_policies(terms: Dict[str, Any]) -> Dict[str, Any]:
@@ -337,6 +347,131 @@ class ContractAgent:
         ctx["edit_history"] = edits
         ctx["working_contract"] = dict(base_contract_create or {})
         save_contract_agent_context(actor_id=actor_id, context=ctx)
+
+    def audit_contract(
+        self,
+        *,
+        actor_id: str,
+        contract_id: str,
+        contract_snapshot: Dict[str, Any],
+        force: bool = False,
+    ) -> ContractAuditResult:
+        ctx_rec = load_contract_agent_context(actor_id)
+        ctx = dict(ctx_rec.context) if ctx_rec is not None else {}
+
+        audits = ctx.get("contract_audits")
+        if not isinstance(audits, dict):
+            audits = {}
+
+        cached = audits.get(contract_id)
+        if (not force) and isinstance(cached, dict):
+            return ContractAuditResult(
+                audit_id=str(cached.get("audit_id") or ""),
+                contract_id=str(cached.get("contract_id") or contract_id),
+                summary=str(cached.get("summary") or ""),
+                issues=list(cached.get("issues") or []),
+                questions=list(cached.get("questions") or []),
+                risk_rating=str(cached.get("risk_rating") or "LOW"),
+            )
+
+        llm = OpenRouterClient.from_env()
+        if llm is None:
+            res = ContractAuditResult(
+                audit_id=str(uuid4()),
+                contract_id=contract_id,
+                summary="LLM not configured",
+                issues=[],
+                questions=[],
+                risk_rating="LOW",
+            )
+            audits[contract_id] = {
+                "audit_id": res.audit_id,
+                "contract_id": res.contract_id,
+                "summary": res.summary,
+                "issues": res.issues,
+                "questions": res.questions,
+                "risk_rating": res.risk_rating,
+            }
+            ctx["contract_audits"] = audits
+            save_contract_agent_context(actor_id=actor_id, context=ctx)
+            return res
+
+        llm_res = self._audit_with_llm(actor_id=actor_id, contract_id=contract_id, contract_snapshot=contract_snapshot, llm=llm)
+        if llm_res is None:
+            raise ValueError("audit failed")
+
+        audits[contract_id] = {
+            "audit_id": llm_res.audit_id,
+            "contract_id": llm_res.contract_id,
+            "summary": llm_res.summary,
+            "issues": llm_res.issues,
+            "questions": llm_res.questions,
+            "risk_rating": llm_res.risk_rating,
+        }
+        ctx["contract_audits"] = audits
+        save_contract_agent_context(actor_id=actor_id, context=ctx)
+        return llm_res
+
+    def _audit_with_llm(
+        self,
+        *,
+        actor_id: str,
+        contract_id: str,
+        contract_snapshot: Dict[str, Any],
+        llm: OpenRouterClient,
+    ) -> ContractAuditResult | None:
+        system = (
+            "你是财务审计官(Financial Auditor)，仅输出合规JSON，禁止输出任何额外文字、注释、符号。",
+            "目标：对收到的契约进行风险解释与质疑，给出清晰摘要、潜在问题、需要追问的点，并给出风险评级。",
+            "输出结构固定：{\"audit_id\":\"...\",\"contract_id\":\"...\",\"summary\":\"...\",\"issues\":[...],\"questions\":[...],\"risk_rating\":\"LOW|MEDIUM|HIGH\"}",
+            "issues/questions 必须是字符串数组，可以为空数组。",
+            "summary 必须是简明中文段落，优先解释 transfers/触发条件/对我方资金与仓位影响。",
+            "禁止输出非JSON内容。",
+        )
+        system_str = "\n".join(system)
+
+        user = (
+            "请输出 JSON，结构如下："
+            "{\"audit_id\":\"...\",\"contract_id\":\"...\",\"summary\":\"...\",\"issues\":[...],\"questions\":[...],\"risk_rating\":\"LOW|MEDIUM|HIGH\"}.\n"
+            f"actor_id: {actor_id}\n"
+            f"contract_id: {contract_id}\n"
+            f"contract_snapshot_json: {json.dumps(contract_snapshot or {}, ensure_ascii=False)}\n"
+        )
+
+        try:
+            resp = llm.chat_completions(system=system_str, user=user, temperature=0.2, max_tokens=800)
+            text = extract_first_message_text(resp)
+            clean_text = text.strip()
+            start_idx = clean_text.find("{")
+            end_idx = clean_text.rfind("}")
+            if start_idx != -1 and end_idx != -1:
+                clean_text = clean_text[start_idx : end_idx + 1]
+            obj = json.loads(clean_text)
+        except Exception as exc:
+            print(f"[ContractAgent] Audit LLM failed: {exc}")
+            return None
+
+        if not isinstance(obj, dict):
+            return None
+
+        audit_id = str(obj.get("audit_id") or uuid4())
+        summary = str(obj.get("summary") or "")
+        issues_raw = obj.get("issues")
+        questions_raw = obj.get("questions")
+        issues = [str(x) for x in (issues_raw or [])] if isinstance(issues_raw, list) else []
+        questions = [str(x) for x in (questions_raw or [])] if isinstance(questions_raw, list) else []
+        risk = str(obj.get("risk_rating") or "LOW").upper()
+        if risk not in {"LOW", "MEDIUM", "HIGH"}:
+            risk = "LOW"
+
+        return ContractAuditResult(
+            audit_id=audit_id,
+            contract_id=str(obj.get("contract_id") or contract_id),
+            summary=summary,
+            issues=issues,
+            questions=questions,
+            risk_rating=risk,
+        )
 
     def _draft_with_llm(
         self,

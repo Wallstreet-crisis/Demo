@@ -471,6 +471,21 @@ export type ContractAgentAppendEditRequest = {
   instruction: string
 }
 
+export type ContractAgentAuditRequest = {
+  actor_id: string
+  contract_id: string
+  force?: boolean
+}
+
+export type ContractAgentAuditResponse = {
+  audit_id: string
+  contract_id: string
+  summary: string
+  issues: string[]
+  questions: string[]
+  risk_rating: string
+}
+
 export type ContractAgentDraftResponse = {
   draft_id: string
   template_id: string

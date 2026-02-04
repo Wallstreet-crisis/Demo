@@ -36,6 +36,7 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
   const ws = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const auditedContractsRef = useRef<Set<string>>(new Set())
 
   const refreshMessages = useCallback(async () => {
     try {
@@ -96,6 +97,21 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
+
+  useEffect(() => {
+    if (!playerId) return
+    const ids = new Set<string>()
+    for (const m of messages) {
+      const payload = m.payload as { referenced_contract_id?: string } | undefined
+      const cid = payload?.referenced_contract_id
+      if (cid) ids.add(String(cid))
+    }
+    for (const cid of ids) {
+      if (auditedContractsRef.current.has(cid)) continue
+      auditedContractsRef.current.add(cid)
+      Api.contractAgentAudit({ actor_id: `user:${playerId}`, contract_id: cid }).catch(() => {})
+    }
+  }, [messages, playerId])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value

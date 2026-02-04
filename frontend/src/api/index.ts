@@ -12,6 +12,8 @@ import type {
   ChatSendPmMessageRequest,
   ContractActivateRequest,
   ContractAgentContextResponse,
+  ContractAgentAuditRequest,
+  ContractAgentAuditResponse,
   ContractAgentDraftRequest,
   ContractAgentDraftResponse,
   ContractAgentAppendEditRequest,
@@ -139,6 +141,7 @@ export const Api = {
 
   contractAgentDraft: (req: ContractAgentDraftRequest) => api.post<ContractAgentDraftResponse>('/contract-agent/draft', req),
   contractAgentAppendEdit: (req: ContractAgentAppendEditRequest) => api.post<ContractAgentDraftResponse>('/contract-agent/append_edit', req),
+  contractAgentAudit: (req: ContractAgentAuditRequest) => api.post<ContractAgentAuditResponse>('/contract-agent/audit', req),
   contractAgentGetContext: (actor_id: string) => api.get<ContractAgentContextResponse>(`/contract-agent/context/${encodeURIComponent(actor_id)}`),
   contractAgentClearContext: (actor_id: string) => api.post<void>(`/contract-agent/context/${encodeURIComponent(actor_id)}/clear`),
 

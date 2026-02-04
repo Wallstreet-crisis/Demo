@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Api, ApiError, type ContractResponse } from '../api'
+import { Api, ApiError, type ContractAgentAuditResponse, type ContractResponse } from '../api'
 import { useAppSession } from '../app/context'
 import { useNotification } from '../app/NotificationContext'
 
@@ -13,6 +13,8 @@ export default function ContractDetailPage() {
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [detail, setDetail] = useState<ContractResponse | null>(null)
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [audit, setAudit] = useState<ContractAgentAuditResponse | null>(null)
 
   const refresh = useCallback(async () => {
     if (!contractId) return
@@ -36,6 +38,43 @@ export default function ContractDetailPage() {
     return playerId ? `user:${playerId}` : ''
   }, [playerId])
 
+  const resolvedActorId = useMemo(() => {
+    if (!actorId) return ''
+    if (!detail) return actorId
+    const probe = actorId.toLowerCase()
+    const pools = [detail.required_signers || [], detail.parties || [], detail.invited_parties || []]
+    for (const arr of pools) {
+      const hit = arr.find(x => String(x).toLowerCase() === probe)
+      if (hit) return String(hit)
+    }
+    return actorId
+  }, [actorId, detail])
+
+  const signDisabledReason = useMemo(() => {
+    if (!playerId) return '当前未登录：请先 RE_AUTH / onboarding'
+    if (!detail) return '合约未加载'
+    const reqs = (detail.required_signers || []).map(x => String(x).toLowerCase())
+    const me = String(resolvedActorId || actorId).toLowerCase()
+    if (!reqs.includes(me)) return '你不是 required_signer'
+    const sigs = detail.signatures || {}
+    const hasSigned = Object.keys(sigs).some(k => String(k).toLowerCase() === me)
+    if (hasSigned) return '你已签署'
+    if (!['DRAFT', 'SIGNED'].includes(detail.status)) return `当前状态不可签署: ${detail.status}`
+    return ''
+  }, [playerId, detail, actorId, resolvedActorId])
+
+  const joinDisabledReason = useMemo(() => {
+    if (!playerId) return '当前未登录：请先 RE_AUTH / onboarding'
+    if (!detail) return '合约未加载'
+    if (detail.participation_mode !== 'OPT_IN') return `非 OPT_IN: ${detail.participation_mode}`
+    const invited = (detail.invited_parties || []).map(x => String(x).toLowerCase())
+    const parties = (detail.parties || []).map(x => String(x).toLowerCase())
+    const me = String(resolvedActorId || actorId).toLowerCase()
+    if (!invited.includes(me)) return '你不在 invited_parties'
+    if (parties.includes(me)) return '你已加入 parties'
+    return ''
+  }, [playerId, detail, actorId, resolvedActorId])
+
   const requiredSignerStatus = useMemo(() => {
     const reqs = detail?.required_signers || []
     const sigs = detail?.signatures || {}
@@ -49,26 +88,45 @@ export default function ContractDetailPage() {
   }, [detail])
 
   const canSign = useMemo(() => {
-    if (!detail || !actorId) return false
-    if (!detail.required_signers?.includes(actorId)) return false
-    if (detail.signatures && detail.signatures[actorId]) return false
-    return true
-  }, [detail, actorId])
+    return !signDisabledReason
+  }, [signDisabledReason])
 
   const canJoin = useMemo(() => {
-    if (!detail || !actorId) return false
-    if (detail.participation_mode !== 'OPT_IN') return false
-    if (!detail.invited_parties?.includes(actorId)) return false
-    if (detail.parties?.includes(actorId)) return false
-    return true
-  }, [detail, actorId])
+    return !joinDisabledReason
+  }, [joinDisabledReason])
+
+  const refreshAudit = useCallback(async (force: boolean) => {
+    if (!playerId || !contractId) return
+    setAuditLoading(true)
+    try {
+      const res = await Api.contractAgentAudit({
+        actor_id: `user:${playerId}`,
+        contract_id: contractId,
+        force,
+      })
+      setAudit(res)
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
+      notify('error', `审计失败: ${msg}`)
+    } finally {
+      setAuditLoading(false)
+    }
+  }, [playerId, contractId, notify])
+
+  useEffect(() => {
+    if (!playerId || !contractId) return
+    refreshAudit(false)
+  }, [playerId, contractId, refreshAudit])
 
   const handleSign = async () => {
     if (!contractId || !actorId) return
-    if (!canSign) return
+    if (!canSign) {
+      notify('info', signDisabledReason || '当前不可签署')
+      return
+    }
     setActionLoading(true)
     try {
-      await Api.contractSign(contractId, { signer: actorId })
+      await Api.contractSign(contractId, { signer: resolvedActorId || actorId })
       notify('success', '已签署')
       await refresh()
     } catch (e) {
@@ -81,10 +139,13 @@ export default function ContractDetailPage() {
 
   const handleJoin = async () => {
     if (!contractId || !actorId) return
-    if (!canJoin) return
+    if (!canJoin) {
+      notify('info', joinDisabledReason || '当前不可响应加入')
+      return
+    }
     setActionLoading(true)
     try {
-      await Api.contractJoin(contractId, { joiner: actorId })
+      await Api.contractJoin(contractId, { joiner: resolvedActorId || actorId })
       notify('success', '已响应加入')
       await refresh()
     } catch (e) {
@@ -155,17 +216,18 @@ export default function ContractDetailPage() {
               ) : null}
             </div>
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
               <button
                 className="cyber-button"
                 onClick={handleSign}
-                disabled={actionLoading || !canSign}
                 style={{
                   fontSize: '11px',
                   padding: '4px 12px',
                   background: canSign ? 'var(--terminal-success)' : 'transparent',
                   borderColor: canSign ? 'var(--terminal-success)' : 'var(--terminal-border)',
                   color: canSign ? '#fff' : '#94a3b8',
+                  opacity: actionLoading ? 0.6 : (canSign ? 1 : 0.6),
+                  cursor: canSign ? 'pointer' : 'not-allowed',
                 }}
               >
                 签署
@@ -174,18 +236,30 @@ export default function ContractDetailPage() {
               <button
                 className="cyber-button"
                 onClick={handleJoin}
-                disabled={actionLoading || !canJoin}
                 style={{
                   fontSize: '11px',
                   padding: '4px 12px',
                   background: canJoin ? 'var(--terminal-info)' : 'transparent',
                   borderColor: canJoin ? 'var(--terminal-info)' : 'var(--terminal-border)',
                   color: canJoin ? '#fff' : '#94a3b8',
+                  opacity: actionLoading ? 0.6 : (canJoin ? 1 : 0.6),
+                  cursor: canJoin ? 'pointer' : 'not-allowed',
                 }}
               >
                 响应加入
               </button>
             </div>
+
+            {signDisabledReason ? (
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: 6 }}>
+                签署不可用：{signDisabledReason}
+              </div>
+            ) : null}
+            {joinDisabledReason ? (
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: 4 }}>
+                响应不可用：{joinDisabledReason}
+              </div>
+            ) : null}
           </div>
 
           <div style={{ display: 'grid', gap: 6 }}>
@@ -219,6 +293,56 @@ export default function ContractDetailPage() {
               {JSON.stringify(detail.terms, null, 2)}
             </pre>
           </details>
+
+          <div style={{ marginTop: 10, padding: 12, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(15, 23, 42, 0.5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '10px', color: '#64748b' }}>FIN_AUDIT</div>
+                <div style={{ fontSize: '12px', color: '#cbd5e1' }}>
+                  风险评级：<span style={{ color: audit?.risk_rating === 'HIGH' ? 'var(--terminal-error)' : 'var(--terminal-success)' }}>{audit?.risk_rating || '--'}</span>
+                </div>
+              </div>
+              <button
+                className="cyber-button"
+                onClick={() => refreshAudit(true)}
+                style={{ fontSize: '11px', padding: '4px 12px' }}
+              >
+                {auditLoading ? 'AUDITING...' : '强制重审'}
+              </button>
+            </div>
+
+            {audit ? (
+              <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
+                <div style={{ color: '#e2e8f0', fontSize: '12px', lineHeight: 1.5 }}>{audit.summary}</div>
+
+                {audit.issues.length > 0 ? (
+                  <div>
+                    <div style={{ fontSize: '10px', color: '#64748b', marginBottom: 4 }}>ISSUES</div>
+                    <div style={{ display: 'grid', gap: 4, fontSize: '12px', color: '#fecaca' }}>
+                      {audit.issues.map((x, i) => (
+                        <div key={i}>- {x}</div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {audit.questions.length > 0 ? (
+                  <div>
+                    <div style={{ fontSize: '10px', color: '#64748b', marginBottom: 4 }}>QUESTIONS</div>
+                    <div style={{ display: 'grid', gap: 4, fontSize: '12px', color: '#e2e8f0' }}>
+                      {audit.questions.map((x, i) => (
+                        <div key={i}>- {x}</div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div style={{ marginTop: 10, opacity: 0.7, fontSize: 12 }}>
+                {auditLoading ? '审计中...' : (playerId ? '暂无审计结果' : '未登录，无法审计')}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div style={{ marginTop: 12, opacity: 0.7 }}>{loading ? 'LOADING...' : 'NO_DATA'}</div>

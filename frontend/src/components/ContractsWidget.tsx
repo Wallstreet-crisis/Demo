@@ -41,6 +41,12 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
   }, [playerId])
 
   useEffect(() => {
+    if (playerId) {
+      fetchMentionsData()
+    }
+  }, [playerId, fetchMentionsData])
+
+  useEffect(() => {
     if (isFocused) {
       fetchMentionsData()
     }
@@ -235,9 +241,11 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative' }}>
         {/* Mention List UI (replicated from ChatWidget) */}
         {showMentionList && (
-          <div style={{
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            style={{
             position: 'absolute',
-            bottom: '100%',
+            top: '100%',
             left: 0,
             right: 0,
             background: 'rgba(10, 15, 25, 0.98)',
@@ -246,7 +254,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
             zIndex: 2000,
             maxHeight: '150px',
             overflowY: 'auto',
-            marginBottom: '8px',
+            marginTop: '6px',
             borderRadius: '4px',
             backdropFilter: 'blur(8px)'
           }} className="custom-scrollbar">
@@ -256,6 +264,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
                 return (
                   <div 
                     key={p} 
+                    onMouseDown={e => e.stopPropagation()}
                     onClick={() => selectMention(p)}
                     style={{ 
                       padding: '8px 12px', 
@@ -276,6 +285,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
                 return (
                   <div 
                     key={c.contract_id} 
+                    onMouseDown={e => e.stopPropagation()}
                     onClick={() => selectMention(c)}
                     style={{ 
                       padding: '8px 12px', 

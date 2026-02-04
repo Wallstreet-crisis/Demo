@@ -1225,6 +1225,79 @@ async def contract_agent_append_edit(req: ContractAgentAppendEditRequest) -> Con
     )
 
 
+class ContractAgentAuditRequest(BaseModel):
+    actor_id: str
+    contract_id: str
+    force: bool = False
+
+
+class ContractAgentAuditResponse(BaseModel):
+    audit_id: str
+    contract_id: str
+    summary: str
+    issues: list[str]
+    questions: list[str]
+    risk_rating: str
+
+
+@router.post("/contract-agent/audit")
+async def contract_agent_audit(req: ContractAgentAuditRequest) -> ContractAgentAuditResponse:
+    try:
+        def _tx(tx, params):
+            res = tx.run(
+                """
+                MATCH (c:Contract {contract_id: $contract_id})
+                RETURN c.contract_id AS contract_id,
+                       c.kind AS kind,
+                       c.title AS title,
+                       c.terms_json AS terms_json,
+                       c.status AS status,
+                       c.parties AS parties,
+                       c.required_signers AS required_signers,
+                       c.signatures AS signatures,
+                       c.participation_mode AS participation_mode,
+                       c.invited_parties AS invited_parties,
+                       c.created_at AS created_at,
+                       c.updated_at AS updated_at,
+                       c.activated_at AS activated_at
+                """,
+                **params,
+            ).single()
+            if not res:
+                return None
+            return dict(res)
+
+        with _driver.session() as session:
+            record = session.execute_read(_tx, {"contract_id": req.contract_id})
+
+        if not record:
+            raise HTTPException(status_code=404, detail="contract not found")
+
+        snapshot: Dict[str, Any] = dict(record)
+        try:
+            snapshot["terms"] = json.loads(snapshot.get("terms_json") or "{}")
+        except Exception:
+            snapshot["terms"] = {}
+
+        audit = _contract_agent.audit_contract(
+            actor_id=req.actor_id,
+            contract_id=req.contract_id,
+            contract_snapshot=snapshot,
+            force=bool(req.force),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return ContractAgentAuditResponse(
+        audit_id=str(audit.audit_id),
+        contract_id=str(audit.contract_id),
+        summary=str(audit.summary),
+        issues=list(audit.issues),
+        questions=list(audit.questions),
+        risk_rating=str(audit.risk_rating),
+    )
+
+
 class ContractAgentContextResponse(BaseModel):
     actor_id: str
     context: Dict[str, Any]
