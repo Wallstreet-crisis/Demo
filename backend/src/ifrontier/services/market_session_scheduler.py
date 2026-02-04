@@ -47,7 +47,7 @@ class MarketSessionScheduler:
 
                 if self._last_phase is not None:
                     if self._last_phase != MarketPhase.TRADING.value and cur_phase == MarketPhase.TRADING.value:
-                        events = await asyncio.to_thread(self._runner.maybe_react_on_market_open)
+                        events = await self._runner.maybe_react_on_market_open()
                         for ev in events:
                             await self._broadcaster(ev.model_dump())
 

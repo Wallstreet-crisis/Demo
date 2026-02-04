@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import random
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException
@@ -84,8 +85,8 @@ async def debug_market_maker_tick_once() -> DebugMarketMakerTickResponse:
         min_qty=float(os.getenv("IF_MARKET_MAKER_MIN_QTY") or "1.0"),
     )
     mm = MarketMaker(cfg=cfg)
-    placed = mm.tick_once()
-    return DebugMarketMakerTickResponse(placed=int(placed))
+    matches = mm.tick_once()
+    return DebugMarketMakerTickResponse(placed=int(len(matches or [])))
 
 class DebugEmitEventRequest(BaseModel):
     event_type: EventType
@@ -117,6 +118,199 @@ async def debug_emit_event(req: DebugEmitEventRequest) -> DebugEmitEventResponse
     await hub.broadcast_json(str(req.event_type), event_json.model_dump())
 
     return DebugEmitEventResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
+
+class NewsStoreCatalogPreset(BaseModel):
+    preset_id: str
+    text: str
+
+class NewsStoreCatalogItem(BaseModel):
+    kind: str
+    price_cash: float
+    requires_symbols: bool = False
+    preview_text: str
+    presets: List[NewsStoreCatalogPreset]
+
+class NewsStoreCatalogResponse(BaseModel):
+    items: List[NewsStoreCatalogItem]
+
+@router.get("/news/store/catalog")
+async def news_store_catalog() -> NewsStoreCatalogResponse:
+    items_cfg: List[Dict[str, Any]] = [
+        {"kind": "RUMOR", "price_cash": 50.0, "requires_symbols": False},
+        {"kind": "LEAK", "price_cash": 120.0, "requires_symbols": True},
+        {"kind": "ANALYST_REPORT", "price_cash": 80.0, "requires_symbols": True},
+        {"kind": "OMEN", "price_cash": 100.0, "requires_symbols": True},
+        {"kind": "DISCLOSURE", "price_cash": 180.0, "requires_symbols": True},
+        {"kind": "EARNINGS", "price_cash": 150.0, "requires_symbols": True},
+        {"kind": "MAJOR_EVENT", "price_cash": 300.0, "requires_symbols": True},
+    ]
+
+    out: List[NewsStoreCatalogItem] = []
+    for it in items_cfg:
+        kind = str(it["kind"])
+        requires_symbols = bool(it.get("requires_symbols") or False)
+        symbols = ["BLUEGOLD"] if requires_symbols else []
+        presets_texts = _news_service.get_preset_templates(kind=kind, symbols=symbols)
+        preview = presets_texts[0] if presets_texts else _news_service.get_preset_template(kind=kind, symbols=symbols)
+        out.append(
+            NewsStoreCatalogItem(
+                kind=kind,
+                price_cash=float(it["price_cash"]),
+                requires_symbols=requires_symbols,
+                preview_text=str(preview),
+                presets=[
+                    NewsStoreCatalogPreset(preset_id=f"{kind}:{idx}", text=str(t))
+                    for idx, t in enumerate(presets_texts)
+                ],
+            )
+        )
+
+    return NewsStoreCatalogResponse(items=out)
+
+def _news_debug_enabled() -> bool:
+    return str(os.getenv("IF_NEWS_DEBUG") or "0").strip().lower() in {"1", "true", "yes"}
+
+class DebugNewsChainsResponse(BaseModel):
+    items: List[Dict[str, Any]]
+
+@router.get("/debug/news/chains")
+async def debug_news_chains(limit: int = 50) -> DebugNewsChainsResponse:
+    if not _news_debug_enabled():
+        raise HTTPException(status_code=403, detail="news debug disabled")
+
+    def _tx(tx, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        result = tx.run(
+            """
+            MATCH (ch:NewsChain)
+            RETURN ch.chain_id AS chain_id,
+                   ch.major_card_id AS major_card_id,
+                   ch.kind AS kind,
+                   ch.phase AS phase,
+                   ch.created_at AS created_at,
+                   ch.t0_at AS t0_at,
+                   ch.next_omen_at AS next_omen_at,
+                   ch.omen_interval_seconds AS omen_interval_seconds,
+                   ch.abort_probability AS abort_probability,
+                   ch.grant_count AS grant_count,
+                   ch.seed AS seed,
+                   ch.symbols AS symbols
+            ORDER BY ch.created_at DESC
+            LIMIT $limit
+            """,
+            **params,
+        )
+        return [dict(r) for r in result]
+
+    with _driver.session() as session:
+        rows = session.execute_read(_tx, {"limit": int(limit)})
+    return DebugNewsChainsResponse(items=rows)
+
+class DebugNewsChainResponse(BaseModel):
+    chain: Dict[str, Any] | None = None
+    major_card: Dict[str, Any] | None = None
+    variants: List[Dict[str, Any]] = []
+
+@router.get("/debug/news/chains/{chain_id}")
+async def debug_news_chain(chain_id: str, variants_limit: int = 50) -> DebugNewsChainResponse:
+    if not _news_debug_enabled():
+        raise HTTPException(status_code=403, detail="news debug disabled")
+
+    def _tx(tx, params: Dict[str, Any]) -> Dict[str, Any]:
+        rec = tx.run(
+            """
+            MATCH (ch:NewsChain {chain_id: $chain_id})
+            OPTIONAL MATCH (c:NewsCard {card_id: ch.major_card_id})
+            RETURN properties(ch) AS chain_props, properties(c) AS card_props
+            """,
+            **params,
+        ).single()
+        if rec is None:
+            return {"chain": None, "major_card": None}
+        return {"chain": rec.get("chain_props"), "major_card": rec.get("card_props")}
+
+    def _variants_tx(tx, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        result = tx.run(
+            """
+            MATCH (ch:NewsChain {chain_id: $chain_id})
+            MATCH (c:NewsCard {card_id: ch.major_card_id})-[:HAS_VARIANT]->(v:NewsVariant)
+            RETURN v.variant_id AS variant_id,
+                   v.text AS text,
+                   v.author_id AS author_id,
+                   v.mutation_depth AS mutation_depth,
+                   v.influence_cost AS influence_cost,
+                   v.created_at AS created_at
+            ORDER BY v.created_at DESC
+            LIMIT $limit
+            """,
+            **params,
+        )
+        return [dict(r) for r in result]
+
+    with _driver.session() as session:
+        base = session.execute_read(_tx, {"chain_id": str(chain_id)})
+        vars_rows = session.execute_read(_variants_tx, {"chain_id": str(chain_id), "limit": int(variants_limit)})
+
+    return DebugNewsChainResponse(chain=base.get("chain"), major_card=base.get("major_card"), variants=vars_rows)
+
+class DebugNewsDeliveriesResponse(BaseModel):
+    items: List[Dict[str, Any]]
+
+@router.get("/debug/news/deliveries")
+async def debug_news_deliveries(variant_id: str, limit: int = 200) -> DebugNewsDeliveriesResponse:
+    if not _news_debug_enabled():
+        raise HTTPException(status_code=403, detail="news debug disabled")
+
+    def _tx(tx, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        result = tx.run(
+            """
+            MATCH (d:NewsDelivery {variant_id: $variant_id})
+            RETURN d.delivery_id AS delivery_id,
+                   d.card_id AS card_id,
+                   d.variant_id AS variant_id,
+                   d.to_player_id AS to_player_id,
+                   d.from_actor_id AS from_actor_id,
+                   d.visibility_level AS visibility_level,
+                   d.delivery_reason AS delivery_reason,
+                   d.delivered_at AS delivered_at
+            ORDER BY d.delivered_at DESC
+            LIMIT $limit
+            """,
+            **params,
+        )
+        return [dict(r) for r in result]
+
+    with _driver.session() as session:
+        rows = session.execute_read(_tx, {"variant_id": str(variant_id), "limit": int(limit)})
+    return DebugNewsDeliveriesResponse(items=rows)
+
+class DebugEventsByCorrelationResponse(BaseModel):
+    items: List[Dict[str, Any]]
+
+@router.get("/debug/events/by_correlation/{correlation_id}")
+async def debug_events_by_correlation(correlation_id: str, limit: int = 200) -> DebugEventsByCorrelationResponse:
+    if not _news_debug_enabled():
+        raise HTTPException(status_code=403, detail="news debug disabled")
+
+    try:
+        corr = UUID(str(correlation_id))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="invalid correlation_id") from exc
+
+    events = _event_store.list_by_correlation_id(corr, limit=int(limit))
+    return DebugEventsByCorrelationResponse(
+        items=[
+            {
+                "event_id": e.event_id,
+                "event_type": e.event_type,
+                "occurred_at": e.occurred_at,
+                "correlation_id": e.correlation_id,
+                "causation_id": e.causation_id,
+                "actor": e.actor,
+                "payload": e.payload,
+            }
+            for e in events
+        ]
+    )
 
 class _AnyPayload(RootModel[Dict[str, Any]]):
     pass
@@ -429,8 +623,9 @@ class MarketQuoteResponse(BaseModel):
 
 @router.get("/market/symbols")
 async def get_market_symbols() -> list[str]:
-    from ifrontier.domain.assets.profile import _ASSET_PROFILES
-    return list(_ASSET_PROFILES.keys())
+    from ifrontier.infra.sqlite.securities import list_securities
+    secs = list_securities()
+    return [s.symbol for s in secs]
 
 
 @router.get("/market/quote/{symbol}")
@@ -694,33 +889,38 @@ class PlayerBootstrapRequest(BaseModel):
 
 @router.post("/players/bootstrap")
 async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountResponse:
-    # 幂等：如果已存在则不重复发放初始资产
+    # 幂等：如果已存在则返回现有数据，不报错也不重复发放初始资产
     account_id = f"user:{req.player_id}"
     conn = get_connection()
 
     row = conn.execute("SELECT 1 FROM accounts WHERE account_id = ?", (account_id,)).fetchone()
-    if row:
-        raise HTTPException(status_code=400, detail="Player already bootstrapped")
+    if not row:
+        initial_cash = float(req.initial_cash) if req.initial_cash is not None else 10000.0
+        positions: Dict[str, float] = {}
 
-    initial_cash = float(req.initial_cash) if req.initial_cash is not None else 10000.0
-    positions: Dict[str, float] = {}
+        if req.caste_id is not None:
+            cfg = get_caste_config(req.caste_id)
+            if cfg is not None:
+                initial_cash = float(cfg.initial_cash)
+                positions = dict(cfg.initial_positions)
 
-    if req.caste_id is not None:
-        cfg = get_caste_config(req.caste_id)
-        if cfg is not None:
-            initial_cash = float(cfg.initial_cash)
-            positions = dict(cfg.initial_positions)
+        create_account(account_id, owner_type="user", initial_cash=float(initial_cash))
 
-    create_account(account_id, owner_type="user", initial_cash=float(initial_cash))
+        if positions:
+            with conn:
+                for symbol, qty in positions.items():
+                    conn.execute(
+                        "INSERT INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?) "
+                        "ON CONFLICT(account_id, symbol) DO UPDATE SET quantity = quantity + excluded.quantity",
+                        (account_id, symbol, qty),
+                    )
 
-    if positions:
-        with conn:
-            for symbol, qty in positions.items():
-                conn.execute(
-                    "INSERT INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?) "
-                    "ON CONFLICT(account_id, symbol) DO UPDATE SET quantity = quantity + excluded.quantity",
-                    (account_id, symbol, qty),
-                )
+    # 确保 Neo4j 中存在该玩家 User 节点（供新闻传播/调试使用）
+    try:
+        with _driver.session() as session:
+            session.execute_write(lambda tx, params: tx.run("MERGE (u:User {user_id: $user_id}) RETURN u.user_id AS user_id", **params), {"user_id": account_id})
+    except Exception:
+        pass
 
     snap = get_snapshot(account_id)
     return PlayerAccountResponse(account_id=snap.account_id, cash=snap.cash, positions=snap.positions)
@@ -1412,8 +1612,14 @@ class NewsPropagateResponse(BaseModel):
 
 @router.post("/news/propagate")
 async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
+    requested_limit = int(req.limit)
+    if requested_limit <= 0:
+        return NewsPropagateResponse(delivered=0, correlation_id=req.correlation_id)
+
+    limit = requested_limit
+    per_delivery_cost: float | None = None
+
     # 若提供 spend_cash，则按 mutation_depth 提高单次投递成本，并用预算限制可投递人数。
-    limit = int(req.limit)
     if req.spend_cash is not None:
         ctx = _news_service.get_variant_context(variant_id=req.variant_id) or {}
         depth = int(ctx.get("mutation_depth") or 0)
@@ -1435,24 +1641,53 @@ async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
         if affordable < limit:
             limit = affordable
 
-        if limit > 0:
-            total_cost = per_delivery_cost * float(limit)
+        if limit <= 0:
+            return NewsPropagateResponse(delivered=0, correlation_id=req.correlation_id)
+
+    recipients: list[str] = []
+    try:
+        with _driver.session() as session:
+            follower_rows = session.execute_read(
+                _news_service._list_followers_tx,
+                {"followee_id": req.from_actor_id, "limit": int(limit)},
+            )
+        recipients = [str(r["user_id"]) for r in follower_rows if str(r.get("user_id")) != str(req.from_actor_id)]
+    except Exception:
+        recipients = []
+
+    if req.spend_cash is not None and len(recipients) < limit:
+        users = _news_service.list_users(limit=5000)
+        seen = set(recipients)
+        candidates = [u for u in users if u not in seen and str(u) != str(req.from_actor_id)]
+        random.shuffle(candidates)
+        recipients.extend(candidates[: max(0, int(limit - len(recipients)))])
+
+    if not recipients:
+        return NewsPropagateResponse(delivered=0, correlation_id=req.correlation_id)
+
+    if req.spend_cash is not None and per_delivery_cost is not None:
+        total_cost = per_delivery_cost * float(len(recipients))
+        if total_cost > 0:
             try:
                 spend_cash(account_id=req.from_actor_id, amount=float(total_cost), event_id=str(uuid4()))
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    try:
-        delivered_events = _news_service.propagate_to_followers(
-            variant_id=req.variant_id,
-            from_actor_id=req.from_actor_id,
-            visibility_level=req.visibility_level,
-            spend_influence=req.spend_influence,
-            limit=limit,
-            correlation_id=req.correlation_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    delivered_events: list[EventEnvelopeJson] = []
+    delivery_reason = "PAID_PROMOTION" if req.spend_cash is not None else "SOCIAL_PROPAGATION"
+    for to_player_id in recipients:
+        try:
+            _delivery_id, ev = _news_service.deliver_variant(
+                variant_id=req.variant_id,
+                to_player_id=to_player_id,
+                from_actor_id=req.from_actor_id,
+                visibility_level=req.visibility_level,
+                delivery_reason=delivery_reason,
+                correlation_id=req.correlation_id,
+            )
+            delivered_events.append(ev)
+        except ValueError:
+            continue
 
     for ev in delivered_events:
         await hub.broadcast_json("events", ev.model_dump())
@@ -1515,7 +1750,7 @@ async def news_broadcast(req: NewsBroadcastRequest) -> NewsBroadcastResponse:
     await hub.broadcast_json("events", event_json.model_dump())
     await hub.broadcast_json(str(EventType.NEWS_BROADCASTED), event_json.model_dump())
 
-    emergency_events = _commonbot_emergency_runner.maybe_react(broadcast_event=event_json)
+    emergency_events = await _commonbot_emergency_runner.maybe_react(broadcast_event=event_json)
     for ev in emergency_events:
         await hub.broadcast_json("events", ev.model_dump())
         await hub.broadcast_json(str(ev.event_type), ev.model_dump())
@@ -1593,7 +1828,7 @@ async def news_tick(req: NewsTickRequest) -> NewsTickResponse:
     now = None
     if req.now_iso is not None:
         now = datetime.fromisoformat(req.now_iso)
-    result = _news_tick_engine.tick(now=now, limit=req.limit)
+    result = await _news_tick_engine.tick(now=now, limit=req.limit)
 
     # 将 tick 内产生的事件推送到 WS
     for chain in result.get("chains", []):
@@ -1718,7 +1953,7 @@ async def news_ownership_list(user_id: str, limit: int = 200) -> NewsOwnedCardsR
 class NewsStorePurchaseRequest(BaseModel):
     buyer_user_id: str
     kind: str
-    price_cash: float
+    preset_id: str | None = None
     image_anchor_id: str | None = None
     image_uri: str | None = None
     truth_payload: Dict[str, Any] | None = None
@@ -1735,23 +1970,33 @@ class NewsStorePurchaseRequest(BaseModel):
     seed: int = 1
     correlation_id: UUID | None = None
 
-
-class NewsStorePurchaseResponse(BaseModel):
-    kind: str
-    buyer_user_id: str
-    card_id: str | None = None
-    variant_id: str | None = None
-    chain_id: str | None = None
-
-
 @router.post("/news/store/purchase")
 async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchaseResponse:
-    if req.price_cash <= 0:
-        raise HTTPException(status_code=400, detail="price_cash must be > 0")
+    items_cfg: List[Dict[str, Any]] = [
+        {"kind": "RUMOR", "price_cash": 50.0, "requires_symbols": False},
+        {"kind": "LEAK", "price_cash": 120.0, "requires_symbols": True},
+        {"kind": "ANALYST_REPORT", "price_cash": 80.0, "requires_symbols": True},
+        {"kind": "OMEN", "price_cash": 100.0, "requires_symbols": True},
+        {"kind": "DISCLOSURE", "price_cash": 180.0, "requires_symbols": True},
+        {"kind": "EARNINGS", "price_cash": 150.0, "requires_symbols": True},
+        {"kind": "MAJOR_EVENT", "price_cash": 300.0, "requires_symbols": True},
+    ]
+    kind_key = str(req.kind)
+    cfg = next((x for x in items_cfg if str(x.get("kind")) == kind_key), None)
+    if cfg is None:
+        raise HTTPException(status_code=400, detail="unknown kind")
+
+    system_price = float(cfg.get("price_cash") or 0.0)
+    if system_price <= 0:
+        raise HTTPException(status_code=400, detail="invalid system price")
+
+    requires_symbols = bool(cfg.get("requires_symbols") or False)
+    if requires_symbols and not (req.symbols or []):
+        raise HTTPException(status_code=400, detail="symbols required for this kind")
 
     purchase_event_id = str(uuid4())
     try:
-        spend_cash(account_id=req.buyer_user_id, amount=float(req.price_cash), event_id=purchase_event_id)
+        spend_cash(account_id=req.buyer_user_id, amount=float(system_price), event_id=purchase_event_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -1770,6 +2015,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
                 abort_probability=req.abort_probability,
                 grant_count=req.grant_count,
                 seed=req.seed,
+                symbols=req.symbols or [],
                 correlation_id=req.correlation_id,
             )
         except ValueError as exc:
@@ -1796,16 +2042,31 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
         )
 
     # 普通卡：等效“随机拾到”，只投递给购买者，后续靠其手动助推传播
-    initial_text = req.initial_text
-    if not initial_text:
-        initial_text = _news_service.get_preset_template(kind=str(req.kind), symbols=req.symbols or [])
+    symbols = req.symbols or []
+    presets = _news_service.get_preset_templates(kind=str(req.kind), symbols=symbols)
+    preset_id = str(req.preset_id) if req.preset_id is not None else ""
+    initial_text = ""
+    if preset_id:
+        prefix = f"{str(req.kind)}:"
+        if not preset_id.startswith(prefix):
+            raise HTTPException(status_code=400, detail="invalid preset_id")
+        try:
+            idx = int(preset_id.split(":", 1)[1])
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="invalid preset_id") from exc
+        if idx < 0 or idx >= len(presets):
+            raise HTTPException(status_code=400, detail="preset_id out of range")
+        initial_text = str(presets[idx])
+    else:
+        # default preset
+        initial_text = str(presets[0]) if presets else _news_service.get_preset_template(kind=str(req.kind), symbols=symbols)
 
     card_id, card_event = _news_service.create_card(
         kind=req.kind,
         image_anchor_id=req.image_anchor_id,
         image_uri=req.image_uri,
         truth_payload=req.truth_payload,
-        symbols=req.symbols,
+        symbols=symbols,
         tags=req.tags,
         actor_id=req.buyer_user_id,
         correlation_id=req.correlation_id,

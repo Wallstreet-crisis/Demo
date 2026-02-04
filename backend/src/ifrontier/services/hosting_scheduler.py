@@ -61,20 +61,30 @@ class HostingScheduler:
     async def tick_once(self) -> None:
         humans = int(await self._get_channel_size(self._channel_for_online_stats))
         missing = max(0, self._min_players - humans)
+        
+        print(f"[HostingScheduler] Tick: humans={humans}, min_required={self._min_players}, missing={missing}")
+
         if missing <= 0:
             # 在线人数充足：把托管用户状态刷新为 IDLE
-            for st in list_enabled_hosting_users(limit=200):
-                upsert_hosting_state(user_id=st.user_id, enabled=True, status="ON_IDLE")
             return
 
         quota = min(int(missing), int(self._max_per_tick))
-        if quota <= 0:
+        enabled = list_enabled_hosting_users(limit=200)
+
+        bot_candidates = [st for st in enabled if str(st.user_id).startswith("bot:")]
+        human_candidates = [st for st in enabled if not str(st.user_id).startswith("bot:")]
+
+        print(
+            f"[HostingScheduler] Available enabled bots: {len(bot_candidates)}; enabled non-bot: {len(human_candidates)}"
+        )
+
+        picked = bot_candidates[:quota]
+        if not picked:
+            print("[HostingScheduler] No enabled bots found to pick.")
             return
 
-        enabled = list_enabled_hosting_users(limit=200)
-        picked = enabled[:quota]
-
         for st in picked:
+            print(f"[HostingScheduler] Activating bot: {st.user_id}")
             upsert_hosting_state(user_id=st.user_id, enabled=True, status="ON_ACTIVE")
 
             facade = self._make_facade(st.user_id)

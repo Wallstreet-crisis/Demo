@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import { Api, ApiError, type AccountValuationResponse, type PlayerAccountResponse } from '../api'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { Api, ApiError, WsClient, type AccountValuationResponse, type PlayerAccountResponse } from '../api'
 import { useAppSession } from '../app/context'
 import CyberWidget from './CyberWidget'
 
@@ -8,6 +8,8 @@ export default function AccountWidget() {
   const [err, setErr] = useState<string>('')
   const [snap, setSnap] = useState<PlayerAccountResponse | null>(null)
   const [val, setVal] = useState<AccountValuationResponse | null>(null)
+
+  const ws = useMemo(() => new WsClient(), [])
 
   const refresh = useCallback(async () => {
     if (!playerId) return
@@ -29,11 +31,29 @@ export default function AccountWidget() {
       if (active) await refresh()
     }
     doRefresh()
-    const t = setInterval(refresh, 5000)
     return () => {
       active = false
-      clearInterval(t)
     }
+  }, [refresh])
+
+  useEffect(() => {
+    if (!playerId) return
+    ws.connect('events', (data: unknown) => {
+      const ev = data as { event_type?: string; payload?: { buy_account_id?: string; sell_account_id?: string } }
+      if (ev?.event_type === 'TRADE_EXECUTED') {
+        const myAcc = `user:${playerId}`
+        if (ev.payload?.buy_account_id === myAcc || ev.payload?.sell_account_id === myAcc) {
+          // 如果成交涉及当前玩家，立即刷新资产
+          refresh()
+        }
+      }
+    })
+    return () => ws.close()
+  }, [ws, playerId, refresh])
+
+  useEffect(() => {
+    const t = setInterval(refresh, 15000) // 轮询频率降低，主要依靠实时推送
+    return () => clearInterval(t)
   }, [refresh])
 
   const cash = val?.cash ?? snap?.cash ?? 0

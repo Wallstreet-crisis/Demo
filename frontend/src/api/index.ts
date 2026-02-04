@@ -53,6 +53,7 @@ import type {
   NewsOwnershipTransferRequest,
   NewsPropagateRequest,
   NewsPropagateResponse,
+  NewsStoreCatalogResponse,
   NewsStorePurchaseRequest,
   NewsStorePurchaseResponse,
   NewsSuppressRequest,
@@ -147,6 +148,7 @@ export const Api = {
   newsOwnershipTransfer: (req: NewsOwnershipTransferRequest) => api.post<NewsOwnershipEventResponse>('/news/ownership/transfer', req),
   newsOwnershipList: (user_id: string, limit = 200) =>
     api.get<NewsOwnedCardsResponse>(`/news/ownership/${encodeURIComponent(user_id)}`, { limit }),
+  newsStoreCatalog: () => api.get<NewsStoreCatalogResponse>('/news/store/catalog'),
   newsStorePurchase: (req: NewsStorePurchaseRequest) => api.post<NewsStorePurchaseResponse>('/news/store/purchase', req),
 
   hostingEnable: (user_id: string) => api.post<HostingEnableResponse>(`/hosting/${encodeURIComponent(user_id)}/enable`),

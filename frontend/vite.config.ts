@@ -7,6 +7,10 @@ export default defineConfig({
   server: {
     host: '127.0.0.1', // 强制使用 IPv4
     proxy: {
+      '/debug': {
+        target: 'http://127.0.0.1:8010',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://127.0.0.1:8010',
         changeOrigin: true,

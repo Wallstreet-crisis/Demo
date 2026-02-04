@@ -53,6 +53,13 @@ def get_quote(symbol: str, *, series_limit: int = 200) -> MarketQuote:
     prices = get_price_series(symbol=symbol, limit=series_limit)
     last_price = get_last_price(symbol)
 
+    # 兜底：如果还没有成交，使用证券定义的种子价格
+    if last_price is None:
+        from ifrontier.infra.sqlite.securities import get_security
+        sec = get_security(symbol)
+        if sec:
+            last_price = float(sec.seed_price)
+
     prev_price: Optional[float] = None
 
     cfg = load_game_time_config_from_env()

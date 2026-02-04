@@ -40,8 +40,7 @@ class NewsTickScheduler:
     async def _run_loop(self) -> None:
         while not self._stop.is_set():
             try:
-                result = await asyncio.to_thread(
-                    self._tick_engine.tick,
+                result = await self._tick_engine.tick(
                     now=None,
                     limit=self._batch_size,
                 )

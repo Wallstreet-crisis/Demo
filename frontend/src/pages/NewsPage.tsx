@@ -4,6 +4,7 @@ import {
   ApiError,
   type NewsInboxResponse,
   type NewsInboxResponseItem,
+  type NewsStoreCatalogItem,
 } from '../api'
 import { useAppSession } from '../app/context'
 import { WsClient } from '../api'
@@ -40,6 +41,9 @@ export default function NewsPage() {
   const [ownedCards, setOwnedCards] = useState<string[]>([])
   const [loadingOwned, setLoadingOwned] = useState(false)
 
+  const [storeItems, setStoreItems] = useState<NewsStoreCatalogItem[]>([])
+  const [loadingStore, setLoadingStore] = useState(false)
+
   // Pre-fill fields
   const [targetVariantId, setTargetVariantId] = useState<string>('')
   const [propLimit, setPropLimit] = useState<number>(50)
@@ -48,6 +52,7 @@ export default function NewsPage() {
   const [purchaseKind, setPurchaseKind] = useState<string>('RUMOR')
   const [purchasePrice, setPurchasePrice] = useState<number>(100)
   const [purchaseText, setPurchaseText] = useState<string>('')
+  const [purchasePresetId, setPurchasePresetId] = useState<string>('')
 
   const [selectedInboxItem, setSelectedInboxItem] = useState<NewsInboxResponseItem | null>(null)
 
@@ -91,13 +96,16 @@ export default function NewsPage() {
 
   async function purchase(): Promise<void> {
     try {
+      const selected = storeItems.find((x) => x.kind === purchaseKind) ?? null
+      const reqSymbols = selected?.requires_symbols ? [symbol] : []
+      const presetId = purchasePresetId || (selected?.presets?.[0]?.preset_id ?? null)
       const r = await Api.newsStorePurchase({
         buyer_user_id: `user:${playerId}`,
         kind: purchaseKind,
         price_cash: Number(purchasePrice),
-        symbols: [symbol],
+        preset_id: presetId,
+        symbols: reqSymbols,
         tags: [],
-        initial_text: purchaseText,
       })
       if (r.variant_id) setTargetVariantId(r.variant_id)
       notify('success', `购买成功: ${r.kind}`)
@@ -109,11 +117,61 @@ export default function NewsPage() {
     }
   }
 
+  async function refreshStoreCatalog(): Promise<void> {
+    setLoadingStore(true)
+    try {
+      const r = await Api.newsStoreCatalog()
+      const items = Array.isArray(r.items) ? r.items : []
+      setStoreItems(items)
+
+      if (items.length > 0) {
+        const selected = items.find((x) => x.kind === purchaseKind) ?? items[0]
+        if (selected) {
+          setPurchaseKind(selected.kind)
+          setPurchasePrice(Number(selected.price_cash))
+          const p0 = selected.presets?.[0]?.preset_id ?? ''
+          setPurchasePresetId(p0)
+          setPurchaseText(String(selected.presets?.[0]?.text ?? selected.preview_text ?? ''))
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
+      notify('error', `获取新闻商店目录失败: ${msg}`)
+      setStoreItems([])
+    } finally {
+      setLoadingStore(false)
+    }
+  }
+
   useEffect(() => {
     refreshInbox()
     refreshOwnedCards()
+    refreshStoreCatalog()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerId])
+
+  useEffect(() => {
+    const selected = storeItems.find((x) => x.kind === purchaseKind) ?? null
+    if (!selected) return
+    setPurchasePrice(Number(selected.price_cash))
+    const nextPreset = selected.presets?.find((p) => p.preset_id === purchasePresetId) ?? selected.presets?.[0] ?? null
+    if (nextPreset) {
+      setPurchasePresetId(nextPreset.preset_id)
+      setPurchaseText(String(nextPreset.text ?? ''))
+    } else {
+      setPurchasePresetId('')
+      setPurchaseText(String(selected.preview_text ?? ''))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purchaseKind, storeItems])
+
+  useEffect(() => {
+    const selected = storeItems.find((x) => x.kind === purchaseKind) ?? null
+    if (!selected) return
+    const chosen = selected.presets?.find((p) => p.preset_id === purchasePresetId) ?? null
+    if (chosen) setPurchaseText(String(chosen.text ?? ''))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purchasePresetId])
 
   useEffect(() => {
     ws.connect('events', (payload) => {
@@ -348,19 +406,48 @@ export default function NewsPage() {
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <label style={{ flex: 1 }}>
             <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>种类</div>
-            <input value={purchaseKind} onChange={(e) => setPurchaseKind(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #ddd', boxSizing: 'border-box' }} />
+            <select
+              value={purchaseKind}
+              onChange={(e) => setPurchaseKind(e.target.value)}
+              disabled={loadingStore}
+              style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #ddd', boxSizing: 'border-box' }}
+            >
+              {storeItems.map((it) => (
+                <option key={it.kind} value={it.kind}>
+                  {it.kind}
+                </option>
+              ))}
+              {storeItems.length === 0 && <option value={purchaseKind}>{purchaseKind}</option>}
+            </select>
           </label>
           <label style={{ flex: 1 }}>
             <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>价格</div>
-            <input type="number" value={purchasePrice} onChange={(e) => setPurchasePrice(Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #ddd', boxSizing: 'border-box' }} />
+            <input type="number" value={purchasePrice} readOnly style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #ddd', boxSizing: 'border-box', background: '#f8f8f8' }} />
           </label>
           <label style={{ flex: 2 }}>
-            <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>初始文本</div>
-            <input
-              placeholder="initial_text"
-              value={purchaseText}
-              onChange={(e) => setPurchaseText(e.target.value)}
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>文本预设</div>
+            <select
+              value={purchasePresetId}
+              onChange={(e) => setPurchasePresetId(e.target.value)}
+              disabled={loadingStore}
               style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #ddd', boxSizing: 'border-box' }}
+            >
+              {(storeItems.find((x) => x.kind === purchaseKind)?.presets ?? []).map((p) => (
+                <option key={p.preset_id} value={p.preset_id}>
+                  {p.preset_id}
+                </option>
+              ))}
+              {!storeItems.find((x) => x.kind === purchaseKind)?.presets?.length && (
+                <option value="">(no presets)</option>
+              )}
+            </select>
+          </label>
+          <label style={{ flex: 3 }}>
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>预览</div>
+            <input
+              value={purchaseText}
+              readOnly
+              style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #ddd', boxSizing: 'border-box', background: '#f8f8f8' }}
             />
           </label>
           <button onClick={purchase} style={{ padding: '10px 24px', borderRadius: 8, background: '#faad14', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }} onMouseOver={e => e.currentTarget.style.opacity = '0.9'} onMouseOut={e => e.currentTarget.style.opacity = '1'}>购买</button>

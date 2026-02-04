@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import { Api, type MarketQuoteResponse } from '../api'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { Api, WsClient, type MarketQuoteResponse } from '../api'
 import { useAppSession } from '../app/context'
 import CyberWidget from './CyberWidget'
 
@@ -8,6 +8,8 @@ export default function MarketWatchWidget() {
   const [symbols, setSymbols] = useState<string[]>([])
   const [quotes, setQuotes] = useState<Record<string, MarketQuoteResponse>>({})
   const [loading, setLoading] = useState(true)
+
+  const ws = useMemo(() => new WsClient(), [])
 
   const refreshQuotes = useCallback(async (syms: string[]) => {
     try {
@@ -38,10 +40,23 @@ export default function MarketWatchWidget() {
   }, [refreshQuotes])
 
   useEffect(() => {
+    ws.connect('events', (data: unknown) => {
+      const ev = data as { event_type?: string }
+      if (ev?.event_type === 'TRADE_EXECUTED') {
+        // 当有任何成交发生时，刷新报价
+        if (symbols.length > 0) {
+          refreshQuotes(symbols)
+        }
+      }
+    })
+    return () => ws.close()
+  }, [ws, symbols, refreshQuotes])
+
+  useEffect(() => {
     if (symbols.length === 0) return
     const t = setInterval(() => {
       refreshQuotes(symbols)
-    }, 5000)
+    }, 10000) // 轮询频率降低，主要依靠 WS
     return () => clearInterval(t)
   }, [refreshQuotes, symbols])
 

@@ -28,6 +28,46 @@ class NewsService:
         self._driver = driver
         self._event_store = event_store
 
+    def _preset_templates(self) -> Dict[str, List[str]]:
+        return {
+            "RUMOR": [
+                "听说 {symbol} 内部正在秘密洽谈一项巨额收购案。",
+                "有人在夜店看到 {symbol} 的 CEO 与竞争对手共进晚餐。",
+                "传闻 {symbol} 的下一代产品由于供应链问题将延期发布。",
+                "市场都在议论 {symbol} 可能会在近期宣布派息计划。",
+                "路边社消息：{symbol} 的核心专利可能面临侵权诉讼。",
+                "匿名论坛传出 {symbol} 正在考虑整体私有化退市。",
+            ],
+            "LEAK": [
+                "【绝密泄露】{symbol} 上季度的实际营收增长率可能远超财报预期。",
+                "内部邮件显示，{symbol} 的核心技术团队已有超过 30% 的人员离职。",
+                "一份未公开的文件指出，监管机构正在调查 {symbol} 的财务合规性。",
+                "{symbol} 内部实验室的初步测试数据显示，新工艺成本降低了 40%。",
+                "【深度爆料】{symbol} 的最大股东正在秘密质押全部股权。",
+                "泄露的内部评估报告认为 {symbol} 进军新市场的计划已陷入停滞。",
+            ],
+            "ANALYST_REPORT": [
+                "【机构内参】维持 {symbol} ‘买入’评级，目标价上调 15%。",
+                "深研报告：{symbol} 在当前宏观环境下具有极强的防御属性。",
+                "风险警示：{symbol} 的资产负债率已接近行业预警线。",
+                "行业透视：{symbol} 正在通过 AI 转型重塑其核心竞争力。",
+                "摩根大通分析：{symbol} 的现金流状况足以支持其三年的研发投入。",
+                "行业蓝皮书：{symbol} 在细分市场的占有率已达到 45% 的统治地位。",
+            ],
+            "OMEN": [
+                "外交部发言人对 {symbol} 所在地区的局势表示深切关注。",
+                "监测到 {symbol} 总部大楼连续三晚彻夜通明。",
+                "大宗交易系统出现针对 {symbol} 的异常看跌期权成交。",
+                "卫星图像显示 {symbol} 的主要工厂外围有大量军方车辆出入。",
+            ],
+            "MAJOR_EVENT": [
+                "【紧急公告】{symbol} 宣布由于不可抗力暂停所有生产活动。",
+                "突发新闻：针对 {symbol} 的反垄断法案在议会高票通过。",
+                "重大突破：{symbol} 宣布其划时代的‘量子能源’已实现商业化落地。",
+                "地缘政经：跨国禁令正式生效，{symbol} 失去其主要海外市场渠道。",
+            ],
+        }
+
     def _now_game_utc(self) -> datetime:
         cfg = load_game_time_config_from_env()
         return game_time_now(cfg=cfg, real_now_utc=None).real_now_utc
@@ -494,51 +534,20 @@ class NewsService:
 
     def get_preset_template(self, kind: str, symbols: List[str]) -> str:
         """获取预设的情报模板并填充符号"""
-        templates = {
-            "RUMOR": [
-                "听说 {symbol} 内部正在秘密洽谈一项巨额收购案。",
-                "有人在夜店看到 {symbol} 的 CEO 与竞争对手共进晚餐。",
-                "传闻 {symbol} 的下一代产品由于供应链问题将延期发布。",
-                "市场都在议论 {symbol} 可能会在近期宣布派息计划。",
-                "路边社消息：{symbol} 的核心专利可能面临侵权诉讼。",
-                "匿名论坛传出 {symbol} 正在考虑整体私有化退市。",
-            ],
-            "LEAK": [
-                "【绝密泄露】{symbol} 上季度的实际营收增长率可能远超财报预期。",
-                "内部邮件显示，{symbol} 的核心技术团队已有超过 30% 的人员离职。",
-                "一份未公开的文件指出，监管机构正在调查 {symbol} 的财务合规性。",
-                "{symbol} 内部实验室的初步测试数据显示，新工艺成本降低了 40%。",
-                "【深度爆料】{symbol} 的最大股东正在秘密质押全部股权。",
-                "泄露的内部评估报告认为 {symbol} 进军新市场的计划已陷入停滞。",
-            ],
-            "ANALYST_REPORT": [
-                "【机构内参】维持 {symbol} ‘买入’评级，目标价上调 15%。",
-                "深研报告：{symbol} 在当前宏观环境下具有极强的防御属性。",
-                "风险警示：{symbol} 的资产负债率已接近行业预警线。",
-                "行业透视：{symbol} 正在通过 AI 转型重塑其核心竞争力。",
-                "摩根大通分析：{symbol} 的现金流状况足以支持其三年的研发投入。",
-                "行业蓝皮书：{symbol} 在细分市场的占有率已达到 45% 的统治地位。",
-            ],
-            "OMEN": [
-                "外交部发言人对 {symbol} 所在地区的局势表示深切关注。",
-                "监测到 {symbol} 总部大楼连续三晚彻夜通明。",
-                "大宗交易系统出现针对 {symbol} 的异常看跌期权成交。",
-                "卫星图像显示 {symbol} 的主要工厂外围有大量军方车辆出入。",
-            ],
-            "MAJOR_EVENT": [
-                "【紧急公告】{symbol} 宣布由于不可抗力暂停所有生产活动。",
-                "突发新闻：针对 {symbol} 的反垄断法案在议会高票通过。",
-                "重大突破：{symbol} 宣布其划时代的‘量子能源’已实现商业化落地。",
-                "地缘政经：跨国禁令正式生效，{symbol} 失去其主要海外市场渠道。",
-            ]
-        }
-        
+        templates = self._preset_templates()
         kind_key = kind.upper()
         pool = templates.get(kind_key, templates["RUMOR"])
         text = random.choice(pool)
         
         symbol_str = ", ".join(symbols) if symbols else "某知名企业"
         return text.format(symbol=symbol_str)
+
+    def get_preset_templates(self, kind: str, symbols: List[str]) -> List[str]:
+        templates = self._preset_templates()
+        kind_key = kind.upper()
+        pool = templates.get(kind_key, templates["RUMOR"])
+        symbol_str = ", ".join(symbols) if symbols else "某知名企业"
+        return [str(t).format(symbol=symbol_str) for t in pool]
 
     @staticmethod
     def _follow_tx(tx, params: Dict[str, Any]) -> None:

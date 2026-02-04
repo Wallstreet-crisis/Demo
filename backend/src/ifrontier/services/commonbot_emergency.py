@@ -20,6 +20,8 @@ from ifrontier.services.game_time import load_game_time_config_from_env
 from ifrontier.services.market_session import MarketPhase, get_market_session
 from ifrontier.infra.sqlite.market import get_price_series
 from ifrontier.services.news import NewsService
+from ifrontier.services.matching import submit_limit_order
+from ifrontier.app.ws import hub
 
 
 @dataclass(frozen=True)
@@ -67,7 +69,7 @@ class CommonBotEmergencyRunner:
         self._market_data_provider = market_data_provider
         self._pending_market_open: _PendingMarketOpenReaction | None = None
 
-    def maybe_react(
+    async def maybe_react(
         self,
         *,
         broadcast_event: EventEnvelopeJson,
@@ -127,10 +129,33 @@ class CommonBotEmergencyRunner:
                 if trade_json is not None:
                     self._event_store.append(trade_json)
                     emitted.append(trade_json)
+                    
+                    # 真正提交订单进入撮合引擎
+                    try:
+                        side = str(trade_json.payload.get("side"))
+                        price = float(trade_json.payload.get("price_hint") or 0.0)
+                        size = float(trade_json.payload.get("size") or 1.0)
+                        
+                        _order_id, matches = submit_limit_order(
+                            account_id=cohort.account_id,
+                            symbol=symbol,
+                            side=side,
+                            price=price,
+                            quantity=size,
+                        )
+                        # 广播成交事件
+                        for m in matches:
+                            ev = m.executed_event.model_dump()
+                            await hub.broadcast_json("events", ev)
+                            ev_type = ev.get("event_type")
+                            if ev_type:
+                                await hub.broadcast_json(str(ev_type), ev)
+                    except Exception as e:
+                        print(f"[CommonBotEmergency:maybe_react] Order failed for {cohort.bot_id}: {e}")
 
         return emitted
 
-    def maybe_react_on_market_open(self) -> List[EventEnvelopeJson]:
+    async def maybe_react_on_market_open(self) -> List[EventEnvelopeJson]:
         cfg = load_game_time_config_from_env()
         session = get_market_session(cfg=cfg)
         if session.phase != MarketPhase.TRADING:
@@ -169,6 +194,29 @@ class CommonBotEmergencyRunner:
                 if trade_json is not None:
                     self._event_store.append(trade_json)
                     emitted.append(trade_json)
+
+                    # 真正提交订单进入撮合引擎
+                    try:
+                        side = str(trade_json.payload.get("side"))
+                        price = float(trade_json.payload.get("price_hint") or 0.0)
+                        size = float(trade_json.payload.get("size") or 1.0)
+
+                        _order_id, matches = submit_limit_order(
+                            account_id=cohort.account_id,
+                            symbol=symbol,
+                            side=side,
+                            price=price,
+                            quantity=size,
+                        )
+                        # 广播成交事件
+                        for m in matches:
+                            ev = m.executed_event.model_dump()
+                            await hub.broadcast_json("events", ev)
+                            ev_type = ev.get("event_type")
+                            if ev_type:
+                                await hub.broadcast_json(str(ev_type), ev)
+                    except Exception as e:
+                        print(f"[CommonBotEmergency:open] Order failed for {cohort.bot_id}: {e}")
 
         return emitted
 

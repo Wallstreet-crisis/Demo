@@ -29,7 +29,7 @@ class OpenRouterClient:
         if not api_key:
             return None
 
-        model = os.getenv("OPENROUTER_MODEL") or "google/gemini-flash-2.5"
+        model = os.getenv("OPENROUTER_MODEL") or "google/gemini-2.5-flash"
         base_url = os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1"
         timeout = float(os.getenv("OPENROUTER_TIMEOUT_SECONDS") or "20")
 
@@ -59,9 +59,14 @@ class OpenRouterClient:
         }
 
         headers = {
-            "Authorization": f"Bearer {self._cfg.api_key}",
+            "Authorization": f"Bearer {self._cfg.api_key[:8]}...{self._cfg.api_key[-4:]}",
             "Content-Type": "application/json",
         }
+        print(f"[LLM] Request Headers (masked): {headers}")
+        
+        # 恢复真实 headers 用于发送
+        headers["Authorization"] = f"Bearer {self._cfg.api_key}"
+
         if extra_headers:
             headers.update(extra_headers)
 
@@ -74,13 +79,22 @@ class OpenRouterClient:
 
         try:
             with request.urlopen(req, timeout=self._cfg.timeout_seconds) as resp:
+                print(f"[LLM] OpenRouter Response Status: {resp.status}")
                 raw = resp.read().decode("utf-8")
         except Exception as exc:
+            print(f"[LLM] OpenRouter Connection Error: {exc}")
+            if hasattr(exc, 'read'):
+                err_body = exc.read().decode("utf-8")
+                print(f"[LLM] Error Body: {err_body}")
             raise OpenRouterError(str(exc)) from exc
 
         try:
-            return json.loads(raw)
+            res = json.loads(raw)
+            if "error" in res:
+                print(f"[LLM] OpenRouter API Error: {res['error']}")
+            return res
         except Exception as exc:
+            print(f"[LLM] JSON Parse Error. Raw: {raw[:500]}...")
             raise OpenRouterError(f"invalid json response: {raw[:2000]}") from exc
 
 

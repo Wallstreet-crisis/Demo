@@ -114,6 +114,19 @@ def update_order_quantity_and_status(order_id: str, new_quantity: float, new_sta
         )
 
 
+def cancel_orders_by_account(account_id: str, symbol: Optional[str] = None) -> int:
+    conn = get_connection()
+    sql = "UPDATE orders SET status = 'CANCELLED', quantity_remaining = 0 WHERE account_id = ? AND status IN ('OPEN', 'PARTIAL_FILLED')"
+    params = [account_id]
+    if symbol:
+        sql += " AND symbol = ?"
+        params.append(symbol)
+    
+    with conn:
+        res = conn.execute(sql, params)
+        return res.rowcount
+
+
 def fetch_best_opposite_orders(symbol: str, side: str) -> List[Order]:
     """Return candidate opposite LIMIT orders sorted by price/time.
 

@@ -45,6 +45,55 @@ class NewsTickEngine:
         self._news = news_service
         self._commonbot_emergency_runner = CommonBotEmergencyRunner(news=self._news, event_store=self._event_store)
 
+    def suppress_propagation(
+        self,
+        *,
+        actor_id: str,
+        chain_id: str,
+        spend_influence: float,
+        signal_class: str | None = None,
+        scope: str = "chain",
+        correlation_id: UUID | None = None,
+    ) -> EventEnvelopeJson:
+        if spend_influence <= 0:
+            raise ValueError("spend_influence must be > 0")
+
+        now = datetime.now(timezone.utc)
+        suppression_id = str(uuid4())
+        sc = str(signal_class or "ANY")
+
+        with self._driver.session() as session:
+            ok = session.execute_write(
+                self._add_suppression_tx,
+                {
+                    "chain_id": str(chain_id),
+                    "spend": float(spend_influence),
+                    "signal_class": sc,
+                },
+            )
+        if not ok:
+            raise ValueError("chain not found")
+
+        payload = NewsPropagationSuppressedPayload(
+            suppression_id=suppression_id,
+            actor_id=str(actor_id),
+            target_chain_id=str(chain_id),
+            target_card_id=None,
+            target_variant_id=None,
+            spend_influence=float(spend_influence),
+            scope=str(scope or "chain"),
+            suppressed_at=now,
+        )
+        env = EventEnvelope[NewsPropagationSuppressedPayload](
+            event_type=EventType.NEWS_PROPAGATION_SUPPRESSED,
+            correlation_id=correlation_id or uuid4(),
+            actor=EventActor(user_id=str(actor_id)),
+            payload=payload,
+        )
+        event_json = EventEnvelopeJson.from_envelope(env)
+        self._event_store.append(event_json)
+        return event_json
+
     def start_chain(
         self,
         *,
@@ -56,6 +105,7 @@ class NewsTickEngine:
         abort_probability: float,
         grant_count: int,
         seed: int,
+        symbols: List[str] | None = None,
         correlation_id: UUID | None = None,
     ) -> Dict[str, Any]:
         if t0_seconds <= 0:
@@ -86,13 +136,14 @@ class NewsTickEngine:
             "phase": "INCUBATING",
             "t0_at": t0_at.isoformat(),
             "abort_probability": float(abort_probability),
+            "symbols": symbols or [],
         }
         major_card_id, card_event_json = self._news.create_card(
             kind=kind,
             image_anchor_id=None,
             image_uri=None,
             truth_payload=truth_payload,
-            symbols=[],
+            symbols=symbols or [],
             tags=["chain"],
             actor_id=actor_id,
             correlation_id=correlation_id,
@@ -113,6 +164,7 @@ class NewsTickEngine:
                     "abort_probability": float(abort_probability),
                     "grant_count": int(grant_count),
                     "seed": int(seed),
+                    "symbols": symbols or [],
                 },
             )
 
@@ -141,77 +193,24 @@ class NewsTickEngine:
             "t0_at": t0_at,
         }
 
-    def tick(
+    async def tick(
         self,
         *,
         now: datetime | None = None,
         limit: int = 50,
     ) -> Dict[str, Any]:
-        now = now or datetime.now(timezone.utc)
-        if now.tzinfo is None:
-            now = now.replace(tzinfo=timezone.utc)
+        if now is None:
+            now = datetime.now(timezone.utc)
 
-        with self._driver.session() as session:
-            chains = session.execute_read(
-                self._list_due_chains_tx,
-                {"now": now.isoformat(), "limit": int(limit)},
-            )
+        chains = self._list_active_chains(now=now, limit=limit)
 
         results: List[Dict[str, Any]] = []
         for c in chains:
-            results.append(self._tick_one_chain(now=now, chain=dict(c)))
+            results.append(await self._tick_one_chain(now=now, chain=dict(c)))
 
         return {"now": now.isoformat(), "chains": results}
 
-    def suppress_propagation(
-        self,
-        *,
-        actor_id: str,
-        chain_id: str,
-        spend_influence: float,
-        signal_class: str | None = None,
-        scope: str = "chain",
-        correlation_id: UUID | None = None,
-    ) -> EventEnvelopeJson:
-        if spend_influence <= 0:
-            raise ValueError("spend_influence must be > 0")
-
-        now = datetime.now(timezone.utc)
-        suppression_id = str(uuid4())
-
-        with self._driver.session() as session:
-            ok = session.execute_write(
-                self._add_suppression_tx,
-                {
-                    "chain_id": chain_id,
-                    "spend": float(spend_influence),
-                    "signal_class": signal_class,
-                },
-            )
-        if not ok:
-            raise ValueError("chain not found")
-
-        payload = NewsPropagationSuppressedPayload(
-            suppression_id=suppression_id,
-            actor_id=actor_id,
-            target_chain_id=chain_id,
-            target_card_id=None,
-            target_variant_id=None,
-            spend_influence=float(spend_influence),
-            scope=scope,
-            suppressed_at=now,
-        )
-        env = EventEnvelope[NewsPropagationSuppressedPayload](
-            event_type=EventType.NEWS_PROPAGATION_SUPPRESSED,
-            correlation_id=correlation_id or uuid4(),
-            actor=EventActor(user_id=actor_id),
-            payload=payload,
-        )
-        event_json = EventEnvelopeJson.from_envelope(env)
-        self._event_store.append(event_json)
-        return event_json
-
-    def _tick_one_chain(self, *, now: datetime, chain: Dict[str, Any]) -> Dict[str, Any]:
+    async def _tick_one_chain(self, *, now: datetime, chain: Dict[str, Any]) -> Dict[str, Any]:
         chain_id = str(chain["chain_id"])
         major_card_id = str(chain["major_card_id"])
         kind = str(chain["kind"])
@@ -222,6 +221,7 @@ class NewsTickEngine:
         abort_probability = float(chain["abort_probability"])
         grant_count = int(chain["grant_count"])
         seed = int(chain["seed"])
+        symbols = chain.get("symbols") or []
 
         rnd = random.Random(f"{chain_id}:{seed}")
 
@@ -249,13 +249,13 @@ class NewsTickEngine:
                     "signal_strength": int(rnd.randint(1, 3)),
                     "t_minus_seconds": int((t0_at - now).total_seconds()),
                 },
-                symbols=[],
+                symbols=symbols,
                 tags=["omen"],
                 actor_id="system",
                 correlation_id=None,
             )
 
-            omen_text = self._news.get_preset_template(kind="OMEN", symbols=[])
+            omen_text = self._news.get_preset_template(kind="OMEN", symbols=symbols)
             omen_variant_id, omen_variant_event = self._news.emit_variant(
                 card_id=omen_card_id,
                 author_id="system",
@@ -310,9 +310,9 @@ class NewsTickEngine:
             outcome = "ABORTED" if aborted else "RESOLVED"
 
             if not aborted:
-                final_text = self._news.get_preset_template(kind="MAJOR_EVENT", symbols=[])
+                final_text = self._news.get_preset_template(kind=kind, symbols=symbols)
             else:
-                final_text = "计划中的重大事件由于未知干扰已流产。"
+                final_text = f"计划中的 {kind} 事件由于未知干扰已流产。"
 
             final_variant_id, final_variant_event = self._news.emit_variant(
                 card_id=major_card_id,
@@ -385,7 +385,7 @@ class NewsTickEngine:
                     correlation_id=None,
                 )
                 if broadcast_event is not None:
-                    emergency_events = self._commonbot_emergency_runner.maybe_react(
+                    emergency_events = await self._commonbot_emergency_runner.maybe_react(
                         broadcast_event=broadcast_event,
                         force=True,
                     )
@@ -408,6 +408,20 @@ class NewsTickEngine:
 
         return out
 
+    def _list_active_chains(self, *, now: datetime, limit: int = 50) -> List[Dict[str, Any]]:
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        now = now.astimezone(timezone.utc)
+
+        with self._driver.session() as session:
+            return session.execute_read(
+                self._list_due_chains_tx,
+                {
+                    "now": now.isoformat(),
+                    "limit": int(limit),
+                },
+            )
+
     @staticmethod
     def _create_chain_tx(tx, params: Dict[str, Any]) -> None:
         tx.run(
@@ -422,7 +436,8 @@ class NewsTickEngine:
                 ch.omen_interval_seconds = $omen_interval_seconds,
                 ch.abort_probability = $abort_probability,
                 ch.grant_count = $grant_count,
-                ch.seed = $seed
+                ch.seed = $seed,
+                ch.symbols = $symbols
             """,
             **params,
         )
@@ -497,7 +512,8 @@ class NewsTickEngine:
                    ch.omen_interval_seconds AS omen_interval_seconds,
                    ch.abort_probability AS abort_probability,
                    ch.grant_count AS grant_count,
-                   ch.seed AS seed
+                   ch.seed AS seed,
+                   ch.symbols AS symbols
             ORDER BY ch.t0_at ASC
             LIMIT $limit
             """,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Api, ApiError } from '../api'
+import { Api, ApiError, type NewsStoreCatalogItem } from '../api'
 import { useAppSession } from '../app/context'
 import { useNotification } from '../app/NotificationContext'
 import CyberWidget from './CyberWidget'
@@ -10,11 +10,15 @@ export default function PropagandaWidget() {
   
   const [loading, setLoading] = useState(false)
   const [ownedCards, setOwnedCards] = useState<string[]>([])
+
+  const [storeItems, setStoreItems] = useState<NewsStoreCatalogItem[]>([])
+  const [loadingStore, setLoadingStore] = useState(false)
   
   // Purchase
   const [purchaseKind, setPurchaseKind] = useState('RUMOR')
-  const [purchasePrice] = useState(100)
+  const [purchasePrice, setPurchasePrice] = useState(100)
   const [purchaseText, setPurchaseText] = useState('')
+  const [purchasePresetId, setPurchasePresetId] = useState('')
 
   // Propagation
   const [targetVariantId, setTargetVariantId] = useState('')
@@ -35,16 +39,71 @@ export default function PropagandaWidget() {
     refreshOwned()
   }, [refreshOwned])
 
+  const refreshStoreCatalog = useCallback(async () => {
+    setLoadingStore(true)
+    try {
+      const r = await Api.newsStoreCatalog()
+      const items = Array.isArray(r.items) ? r.items : []
+      setStoreItems(items)
+
+      if (items.length > 0) {
+        const selected = items.find((x) => x.kind === purchaseKind) ?? items[0]
+        if (selected) {
+          setPurchaseKind(selected.kind)
+          setPurchasePrice(Number(selected.price_cash))
+          const p0 = selected.presets?.[0]?.preset_id ?? ''
+          setPurchasePresetId(p0)
+          setPurchaseText(String(selected.presets?.[0]?.text ?? selected.preview_text ?? ''))
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch store catalog', e)
+      setStoreItems([])
+    } finally {
+      setLoadingStore(false)
+    }
+  }, [purchaseKind])
+
+  useEffect(() => {
+    refreshStoreCatalog()
+  }, [refreshStoreCatalog])
+
+  useEffect(() => {
+    const selected = storeItems.find((x) => x.kind === purchaseKind) ?? null
+    if (!selected) return
+    setPurchasePrice(Number(selected.price_cash))
+    const nextPreset = selected.presets?.find((p) => p.preset_id === purchasePresetId) ?? selected.presets?.[0] ?? null
+    if (nextPreset) {
+      setPurchasePresetId(nextPreset.preset_id)
+      setPurchaseText(String(nextPreset.text ?? ''))
+    } else {
+      setPurchasePresetId('')
+      setPurchaseText(String(selected.preview_text ?? ''))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purchaseKind, storeItems])
+
+  useEffect(() => {
+    const selected = storeItems.find((x) => x.kind === purchaseKind) ?? null
+    if (!selected) return
+    const chosen = selected.presets?.find((p) => p.preset_id === purchasePresetId) ?? null
+    if (chosen) setPurchaseText(String(chosen.text ?? ''))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purchasePresetId])
+
   const handlePurchase = async () => {
     setLoading(true)
     try {
+      const selected = storeItems.find((x) => x.kind === purchaseKind) ?? null
+      const reqSymbols = selected?.requires_symbols ? [symbol] : []
+      const presetId = purchasePresetId || (selected?.presets?.[0]?.preset_id ?? null)
       const r = await Api.newsStorePurchase({
         buyer_user_id: `user:${playerId}`,
         kind: purchaseKind,
         price_cash: purchasePrice,
-        symbols: [symbol],
+        preset_id: presetId,
+        symbols: reqSymbols,
         tags: [],
-        initial_text: purchaseText,
       })
       notify('success', `INTEL_ACQUIRED: ${r.kind}`)
       if (r.variant_id) setTargetVariantId(r.variant_id)
@@ -94,17 +153,34 @@ export default function PropagandaWidget() {
             className="cyber-input" 
             value={purchaseKind} 
             onChange={e => setPurchaseKind(e.target.value)}
+            disabled={loadingStore}
             style={{ fontSize: '12px', height: '32px' }}
           >
-            <option value="RUMOR">RUMOR ($100)</option>
-            <option value="LEAK">LEAK ($500)</option>
-            <option value="ANALYST_REPORT">REPORT ($2000)</option>
+            {storeItems.map((it) => (
+              <option key={it.kind} value={it.kind}>
+                {it.kind}
+              </option>
+            ))}
+            {storeItems.length === 0 && <option value={purchaseKind}>{purchaseKind}</option>}
+          </select>
+          <select
+            className="cyber-input"
+            value={purchasePresetId}
+            onChange={e => setPurchasePresetId(e.target.value)}
+            disabled={loadingStore}
+            style={{ fontSize: '12px', height: '32px' }}
+          >
+            {(storeItems.find((x) => x.kind === purchaseKind)?.presets ?? []).map((p) => (
+              <option key={p.preset_id} value={p.preset_id}>
+                {p.preset_id}
+              </option>
+            ))}
+            {!storeItems.find((x) => x.kind === purchaseKind)?.presets?.length && <option value="">(no presets)</option>}
           </select>
           <textarea 
             className="cyber-input"
-            placeholder="CUSTOM_TEXT_OVERRIDE..."
             value={purchaseText}
-            onChange={e => setPurchaseText(e.target.value)}
+            readOnly
             style={{ fontSize: '11px', minHeight: '60px', resize: 'none', background: 'var(--terminal-bg)' }}
           />
           <button 

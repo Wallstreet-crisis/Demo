@@ -316,10 +316,28 @@ export type NewsOwnedCardsResponse = {
   cards: string[]
 }
 
+export type NewsStoreCatalogItem = {
+  kind: string
+  price_cash: number
+  requires_symbols?: boolean
+  preview_text: string
+  presets?: NewsStoreCatalogPreset[]
+}
+
+export type NewsStoreCatalogResponse = {
+  items: NewsStoreCatalogItem[]
+}
+
+export type NewsStoreCatalogPreset = {
+  preset_id: string
+  text: string
+}
+
 export type NewsStorePurchaseRequest = {
   buyer_user_id: string
   kind: string
   price_cash: number
+  preset_id?: string | null
   image_anchor_id?: string | null
   image_uri?: string | null
   truth_payload?: Record<string, unknown> | null

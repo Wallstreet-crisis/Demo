@@ -6,6 +6,7 @@ from typing import List
 from ifrontier.infra.sqlite.db import get_connection
 from ifrontier.infra.sqlite.ledger import create_account
 from ifrontier.infra.sqlite.securities import list_securities
+from ifrontier.infra.sqlite.hosting import upsert_hosting_state
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,9 @@ def init_bot_accounts() -> None:
             if not row:
                 create_account(p.account_id, owner_type=p.owner_type, initial_cash=p.initial_cash)
             
+            # 默认开启机器人的 AI 托管
+            upsert_hosting_state(user_id=p.account_id, enabled=True, status="ON_IDLE")
+
             # 即使账户已存在，也确保机构（做市商）持有足够的初始证券以供卖出
             if p.owner_type == "bot_institution" and symbols:
                 for sym in symbols:
@@ -50,8 +54,3 @@ def init_bot_accounts() -> None:
                         "INSERT OR IGNORE INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?)",
                         (p.account_id, sym, 100000.0)
                     )
-
-
-        # 简化说明：
-        # 初版 Bot 初始持仓为 0（不凭空造股）。因此 SELL 下单可能失败，直到你显式分配持仓。
-        # 你后续可以在这里插入 positions 作为“创世分配”的一部分。

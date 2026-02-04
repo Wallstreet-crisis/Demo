@@ -228,11 +228,15 @@ export default function CandlestickChart({ candles, height = 300, width = 600 }:
         })}
 
         {/* Time Labels */}
-        {candles.length > 0 && [0, Math.floor(candles.length / 2), candles.length - 1].map(idx => (
-          <text key={`t-${idx}`} x={scaleX(idx)} y={height - 10} fill="#64748b" fontSize="9" fontFamily="monospace" textAnchor="middle">
-            {new Date(candles[idx].bucket_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </text>
-        ))}
+        {candles.length > 0 && Array.from(new Set([0, Math.floor(candles.length / 2), candles.length - 1])).filter(idx => idx >= 0 && idx < candles.length).map(idx => {
+          const c = candles[idx];
+          if (!c) return null;
+          return (
+            <text key={`chart-time-label-${c.bucket_start}-${idx}`} x={scaleX(idx)} y={height - 10} fill="#64748b" fontSize="9" fontFamily="monospace" textAnchor="middle">
+              {new Date(c.bucket_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </text>
+          );
+        })}
       </svg>
     </div>
   )

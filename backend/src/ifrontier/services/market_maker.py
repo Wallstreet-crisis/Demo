@@ -22,11 +22,20 @@ class MarketMaker:
     def tick_once(self) -> List[MatchResult]:
         create_account(self._cfg.account_id, owner_type="bot_institution", initial_cash=0.0)
 
+        from ifrontier.infra.sqlite.orders import cancel_orders_by_account
+        # 每次 Tick 前先清理旧挂单，保持盘口新鲜
+        cancel_orders_by_account(self._cfg.account_id)
+
+        import random
         all_matches = []
         for sec in list_securities(status="TRADABLE"):
             mid = get_last_price(sec.symbol) or float(sec.seed_price)
             if mid <= 0:
                 continue
+
+            # 模拟微幅价格呼吸效应 (+/- 0.1%)
+            breathing = 1.0 + random.uniform(-0.001, 0.001)
+            mid *= breathing
 
             bid = float(mid) * (1.0 - float(self._cfg.spread_pct) / 2.0)
             ask = float(mid) * (1.0 + float(self._cfg.spread_pct) / 2.0)
