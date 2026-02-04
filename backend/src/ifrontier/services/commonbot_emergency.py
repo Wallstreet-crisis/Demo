@@ -30,6 +30,7 @@ class CommonBotCohortConfig:
     bot_id: str
     account_id: str
     use_llm: bool
+    is_insider: bool = False
     max_news_items: int = 10
 
 
@@ -39,6 +40,7 @@ class _PendingMarketOpenReaction:
     variant_id: str
     news_text: str
     symbols: List[str]
+    truth_payload: Dict[str, Any]
 
 
 class CommonBotEmergencyRunner:
@@ -53,10 +55,10 @@ class CommonBotEmergencyRunner:
         self._news = news
         self._event_store = event_store
         self._cohorts = cohorts or [
-            CommonBotCohortConfig(cohort_id=f"ret:{i}", bot_id=f"commonbot:ret:{i}", account_id=f"bot:ret:{i}", use_llm=True)
+            CommonBotCohortConfig(cohort_id=f"ret:{i}", bot_id=f"commonbot:ret:{i}", account_id=f"bot:ret:{i}", use_llm=True, is_insider=False)
             for i in range(1, 11)
         ] + [
-            CommonBotCohortConfig(cohort_id=f"inst:{i}", bot_id=f"commonbot:inst:{i}", account_id=f"bot:inst:{i}", use_llm=True)
+            CommonBotCohortConfig(cohort_id=f"inst:{i}", bot_id=f"commonbot:inst:{i}", account_id=f"bot:inst:{i}", use_llm=True, is_insider=True)
             for i in range(1, 4)
         ]
         self._market_data_provider = market_data_provider
@@ -81,7 +83,13 @@ class CommonBotEmergencyRunner:
         if not variant_id:
             return []
 
-        variant_text, symbols = self._load_variant_text_and_symbols(variant_id)
+        ctx_news = self._load_variant_context(variant_id)
+        variant_text = str(ctx_news.get("text") or "")
+        symbols = ctx_news.get("symbols") or []
+        truth_payload = ctx_news.get("truth_payload") or {}
+        author_id = str(ctx_news.get("author_id") or "system")
+        mutation_depth = int(ctx_news.get("mutation_depth") or 0)
+
         if not symbols:
             # v0.1: 对于 WORLD_EVENT 等可能影响全局的新闻，如果没定义符号，则赋予默认关键证券
             # 确保 CommonBot 能够对重大新闻产生市场反应
@@ -109,6 +117,10 @@ class CommonBotEmergencyRunner:
                     correlation_id=corr,
                     news_text="\n".join(ctx.recent_news_texts),
                     use_llm=cohort.use_llm,
+                    truth_payload=truth_payload,
+                    is_insider=cohort.is_insider,
+                    author_id=author_id,
+                    mutation_depth=mutation_depth,
                 )
 
                 self._event_store.append(decision_json)
@@ -121,6 +133,7 @@ class CommonBotEmergencyRunner:
                         variant_id=variant_id,
                         news_text=variant_text,
                         symbols=list(symbols),
+                        truth_payload=truth_payload,
                     )
                     continue
 
@@ -186,6 +199,10 @@ class CommonBotEmergencyRunner:
         # 清除 pending，避免反复触发
         self._pending_market_open = None
 
+        ctx_news = self._load_variant_context(pending.variant_id)
+        author_id = str(ctx_news.get("author_id") or "system")
+        mutation_depth = int(ctx_news.get("mutation_depth") or 0)
+
         emitted: List[EventEnvelopeJson] = []
         for cohort in self._cohorts:
             ctx = self._build_shared_context(
@@ -206,6 +223,10 @@ class CommonBotEmergencyRunner:
                     correlation_id=pending.correlation_id,
                     news_text="\n".join(ctx.recent_news_texts),
                     use_llm=cohort.use_llm,
+                    truth_payload=pending.truth_payload,
+                    is_insider=cohort.is_insider,
+                    author_id=author_id,
+                    mutation_depth=mutation_depth,
                 )
                 self._event_store.append(decision_json)
                 emitted.append(decision_json)
@@ -303,14 +324,9 @@ class CommonBotEmergencyRunner:
             trends=trends,
         )
 
-    def _load_variant_text_and_symbols(self, variant_id: str) -> Tuple[str, List[str]]:
+    def _load_variant_context(self, variant_id: str) -> Dict[str, Any]:
         rec = self._news.get_variant_context(variant_id=variant_id)
-        text = str((rec or {}).get("text") or "")
-        symbols = rec.get("symbols") if isinstance(rec, dict) else None
-        if not isinstance(symbols, list):
-            symbols = []
-        symbols = [str(s) for s in symbols if s]
-        return text, symbols
+        return rec or {}
 
     async def react_to_delivery(
         self,
@@ -329,7 +345,13 @@ class CommonBotEmergencyRunner:
 
         print(f"[CommonBotEmergency:react_to_delivery] Bot {to_player_id} reacting to news {variant_id}")
         
-        variant_text, symbols = self._load_variant_text_and_symbols(variant_id)
+        ctx_news = self._load_variant_context(variant_id)
+        variant_text = str(ctx_news.get("text") or "")
+        symbols = ctx_news.get("symbols") or []
+        truth_payload = ctx_news.get("truth_payload") or {}
+        author_id = str(ctx_news.get("author_id") or "system")
+        mutation_depth = int(ctx_news.get("mutation_depth") or 0)
+
         if not symbols:
             symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
 
@@ -352,6 +374,10 @@ class CommonBotEmergencyRunner:
                 correlation_id=corr,
                 news_text="\n".join(ctx.recent_news_texts),
                 use_llm=target_cohort.use_llm,
+                truth_payload=truth_payload,
+                is_insider=target_cohort.is_insider,
+                author_id=author_id,
+                mutation_depth=mutation_depth,
             )
             self._event_store.append(decision_json)
             emitted.append(decision_json)

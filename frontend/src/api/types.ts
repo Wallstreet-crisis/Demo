@@ -8,6 +8,18 @@ export type MarketQuoteResponse = {
   ma_5: number | null
   ma_20: number | null
   vol_20: number | null
+  high_24h?: number | null
+  low_24h?: number | null
+  volume_24h?: number | null
+}
+
+export type MarketSummaryResponse = {
+  total_turnover: number
+  total_trades: number
+  top_gainers: { symbol: string; last_price: number; change_pct: number }[]
+  top_losers: { symbol: string; last_price: number; change_pct: number }[]
+  active_symbols: { symbol: string; volume: number; turnover: number }[]
+  refreshed_at: string
 }
 
 export type MarketSeriesResponse = {

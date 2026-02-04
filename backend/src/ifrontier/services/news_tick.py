@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -49,6 +50,10 @@ class NewsTickEngine:
             event_store=self._event_store,
             market_data_provider=get_market_trends
         )
+        # 初始化为过去的某个时间，确保启动后立即触发首轮投放
+        past = datetime.now(timezone.utc) - timedelta(hours=1)
+        self._last_small_news_at: datetime | None = past
+        self._last_chain_at: datetime | None = past
 
     def suppress_propagation(
         self,
@@ -112,6 +117,7 @@ class NewsTickEngine:
         seed: int,
         symbols: List[str] | None = None,
         correlation_id: UUID | None = None,
+        extra_truth: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         if t0_seconds <= 0:
             raise ValueError("t0_seconds must be > 0")
@@ -138,11 +144,16 @@ class NewsTickEngine:
 
         truth_payload = {
             "chain_id": chain_id,
+            "kind": kind,
+            "system_spawn": True, # 标识为系统生成的权威事件
             "phase": "INCUBATING",
             "t0_at": t0_at.isoformat(),
             "abort_probability": float(abort_probability),
             "symbols": symbols or [],
         }
+        if extra_truth:
+            truth_payload.update(extra_truth)
+
         major_card_id, card_event_json = self._news.create_card(
             kind=kind,
             image_anchor_id=None,
@@ -207,13 +218,175 @@ class NewsTickEngine:
         if now is None:
             now = datetime.now(timezone.utc)
 
+        # 0) 定期生成新的系统新闻
+        spawn_events = await self._periodic_spawn(now=now)
+
         chains = self._list_active_chains(now=now, limit=limit)
 
         results: List[Dict[str, Any]] = []
         for c in chains:
             results.append(await self._tick_one_chain(now=now, chain=dict(c)))
 
-        return {"now": now.isoformat(), "chains": results}
+        return {
+            "now": now.isoformat(), 
+            "chains": results,
+            "spawned_events": spawn_events
+        }
+
+    async def _periodic_spawn(self, *, now: datetime) -> List[Dict[str, Any]]:
+        """系统自动投放逻辑：每隔一段时间尝试生成一条新闻"""
+        spawned_events: List[Dict[str, Any]] = []
+        
+        # 1) 小新闻投放 (每 60s 触发)
+        if self._last_small_news_at is None or (now - self._last_small_news_at).total_seconds() >= 60:
+            self._last_small_news_at = now
+            kind = random.choice(["RUMOR", "LEAK", "ANALYST_REPORT"])
+            from ifrontier.infra.sqlite.securities import list_securities
+            secs = [s.symbol for s in list_securities(status="TRADABLE")]
+            if secs:
+                target_symbol = random.choice(secs)
+                text = self._news.get_preset_template(kind=kind, symbols=[target_symbol])
+                
+                # 随机生成一个利好或利空倾向
+                impact_direction = random.choice(["UP", "DOWN", "STABLE"])
+                
+                # 增加 kind 信息，方便机器人识别新闻类型
+                truth_payload = {
+                    "system_spawn": True, 
+                    "direction": impact_direction,
+                    "kind": kind
+                }
+                
+                card_id, card_ev = self._news.create_card(
+                    kind=kind,
+                    image_anchor_id=None,
+                    image_uri=None,
+                    truth_payload=truth_payload,
+                    symbols=[target_symbol],
+                    tags=["system_spawn"],
+                    actor_id="system"
+                )
+                variant_id, var_ev = self._news.emit_variant(
+                    card_id=card_id,
+                    author_id="system",
+                    text=text
+                )
+                spawned_events.append(card_ev.model_dump(mode="json"))
+                spawned_events.append(var_ev.model_dump(mode="json"))
+                
+                users = self._news.list_users(limit=5000)
+                if users:
+                    # 随机挑选 1-5 个幸运玩家投递
+                    lucky_ones = random.sample(users, min(len(users), random.randint(1, 5)))
+                    for uid in lucky_ones:
+                        _deliv_id, deliv_ev = self._news.deliver_variant(
+                            variant_id=variant_id,
+                            to_player_id=str(uid),
+                            from_actor_id="system",
+                            visibility_level="NORMAL",
+                            delivery_reason="SYSTEM_SPAWN"
+                        )
+                        spawned_events.append(deliv_ev.model_dump(mode="json"))
+                        
+                        # 立即触发机器人对该投递的反应
+                        emergency_events = await self._commonbot_emergency_runner.react_to_delivery(delivery_event=deliv_ev)
+                        for eev in emergency_events:
+                            spawned_events.append(eev.model_dump(mode="json"))
+                            
+                    print(f"[NewsTick:Spawn] Spawned {kind} for {target_symbol} to {len(lucky_ones)} users. Bias: {impact_direction}")
+
+        # 2) 重大事件链投放 (每 600s 触发)
+        if self._last_chain_at is None or (now - self._last_chain_at).total_seconds() >= 600:
+            self._last_chain_at = now
+            kind = random.choice(["MAJOR_EVENT", "WORLD_EVENT"])
+            from ifrontier.infra.sqlite.securities import list_securities
+            from ifrontier.domain.assets.profile import get_profile
+            
+            all_secs = list_securities(status="TRADABLE")
+            if all_secs:
+                # 核心联动逻辑：
+                # 1. WAR (战争) -> MILITARY/ENERGY (UP), FINANCE/CONSUMER/LOGISTICS (DOWN)
+                # 2. TECH_BREAKTHROUGH (技术突破) -> TECH/HEALTHCARE (UP), ENERGY (UP)
+                # 3. FINANCIAL_CRISIS (金融危机) -> FINANCE (DOWN), CONSUMER/TECH (DOWN), MILITARY (STABLE)
+                # 4. ENERGY_SHORTAGE (能源荒) -> ENERGY (UP), LOGISTICS/TECH (DOWN), CONSUMER (DOWN)
+                # 5. BIO_HAZARD (生化危机) -> HEALTHCARE (UP), CONSUMER/LOGISTICS (DOWN), TECH (STABLE)
+                
+                theme = random.choice(["WAR", "TECH_BREAKTHROUGH", "FINANCIAL_CRISIS", "ENERGY_SHORTAGE", "BIO_HAZARD"])
+                target_symbols = []
+                impact_map = {} # symbol -> direction
+                
+                if theme == "WAR":
+                    for s in all_secs:
+                        prof = get_profile(s.symbol)
+                        if prof:
+                            if prof.sector in ["MILITARY", "ENERGY"]:
+                                impact_map[s.symbol] = "UP"
+                                target_symbols.append(s.symbol)
+                            elif prof.sector in ["FINANCE", "CONSUMER", "LOGISTICS"]:
+                                impact_map[s.symbol] = "DOWN"
+                                target_symbols.append(s.symbol)
+                elif theme == "TECH_BREAKTHROUGH":
+                    for s in all_secs:
+                        prof = get_profile(s.symbol)
+                        if prof:
+                            if prof.sector in ["TECH", "HEALTHCARE", "ENERGY"]:
+                                impact_map[s.symbol] = "UP"
+                                target_symbols.append(s.symbol)
+                elif theme == "FINANCIAL_CRISIS":
+                    for s in all_secs:
+                        prof = get_profile(s.symbol)
+                        if prof:
+                            if prof.sector == "FINANCE":
+                                impact_map[s.symbol] = "DOWN"
+                                target_symbols.append(s.symbol)
+                            elif prof.sector in ["CONSUMER", "TECH"]:
+                                impact_map[s.symbol] = "DOWN"
+                                target_symbols.append(s.symbol)
+                elif theme == "ENERGY_SHORTAGE":
+                    for s in all_secs:
+                        prof = get_profile(s.symbol)
+                        if prof:
+                            if prof.sector == "ENERGY":
+                                impact_map[s.symbol] = "UP"
+                                target_symbols.append(s.symbol)
+                            elif prof.sector in ["LOGISTICS", "TECH", "CONSUMER"]:
+                                impact_map[s.symbol] = "DOWN"
+                                target_symbols.append(s.symbol)
+                elif theme == "BIO_HAZARD":
+                    for s in all_secs:
+                        prof = get_profile(s.symbol)
+                        if prof:
+                            if prof.sector == "HEALTHCARE":
+                                impact_map[s.symbol] = "UP"
+                                target_symbols.append(s.symbol)
+                            elif prof.sector in ["CONSUMER", "LOGISTICS"]:
+                                impact_map[s.symbol] = "DOWN"
+                                target_symbols.append(s.symbol)
+                
+                if not target_symbols:
+                    target_symbols = [random.choice(all_secs).symbol]
+                    impact_map[target_symbols[0]] = random.choice(["UP", "DOWN"])
+
+                # 限制参与标的数量，避免刷屏，但增加到 6 个以体现连锁反应
+                target_symbols = random.sample(target_symbols, min(len(target_symbols), 6))
+                final_impact_map = {s: impact_map[s] for s in target_symbols}
+
+                print(f"[NewsTick:Spawn] Starting system chain: {kind} ({theme}) for {target_symbols}")
+                res = self.start_chain(
+                    kind=kind,
+                    actor_id="system",
+                    t0_seconds=random.randint(60, 300), # 1-5 分钟后爆发
+                    omen_interval_seconds=random.randint(20, 45),
+                    abort_probability=0.15,
+                    grant_count=random.randint(3, 8),
+                    seed=random.randint(1, 1000000),
+                    symbols=target_symbols,
+                    extra_truth={"theme": theme, "impact_map": final_impact_map}
+                )
+                spawned_events.append(res["card_created_event"].model_dump(mode="json"))
+                spawned_events.append(res["chain_started_event"].model_dump(mode="json"))
+
+        return spawned_events
 
     async def _tick_one_chain(self, *, now: datetime, chain: Dict[str, Any]) -> Dict[str, Any]:
         chain_id = str(chain["chain_id"])
@@ -244,16 +417,28 @@ class NewsTickEngine:
                 requested=int(grant_count),
             )
             effective_grant_count = max(0, int(grant_count) - int(suppressed))
+            
+            # 从链的真相中提取针对各标的的冲击方向，传递给预兆
+            # 这允许内幕机器人通过预兆提前布局
+            chain_impact_map = chain.get("impact_map") or {}
+            
+            # 增强 OMEN 真真负载，标识为系统生成的预兆
+            omen_truth = {
+                "chain_id": chain_id,
+                "kind": "OMEN",
+                "system_spawn": True,
+                "signal_class": signal_class,
+                "signal_strength": int(rnd.randint(1, 3)),
+                "t_minus_seconds": int((t0_at - now).total_seconds()), # 后台可见，文本不可见
+            }
+            if chain_impact_map:
+                omen_truth["impact_map"] = chain_impact_map
+
             omen_card_id, omen_card_event = self._news.create_card(
                 kind="OMEN",
                 image_anchor_id=None,
                 image_uri=None,
-                truth_payload={
-                    "chain_id": chain_id,
-                    "signal_class": signal_class,
-                    "signal_strength": int(rnd.randint(1, 3)),
-                    "t_minus_seconds": int((t0_at - now).total_seconds()),
-                },
+                truth_payload=omen_truth,
                 symbols=symbols,
                 tags=["omen"],
                 actor_id="system",
@@ -344,13 +529,24 @@ class NewsTickEngine:
                 )
 
             # 记录 truth_revealed 与 chain_aborted 事件
+            final_truth = {
+                "chain_id": chain_id, 
+                "kind": kind,
+                "system_spawn": True,
+                "outcome": outcome
+            }
+            if chain.get("theme"):
+                final_truth["theme"] = chain["theme"]
+            if chain.get("impact_map"):
+                final_truth["impact_map"] = chain["impact_map"]
+
             truth_payload = NewsTruthRevealedPayload(
                 card_id=major_card_id,
                 chain_id=chain_id,
                 outcome=outcome,
                 image_anchor_id=None,
                 image_uri=None,
-                truth_payload={"chain_id": chain_id, "outcome": outcome},
+                truth_payload=final_truth,
                 revealed_at=now,
             )
             truth_env = EventEnvelope[NewsTruthRevealedPayload](
@@ -432,6 +628,8 @@ class NewsTickEngine:
 
     @staticmethod
     def _create_chain_tx(tx, params: Dict[str, Any]) -> None:
+        # 允许存储额外的真相数据（如 impact_map）
+        extra_json = json.dumps(params.get("extra_truth") or {}, ensure_ascii=False)
         tx.run(
             """
             MERGE (ch:NewsChain {chain_id: $chain_id})
@@ -445,9 +643,10 @@ class NewsTickEngine:
                 ch.abort_probability = $abort_probability,
                 ch.grant_count = $grant_count,
                 ch.seed = $seed,
-                ch.symbols = $symbols
+                ch.symbols = $symbols,
+                ch.extra_truth_json = $extra_json
             """,
-            **params,
+            **{**params, "extra_json": extra_json},
         )
 
     def _consume_suppression_budget(self, *, chain_id: str, signal_class: str, requested: int) -> tuple[int, float]:
@@ -521,13 +720,24 @@ class NewsTickEngine:
                    ch.abort_probability AS abort_probability,
                    ch.grant_count AS grant_count,
                    ch.seed AS seed,
-                   ch.symbols AS symbols
+                   ch.symbols AS symbols,
+                   coalesce(ch.extra_truth_json, '{}') AS extra_truth_json
             ORDER BY ch.t0_at ASC
             LIMIT $limit
             """,
             **params,
         )
-        return [dict(r) for r in result]
+        out = []
+        for r in result:
+            d = dict(r)
+            if d.get("extra_truth_json") and d["extra_truth_json"] != '{}':
+                try:
+                    extra = json.loads(d["extra_truth_json"])
+                    d.update(extra)
+                except Exception:
+                    pass
+            out.append(d)
+        return out
 
     @staticmethod
     def _update_next_omen_tx(tx, params: Dict[str, Any]) -> None:

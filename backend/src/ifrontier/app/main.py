@@ -23,9 +23,9 @@ def create_app() -> FastAPI:
         from ifrontier.app.ws import hub
         from ifrontier.infra.sqlite.bots import default_bot_profiles
 
-        # 同步内置机器人到 Neo4j 用户池，确保新闻传播有目标
+        # 同步内置机器人及系统账号到 Neo4j 用户池，确保新闻传播有目标
         bots = default_bot_profiles()
-        bot_ids = [b.account_id for b in bots]
+        bot_ids = [b.account_id for b in bots] + ["system"]
         api_module._news_service.ensure_bot_users(bot_ids)
 
         api_module._news_service.init_news_seed_data()

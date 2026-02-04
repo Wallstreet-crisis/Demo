@@ -119,8 +119,17 @@ def get_last_price_before(*, symbol: str, before_utc: datetime) -> Optional[floa
 
 def get_price_series(*, symbol: str, limit: int = 200) -> List[float]:
     conn = get_connection()
+    # 获取最新的 N 笔交易价格，并按时间正序排列（最旧到最新）
     rows = conn.execute(
-        "SELECT price FROM market_trades WHERE symbol = ? ORDER BY occurred_at ASC, trade_id ASC LIMIT ?",
+        """
+        SELECT price FROM (
+            SELECT price, occurred_at, trade_id 
+            FROM market_trades 
+            WHERE symbol = ? 
+            ORDER BY occurred_at DESC, trade_id DESC 
+            LIMIT ?
+        ) ORDER BY occurred_at ASC, trade_id ASC
+        """,
         (symbol, int(limit)),
     ).fetchall()
     return [float(r["price"]) for r in rows]

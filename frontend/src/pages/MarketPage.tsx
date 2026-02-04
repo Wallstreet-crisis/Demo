@@ -182,8 +182,16 @@ export default function MarketPage() {
             <div style={{ fontSize: 18, fontWeight: 700, color: changeColor }}>{changeText}</div>
           </div>
           <div style={{ padding: 12, background: '#fafafa', borderRadius: 8, border: '1px solid #f0f0f0' }}>
-            <div style={{ color: '#888', fontSize: 12 }}>波动率(20d)</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{quote?.vol_20 ? (quote.vol_20 * 100).toFixed(2) + '%' : '--'}</div>
+            <div style={{ color: '#888', fontSize: 12 }}>24h 最高 / 最低</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>
+              <span style={{ color: '#52c41a' }}>{quote?.high_24h?.toFixed(2) ?? '--'}</span>
+              <span style={{ margin: '0 4px', color: '#ccc' }}>/</span>
+              <span style={{ color: '#f5222d' }}>{quote?.low_24h?.toFixed(2) ?? '--'}</span>
+            </div>
+          </div>
+          <div style={{ padding: 12, background: '#fafafa', borderRadius: 8, border: '1px solid #f0f0f0' }}>
+            <div style={{ color: '#888', fontSize: 12 }}>24h 成交量</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{quote?.volume_24h?.toLocaleString() ?? '--'}</div>
           </div>
         </div>
 

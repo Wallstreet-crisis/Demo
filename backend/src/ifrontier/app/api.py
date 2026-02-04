@@ -668,6 +668,9 @@ class MarketQuoteResponse(BaseModel):
     ma_5: float | None
     ma_20: float | None
     vol_20: float | None
+    high_24h: float | None = None
+    low_24h: float | None = None
+    volume_24h: float | None = None
 
 
 @router.get("/market/symbols")
@@ -688,6 +691,32 @@ async def market_quote(symbol: str) -> MarketQuoteResponse:
         ma_5=q.ma_5,
         ma_20=q.ma_20,
         vol_20=q.vol_20,
+        high_24h=q.high_24h,
+        low_24h=q.low_24h,
+        volume_24h=q.volume_24h,
+    )
+
+
+class MarketSummaryResponse(BaseModel):
+    total_turnover: float
+    total_trades: int
+    top_gainers: List[Dict[str, Any]]
+    top_losers: List[Dict[str, Any]]
+    active_symbols: List[Dict[str, Any]]
+    refreshed_at: datetime
+
+
+@router.get("/market/summary")
+async def market_summary() -> MarketSummaryResponse:
+    from ifrontier.services.market_analytics import get_market_summary
+    s = get_market_summary()
+    return MarketSummaryResponse(
+        total_turnover=s.total_turnover,
+        total_trades=s.total_trades,
+        top_gainers=s.top_gainers,
+        top_losers=s.top_losers,
+        active_symbols=s.active_symbols,
+        refreshed_at=s.refreshed_at,
     )
 
 
@@ -1769,6 +1798,9 @@ class NewsInboxResponseItem(BaseModel):
     delivery_reason: str
     delivered_at: str
     text: str
+    symbols: list[str] | None = None
+    tags: list[str] | None = None
+    truth_payload: dict[str, Any] | None = None
 
 
 class NewsInboxResponse(BaseModel):

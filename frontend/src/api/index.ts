@@ -35,6 +35,7 @@ import type {
   MarketCandlesResponse,
   MarketQuoteResponse,
   MarketSeriesResponse,
+  MarketSummaryResponse,
   MarketSessionResponse,
   NewsBroadcastRequest,
   NewsBroadcastResponse,
@@ -90,6 +91,7 @@ export const Api = {
       limit,
     }),
   marketSession: () => api.get<MarketSessionResponse>('/market/session'),
+  marketSummary: () => api.get<MarketSummaryResponse>('/market/summary'),
 
   submitLimitOrder: (req: PlayerLimitOrderRequest) => api.post<PlayerOrderResponse>('/orders/limit', req),
   submitMarketOrder: async (req: PlayerMarketOrderRequest) => {

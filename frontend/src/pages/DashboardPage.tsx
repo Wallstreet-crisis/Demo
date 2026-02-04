@@ -1,4 +1,5 @@
 import MarketWatchWidget from '../components/MarketWatchWidget'
+import MarketSummaryWidget from '../components/MarketSummaryWidget'
 import MarketWidget from '../components/MarketWidget'
 import TradeWidget from '../components/TradeWidget'
 import NewsWidget from '../components/NewsWidget'
@@ -18,8 +19,9 @@ export default function DashboardPage() {
       paddingBottom: '20px'
     }}>
       {/* 左侧：行情列表 (3列) */}
-      <div style={{ gridColumn: 'span 3', gridRow: 'span 3' }}>
+      <div style={{ gridColumn: 'span 3', gridRow: 'span 3', display: 'flex', flexDirection: 'column', gap: '15px' }}>
         <MarketWatchWidget />
+        <MarketSummaryWidget />
       </div>
 
       {/* 中间/右侧：详情与交易 (9列) */}

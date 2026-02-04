@@ -51,7 +51,12 @@ class NewsTickScheduler:
                 print(f"[NewsTickScheduler] Error: {e}")
                 result = {"chains": []}
 
-            # 广播 tick 产生的事件
+            # 广播 tick 产生的系统生成事件 (Spawned events)
+            for ev in (result or {}).get("spawned_events", []) or []:
+                if ev and isinstance(ev, dict):
+                    await self._broadcaster(ev)
+
+            # 广播 tick 产生的事件 (Chains)
             for chain in (result or {}).get("chains", []) or []:
                 for action in (chain or {}).get("actions", []) or []:
                     # 1) 普通事件 (News events)

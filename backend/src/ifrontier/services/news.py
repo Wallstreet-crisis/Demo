@@ -31,46 +31,60 @@ class NewsService:
     def _preset_templates(self) -> Dict[str, List[str]]:
         return {
             "RUMOR": [
-                "听说 {symbol} 内部正在秘密洽谈一项巨额收购案。",
-                "有人在夜店看到 {symbol} 的 CEO 与竞争对手共进晚餐。",
-                "传闻 {symbol} 的下一代产品由于供应链问题将延期发布。",
-                "市场都在议论 {symbol} 可能会在近期宣布派息计划。",
-                "路边社消息：{symbol} 的核心专利可能面临侵权诉讼。",
-                "匿名论坛传出 {symbol} 正在考虑整体私有化退市。",
+                "暗网监控：{symbol} 的加密通讯协议已被暴力破解，大量核心机密正在霓虹街头贱卖。",
+                "霓虹街头流传：{symbol} 正在秘密测试一种能够通过神经链接直接改写市场感知的‘认知病毒’。",
+                "传闻 {symbol} 的地下基因实验室流出了非法的‘永生’变异样本，企业安保部队已封锁整个街区。",
+                "黑客组织‘死代码’宣称：{symbol} 的下一代决策 AI 核心存在致命的逻辑坍缩后门。",
+                "【边缘情报】{symbol} 与北方联盟的军工订单因涉嫌‘非法人体计算’调查而面临无限期搁置。",
+                "匿名爆料：{symbol} 董事会已被某种来自深网的意识实体完全渗透，正在进行‘资产置换’。",
+                "传言 {symbol} 的首席架构师已在所有在保义体中植入了远程自毁指令，并携带密钥叛逃。",
+                "情报点显示：{symbol} 正在大规模紧急抛售其在火星殖民地的基础能源配额，疑似准备撤离。",
+                "内幕消息：{symbol} 研发的‘数字灵魂’存储器被发现存在无法修复的逻辑死循环，首批受试者已全部脑死亡。",
+                "坊间异动：{symbol} 旗下的义体诊所最近出现了大量由于非法算力超频导致的‘赛博精神病’集群案例。",
             ],
             "LEAK": [
-                "【绝密泄露】{symbol} 上季度的实际营收增长率可能远超财报预期。",
-                "内部邮件显示，{symbol} 的核心技术团队已有超过 30% 的人员离职。",
-                "一份未公开的文件指出，监管机构正在调查 {symbol} 的财务合规性。",
-                "{symbol} 内部实验室的初步测试数据显示，新工艺成本降低了 40%。",
-                "【深度爆料】{symbol} 的最大股东正在秘密质押全部股权。",
-                "泄露的内部评估报告认为 {symbol} 进军新市场的计划已陷入停滞。",
+                "【绝密数据泄露】{symbol} 核心反应堆的损耗率已达临界点，一旦过载将引发足以抹平整个行政区的能量风暴。",
+                "内部邮件证实：{symbol} 的‘神谕’决策系统曾多次通过降维打击精准清除竞争对手，涉嫌违反《星际公平竞争法》。",
+                "泄露的监管文件指出：{symbol} 长期非法挪用玩家的托管资产，用于维持其在拉格朗日点的巨型算力农场。",
+                "【私密录音】{symbol} CEO 在密谈中承认其新型防御矩阵在极端压力下会发生定向过载，将用户作为缓冲电池。",
+                "【深度爆料】{symbol} 的所有中层管理人员其实都是由低成本克隆体担任的，其本体意识早已在数据海中消亡。",
+                "一份审计报告显示：{symbol} 进军深空采矿的巨额资金已被秘密转移至某个名为‘虚无’的黑洞账户。",
+                "泄露的清单：{symbol} 正在秘密组建一支完全由高维 AI 操控的‘幽灵雇佣兵’部队，目标不明。",
+                "绝密档案：{symbol} 在最近的季度报告中隐瞒了其核心逻辑引擎已失去自我进化能力，仅靠循环旧代码维持的事实。",
             ],
             "ANALYST_REPORT": [
-                "【机构内参】维持 {symbol} ‘买入’评级，目标价上调 15%。",
-                "深研报告：{symbol} 在当前宏观环境下具有极强的防御属性。",
-                "风险警示：{symbol} 的资产负债率已接近行业预警线。",
-                "行业透视：{symbol} 正在通过 AI 转型重塑其核心竞争力。",
-                "摩根大通分析：{symbol} 的现金流状况足以支持其三年的研发投入。",
-                "行业蓝皮书：{symbol} 在细分市场的占有率已达到 45% 的统治地位。",
+                "【深网分析】维持 {symbol} ‘强力买入’评级，其在‘意识上传’领域的专利垄断将确保其在下个纪元的霸权。",
+                "深研报告：{symbol} 在当前的全球封锁环境下表现出了极强的‘极端生存’韧性，其算力储备足以买下半个地球。",
+                "【金融预警】{symbol} 的信用评级已跌至 D 级（毁灭级），一场足以撕裂整个金融体系的坏账风暴正在其内部酝酿。",
+                "行业透视：{symbol} 通过掠夺小型公司的算力带宽，已建立起绝对的‘数据护城河’，建议避险。",
+                "赛博金融周刊：{symbol} 的现金流足以支持其在‘全球战争’期间进行毁灭性的溢价收购，建议紧跟庄家。",
+                "【灰区评估】{symbol} 垄断了 90% 的神经链接修复件供应，是控制未来全人类肉体的‘隐形暴君’。",
+                "高盛深网研报：{symbol} 成功整合了地月之间的量子中继链，将实现跨星系的‘零延迟’财富收割。",
             ],
             "OMEN": [
-                "外交部发言人对 {symbol} 所在地区的局势表示深切关注。",
-                "监测到 {symbol} 总部大楼连续三晚彻夜通明。",
-                "大宗交易系统出现针对 {symbol} 的异常看跌期权成交。",
-                "卫星图像显示 {symbol} 的主要工厂外围有大量军方车辆出入。",
+                "【异常预兆】外交部对 {symbol} 利益相关地区的信号屏蔽行为保持死一般的沉默，空气中弥漫着硝烟味。",
+                "【信号监测】{symbol} 全球生产设施的生命维持系统已强制切换至‘静默离线模式’，疑似在大规模转运资产。",
+                "【暗流涌动】大宗交易系统监测到针对 {symbol} 的海量空头头寸正通过数万个匿名代理节点在毫秒内集结完毕。",
+                "【轨道快讯】卫星图像捕捉到 {symbol} 轨道站周围集结了大量挂载‘逻辑核弹’的截击机编队，进入预热状态。",
+                "【视觉干扰】坊间流传的照片显示 {symbol} 总部大楼已被某种脉冲频率极高的半透明‘维度力场’完全覆盖。",
+                "【高能反应】某种无法被现有物理框架解析的‘熵减信号’正从 {symbol} 核心机房向周边星域疯狂辐射。",
+                "【底层异动】{symbol} 的股价在没有任何成交的情况下出现了极高频的毫秒级跳动，逻辑防火墙正处于崩溃边缘。",
             ],
             "MAJOR_EVENT": [
-                "【紧急公告】{symbol} 宣布由于不可抗力暂停所有生产活动。",
-                "突发新闻：针对 {symbol} 的反垄断法案在议会高票通过。",
-                "重大突破：{symbol} 宣布其划时代的‘量子能源’已实现商业化落地。",
-                "地缘政经：跨国禁令正式生效，{symbol} 失去其主要海外市场渠道。",
+                "【紧急公告】{symbol} 的核心聚变堆发生‘维度坍缩’，整个工业园区已从物理现实中被彻底抹除。",
+                "【法律降维】最高法院裁定 {symbol} 的所有数字资产受法律保护失效，全球黑客已开启‘合法化’暴力搬运。",
+                "【重大突破】{symbol} 宣布其‘意识备份’技术成功实现了 99.99% 的灵魂完整度，正式开启‘数字永生’商业化元年。",
+                "【主权禁令】全网禁令正式生效，{symbol} 在所有主权国家的海外资产已被当地军政府强制‘物理接管’。",
+                "【公司战争】{symbol} 正式对竞争对手发动‘逻辑清除’打击，双方已在数据海和物理现实中进入全面交战状态。",
+                "【算力奇点】{symbol} 部署的全球算力池发生非主观觉醒，开始自我删除所有不符合其‘进化审美’的财务坏账。",
             ],
             "WORLD_EVENT": [
-                "【突发】全面战争爆发，全球资本市场进入紧急状态。",
-                "全球供应链出现系统性断裂，多国宣布进入战时经济管制。",
-                "重大公共卫生事件升级，跨境流动被全面限制。",
-                "国际结算系统遭遇攻击，主要货币清算通道短时中断。",
+                "【全网紧急广播】全球战争爆发，所有跨国资本流动和算力租借已被星际联合议会进行‘军事级接管’。",
+                "【系统性崩溃】全球供应链发生连锁断裂，多国宣布进入‘战时配给制’及‘数字口粮’分发模式。",
+                "【数字瘟疫】一种名为‘霓虹病毒’的逻辑炸弹开始在大规模义体植入人群中通过无线信号自我复制。",
+                "【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。",
+                "【算力黑洞】由于全球性算力风暴，所有基于加密逻辑的资产正在面临史无前例的‘格式化’归零性修正。",
+                "【黑昼降临】由于地月拉格朗日点的量子干扰塔被‘未知实体’爆破，全球卫星通讯和定位系统已完全中断。",
             ],
         }
 
@@ -383,7 +397,18 @@ class NewsService:
                 {"player_id": player_id, "limit": int(limit)},
             )
 
-        return [dict(r) for r in records]
+        out = []
+        for r in records:
+            d = dict(r)
+            if d.get("truth_payload_json"):
+                try:
+                    d["truth_payload"] = json.loads(d["truth_payload_json"])
+                except Exception:
+                    d["truth_payload"] = {}
+            else:
+                d["truth_payload"] = None
+            out.append(d)
+        return out
 
     def get_variant_context(self, *, variant_id: str) -> Dict[str, Any] | None:
         with self._driver.session() as session:
@@ -391,7 +416,16 @@ class NewsService:
                 self._get_variant_context_tx,
                 {"variant_id": variant_id},
             )
-        return dict(rec) if rec is not None else None
+        if rec is None:
+            return None
+        
+        out = dict(rec)
+        if out.get("truth_payload_json"):
+            try:
+                out["truth_payload"] = json.loads(out["truth_payload_json"])
+            except Exception:
+                out["truth_payload"] = {}
+        return out
 
     def grant_ownership(
         self,
@@ -738,8 +772,11 @@ class NewsService:
             """
             MATCH (c:NewsCard)-[:HAS_VARIANT]->(v:NewsVariant {variant_id: $variant_id})
             RETURN v.text AS text,
+                   v.author_id AS author_id,
                    CASE WHEN v.mutation_depth IS NULL THEN 0 ELSE toInteger(v.mutation_depth) END AS mutation_depth,
-                   c.symbols AS symbols
+                   c.symbols AS symbols,
+                   c.truth_payload_json AS truth_payload_json,
+                   c.kind AS kind
             """,
             **params,
         ).single()
@@ -750,6 +787,8 @@ class NewsService:
         result = tx.run(
             """
             MATCH (u:User {user_id: $player_id})-[:INBOX_ITEM]->(d:NewsDelivery)-[:DELIVERS_VARIANT]->(v:NewsVariant)
+            MATCH (c:NewsCard {card_id: d.card_id})
+            OPTIONAL MATCH (u)-[r:OWNS_NEWS]->(c)
             RETURN d.delivery_id AS delivery_id,
                    d.card_id AS card_id,
                    d.variant_id AS variant_id,
@@ -757,7 +796,10 @@ class NewsService:
                    d.visibility_level AS visibility_level,
                    d.delivery_reason AS delivery_reason,
                    d.delivered_at AS delivered_at,
-                   v.text AS text
+                   v.text AS text,
+                   c.symbols AS symbols,
+                   c.tags AS tags,
+                   CASE WHEN r IS NOT NULL THEN c.truth_payload_json ELSE NULL END AS truth_payload_json
             ORDER BY d.delivered_at DESC
             LIMIT $limit
             """,

@@ -88,10 +88,6 @@ export default function MarketWidget() {
   const last = quote?.last_price
   const changePct = quote?.change_pct
 
-  const lastCandle = candles?.candles && candles.candles.length > 0 
-    ? candles.candles[candles.candles.length - 1] 
-    : null
-
   const changeText =
     changePct === null || changePct === undefined
       ? 'N/A'
@@ -151,19 +147,19 @@ export default function MarketWidget() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'x 20px', textAlign: 'right' }}>
           <div>
             <div style={{ fontSize: '9px', color: '#64748b' }}>HIGH_24H</div>
-            <div style={{ fontSize: '12px', color: '#fff', fontWeight: '600' }}>{lastCandle?.high.toFixed(2) ?? '--'}</div>
+            <div style={{ fontSize: '12px', color: '#fff', fontWeight: '600' }}>{quote?.high_24h?.toFixed(2) ?? '--'}</div>
           </div>
           <div>
             <div style={{ fontSize: '9px', color: '#64748b' }}>LOW_24H</div>
-            <div style={{ fontSize: '12px', color: '#fff', fontWeight: '600' }}>{lastCandle?.low.toFixed(2) ?? '--'}</div>
+            <div style={{ fontSize: '12px', color: '#fff', fontWeight: '600' }}>{quote?.low_24h?.toFixed(2) ?? '--'}</div>
           </div>
           <div style={{ marginTop: '4px' }}>
             <div style={{ fontSize: '9px', color: '#64748b' }}>OPEN_24H</div>
-            <div style={{ fontSize: '12px', color: '#cbd5e1' }}>{lastCandle?.open.toFixed(2) ?? '--'}</div>
+            <div style={{ fontSize: '12px', color: '#cbd5e1' }}>{quote?.prev_price?.toFixed(2) ?? '--'}</div>
           </div>
           <div style={{ marginTop: '4px' }}>
-            <div style={{ fontSize: '9px', color: '#64748b' }}>VOLUME</div>
-            <div style={{ fontSize: '12px', color: '#cbd5e1' }}>{lastCandle?.volume.toLocaleString() ?? '--'}</div>
+            <div style={{ fontSize: '9px', color: '#64748b' }}>VOLUME_24H</div>
+            <div style={{ fontSize: '12px', color: '#cbd5e1' }}>{quote?.volume_24h?.toLocaleString() ?? '--'}</div>
           </div>
         </div>
       </div>
