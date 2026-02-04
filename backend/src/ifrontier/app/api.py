@@ -20,7 +20,7 @@ from ifrontier.services.commonbot_emergency import CommonBotEmergencyRunner
 from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account, get_snapshot, spend_cash
 from ifrontier.infra.sqlite.market import get_candles, get_last_price, get_price_series, record_trade
 from ifrontier.services.matching import submit_limit_order, submit_market_order
-from ifrontier.services.market_analytics import get_quote
+from ifrontier.services.market_analytics import get_market_trends, get_quote
 from ifrontier.services.valuation import value_account
 from ifrontier.domain.players.caste import get_caste_config
 from ifrontier.infra.sqlite.db import get_connection
@@ -58,31 +58,16 @@ def _news_debug_enabled() -> bool:
     """检查新闻调试是否开启"""
     return str(os.getenv("IF_NEWS_DEBUG") or "0").strip().lower() in {"1", "true", "yes"}
 
-def get_market_trends(symbols: List[str]) -> CommonBotMarketTrends:
-    from ifrontier.services.commonbot_context import CommonBotMarketTrends
-    from ifrontier.services.market_session import get_market_session
-    from ifrontier.services.game_time import load_game_time_config_from_env
-    from ifrontier.services.market_analytics import get_quote
-    from ifrontier.infra.sqlite.market import get_price_series
-
-    trends = CommonBotMarketTrends()
-    cfg = load_game_time_config_from_env()
-    session = get_market_session(cfg=cfg)
-    trends.market_phase = session.phase.value
-
-    for s in symbols:
-        q = get_quote(s)
-        trends.market_quotes[s] = {
-            "symbol": q.symbol,
-            "last_price": q.last_price,
-            "prev_price": q.prev_price,
-            "change_pct": q.change_pct,
-            "ma_5": q.ma_5,
-            "ma_20": q.ma_20,
-            "vol_20": q.vol_20,
-        }
-        trends.symbol_price_series[s] = get_price_series(symbol=s, limit=200)
-    return trends
+@router.post("/debug/bots/reset_balances")
+async def debug_bots_reset_balances() -> Dict[str, Any]:
+    """强制刷新全服 Bot 的资金和持仓，制造惊涛骇浪的基础"""
+    try:
+        from ifrontier.infra.sqlite.bots import init_bot_accounts
+        init_bot_accounts()
+        return {"ok": True, "message": "Bot balances and positions reset to aggressive levels."}
+    except Exception as exc:
+        print(f"[API:Debug] Failed to reset bot balances: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @router.get("/health")
 def health() -> Dict[str, str]:
@@ -136,7 +121,7 @@ class DebugEmitEventResponse(BaseModel):
 
 @router.post("/debug/emit_event")
 async def debug_emit_event(req: DebugEmitEventRequest) -> DebugEmitEventResponse:
-    envelope = EventEnvelope(
+    envelope = EventEnvelope[_AnyPayload](
         event_type=req.event_type,
         occurred_at=datetime.now(timezone.utc),
         correlation_id=req.correlation_id or uuid4(),
@@ -396,20 +381,21 @@ class HostingDisableResponse(BaseModel):
 @router.post("/hosting/{user_id}/enable")
 async def hosting_enable(user_id: str) -> HostingEnableResponse:
     st = upsert_hosting_state(user_id=user_id, enabled=True, status="ON_IDLE")
-    payload = _AnyPayload(
-        {
-            "as_user_id": str(user_id),
-            "enabled": True,
-            "status": st.status,
-            "changed_at": datetime.now(timezone.utc),
-        }
+    from ifrontier.domain.events.payloads import AiHostingStateChangedPayload
+    
+    payload = AiHostingStateChangedPayload(
+        user_id=str(user_id),
+        enabled=True,
+        status="ON_IDLE",
+        changed_at=datetime.now(timezone.utc),
     )
-    env = EventEnvelope(
+    env = EventEnvelope[AiHostingStateChangedPayload](
         event_type=EventType.AI_HOSTING_STATE_CHANGED,
         correlation_id=uuid4(),
         actor=EventActor(agent_id=f"hosting:{user_id}"),
         payload=payload,
     )
+    
     ev = EventEnvelopeJson.from_envelope(env)
     _event_store.append(ev)
     await hub.broadcast_json("events", ev.model_dump())
@@ -429,20 +415,21 @@ async def hosting_enable(user_id: str) -> HostingEnableResponse:
 @router.post("/hosting/{user_id}/disable")
 async def hosting_disable(user_id: str) -> HostingDisableResponse:
     st = upsert_hosting_state(user_id=user_id, enabled=False, status="OFF")
-    payload = _AnyPayload(
-        {
-            "as_user_id": str(user_id),
-            "enabled": False,
-            "status": st.status,
-            "changed_at": datetime.now(timezone.utc),
-        }
+    from ifrontier.domain.events.payloads import AiHostingStateChangedPayload
+    
+    payload = AiHostingStateChangedPayload(
+        user_id=str(user_id),
+        enabled=False,
+        status="OFF",
+        changed_at=datetime.now(timezone.utc),
     )
-    env = EventEnvelope(
+    env = EventEnvelope[AiHostingStateChangedPayload](
         event_type=EventType.AI_HOSTING_STATE_CHANGED,
         correlation_id=uuid4(),
         actor=EventActor(agent_id=f"hosting:{user_id}"),
         payload=payload,
     )
+    
     ev = EventEnvelopeJson.from_envelope(env)
     _event_store.append(ev)
     await hub.broadcast_json("events", ev.model_dump())
@@ -895,20 +882,26 @@ class PlayerOrderResponse(BaseModel):
 @router.post("/orders/limit")
 async def submit_player_limit_order(req: PlayerLimitOrderRequest) -> PlayerOrderResponse:
     account_id = f"user:{req.player_id}"
-    order_id, matches = submit_limit_order(
-        account_id=account_id,
-        symbol=req.symbol,
-        side=req.side,
-        price=req.price,
-        quantity=req.quantity,
-    )
-    # 广播成交事件
-    for m in matches:
-        ev = m.executed_event.model_dump()
-        await hub.broadcast_json("events", ev)
-        await hub.broadcast_json(str(ev.get("event_type")), ev)
+    try:
+        order_id, matches = submit_limit_order(
+            account_id=account_id,
+            symbol=req.symbol,
+            side=req.side,
+            price=float(req.price),
+            quantity=float(req.quantity),
+        )
+        # 广播成交事件
+        for m in matches:
+            ev = m.executed_event.model_dump()
+            await hub.broadcast_json("events", ev)
+            ev_type = ev.get("event_type")
+            if ev_type:
+                await hub.broadcast_json(str(ev_type), ev)
 
-    return PlayerOrderResponse(order_id=order_id)
+        return PlayerOrderResponse(order_id=order_id)
+    except Exception as exc:
+        print(f"[API:Order] Failed to submit limit order: {exc}")
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 class PlayerMarketOrderRequest(BaseModel):
@@ -922,19 +915,26 @@ class PlayerMarketOrderRequest(BaseModel):
 async def submit_player_market_order(req: PlayerMarketOrderRequest) -> None:
     account_id = f"user:{req.player_id}"
     try:
+        q = float(req.quantity)
+        if q <= 0:
+            raise ValueError("Quantity must be positive")
+
         matches = submit_market_order(
             account_id=account_id,
             symbol=req.symbol,
             side=req.side,
-            quantity=req.quantity,
+            quantity=q,
         )
         # 广播成交事件
         for m in matches:
             ev = m.executed_event.model_dump()
             await hub.broadcast_json("events", ev)
-            await hub.broadcast_json(str(ev.get("event_type")), ev)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+            ev_type = ev.get("event_type")
+            if ev_type:
+                await hub.broadcast_json(str(ev_type), ev)
+    except Exception as exc:
+        print(f"[API:Order] Failed to submit market order for {req.symbol}: {exc}")
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 class PlayerAccountResponse(BaseModel):
@@ -1041,12 +1041,13 @@ async def contract_agent_draft(req: ContractAgentDraftRequest) -> ContractAgentD
         risk_rating=str(res.risk_rating),
         drafted_at=datetime.now(timezone.utc),
     )
-    env = EventEnvelope(
+    env = EventEnvelope[AiContractDraftedPayload](
         event_type=EventType.AI_CONTRACT_DRAFTED,
         correlation_id=uuid4(),
         actor=EventActor(user_id=req.actor_id),
         payload=payload,
     )
+    
     ev_json = EventEnvelopeJson.from_envelope(env)
     _event_store.append(ev_json)
     await hub.broadcast_json("events", ev_json.model_dump())
@@ -2113,7 +2114,11 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
                 except ValueError:
                     t0_at = None
             
-            print(f"[API:Purchase] Starting chain for {req.kind}, t0_at={t0_at}, symbols={req_symbols or symbol_options[:2]}")
+            sec_symbols = [s.symbol for s in list_securities(status="TRADABLE")]
+            if not sec_symbols:
+                sec_symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
+            
+            print(f"[API:Purchase] Starting chain for {req.kind}, t0_at={t0_at}, symbols={req_symbols or sec_symbols}")
             # v0.1: 对于测试阶段，将默认倒计时从 60s 缩短至 15s，提高反馈速度
             default_delay = 15 if str(req.kind) == "WORLD_EVENT" else 60
             result = _news_tick_engine.start_chain(
@@ -2125,7 +2130,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
                 abort_probability=float(req.abort_probability if req.abort_probability is not None else 0.3),
                 grant_count=int(req.grant_count if req.grant_count is not None else 2),
                 seed=int(req.seed if req.seed is not None else 1),
-                symbols=req_symbols if req_symbols else symbol_options[:2],
+                symbols=req_symbols if req_symbols else sec_symbols,
                 correlation_id=req.correlation_id,
             )
         except Exception as exc:

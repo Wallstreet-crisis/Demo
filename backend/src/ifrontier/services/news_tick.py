@@ -40,10 +40,15 @@ class NewsTickEngine:
         event_store: Neo4jEventStore,
         news_service: NewsService,
     ) -> None:
+        from ifrontier.services.market_analytics import get_market_trends
         self._driver = driver
         self._event_store = event_store
         self._news = news_service
-        self._commonbot_emergency_runner = CommonBotEmergencyRunner(news=self._news, event_store=self._event_store)
+        self._commonbot_emergency_runner = CommonBotEmergencyRunner(
+            news=self._news, 
+            event_store=self._event_store,
+            market_data_provider=get_market_trends
+        )
 
     def suppress_propagation(
         self,

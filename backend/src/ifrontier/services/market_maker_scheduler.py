@@ -11,9 +11,11 @@ class MarketMakerScheduler:
     def __init__(
         self,
         *,
+        driver: Any = None,
         tick_interval_seconds: float = 2.0,
         broadcaster: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
     ) -> None:
+        self._driver = driver
         self._tick_interval_seconds = float(tick_interval_seconds)
         self._broadcaster = broadcaster
         self._stop = asyncio.Event()
@@ -51,14 +53,22 @@ class MarketMakerScheduler:
                 session = get_market_session(cfg=gt_cfg)
                 
                 if session.phase == MarketPhase.TRADING:
+                    active_chains_count = 0
+                    if self._driver:
+                        with self._driver.session() as neo_session:
+                            res = neo_session.run("MATCH (ch:NewsChain {phase: 'INCUBATING'}) RETURN count(ch) as c").single()
+                            active_chains_count = int(res["c"]) if res else 0
+
                     # 在线程池中运行同步的 tick_once
-                    matches = await asyncio.to_thread(self._mm.tick_once)
+                    matches = await asyncio.to_thread(self._mm.tick_once, active_chains_count=active_chains_count)
                     
                     # 广播成交事件
                     if self._broadcaster and matches:
                         for m in matches:
                             await self._broadcaster(m.executed_event.model_dump())
             except Exception as exc:
+                import traceback
+                traceback.print_exc()
                 print(f"[MarketMakerScheduler] Error: {exc}")
                 pass
 

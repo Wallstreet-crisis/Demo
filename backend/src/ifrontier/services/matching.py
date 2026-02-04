@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import List
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from ifrontier.domain.events.envelope import EventEnvelopeJson
 from ifrontier.domain.events.types import EventType
@@ -98,6 +98,11 @@ def submit_limit_order(
             payload=payload,
         )
 
+        event_dict = event_json.model_dump()
+        # 确保 UUID 在广播前序列化为字符串，防止 WebSocket 广播 500 错误
+        if isinstance(event_dict.get("event_id"), UUID):
+            event_dict["event_id"] = str(event_dict["event_id"])
+
         print(f"[MatchingEngine] TRADE_EXECUTED: {symbol} {trade_qty} @ {trade_price} ({payload['buy_account_id']} <- {payload['sell_account_id']})")
 
         # 账本记账
@@ -120,7 +125,7 @@ def submit_limit_order(
 
         # 写入事件存储
         _event_store.append(event_json)
-        matches.append(MatchResult(executed_event=event_json))
+        matches.append(MatchResult(executed_event=EventEnvelopeJson(**event_dict)))
 
         # 更新订单剩余数量和状态
         remaining -= trade_qty
@@ -197,6 +202,11 @@ def submit_market_order(
             payload=payload,
         )
 
+        event_dict = event_json.model_dump()
+        # 确保 UUID 序列化
+        if isinstance(event_dict.get("event_id"), UUID):
+            event_dict["event_id"] = str(event_dict["event_id"])
+
         apply_trade_executed(
             buy_account_id=payload["buy_account_id"],
             sell_account_id=payload["sell_account_id"],
@@ -214,8 +224,9 @@ def submit_market_order(
             event_id=str(event_json.event_id),
         )
 
+        # 写入事件存储
         _event_store.append(event_json)
-        matches.append(MatchResult(executed_event=event_json))
+        matches.append(MatchResult(executed_event=EventEnvelopeJson(**event_dict)))
 
         new_opp_qty = opp.quantity_remaining - trade_qty
         update_order_quantity_and_status(

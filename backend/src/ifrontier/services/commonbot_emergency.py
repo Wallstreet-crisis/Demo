@@ -132,7 +132,17 @@ class CommonBotEmergencyRunner:
                     try:
                         side = str(trade_json.payload.get("side"))
                         # 从 trade_json 获取由 run_commonbot_for_earnings 计算出的动态规模和价格
-                        last_price = float(trade_json.payload.get("price_hint") or 0.0)
+                        last_price_val = trade_json.payload.get("price_hint")
+                        if last_price_val is None:
+                            from ifrontier.infra.sqlite.market import get_last_price
+                            last_price = get_last_price(symbol) or 0.0
+                        else:
+                            last_price = float(last_price_val)
+                            
+                        if last_price <= 0:
+                            print(f"[CommonBotEmergency:maybe_react] Skipping trade for {symbol}: invalid price {last_price}")
+                            continue
+
                         size = float(trade_json.payload.get("size") or 1.0)
                         confidence = float(trade_json.payload.get("confidence") or 0.5)
 
@@ -207,7 +217,17 @@ class CommonBotEmergencyRunner:
                     # 真正提交订单进入撮合引擎
                     try:
                         side = str(trade_json.payload.get("side"))
-                        last_price = float(trade_json.payload.get("price_hint") or 0.0)
+                        last_price_val = trade_json.payload.get("price_hint")
+                        if last_price_val is None:
+                            from ifrontier.infra.sqlite.market import get_last_price
+                            last_price = get_last_price(symbol) or 0.0
+                        else:
+                            last_price = float(last_price_val)
+                            
+                        if last_price <= 0:
+                            print(f"[CommonBotEmergency:open] Skipping trade for {symbol}: invalid price {last_price}")
+                            continue
+
                         size = float(trade_json.payload.get("size") or 1.0)
                         confidence = float(trade_json.payload.get("confidence") or 0.5)
 
@@ -341,7 +361,16 @@ class CommonBotEmergencyRunner:
                 emitted.append(trade_json)
                 try:
                     side = str(trade_json.payload.get("side"))
-                    last_price = float(trade_json.payload.get("price_hint") or 0.0)
+                    last_price_val = trade_json.payload.get("price_hint")
+                    if last_price_val is None:
+                        from ifrontier.infra.sqlite.market import get_last_price
+                        last_price = get_last_price(symbol) or 0.0
+                    else:
+                        last_price = float(last_price_val)
+                        
+                    if last_price <= 0:
+                        print(f"[CommonBotEmergency:delivery] Skipping trade for {symbol}: invalid price {last_price}")
+                        continue
                     
                     # 让机器人更具攻击性以促成成交：
                     # 根据信心指数动态调整价格偏移，最高可达 5%

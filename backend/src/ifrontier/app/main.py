@@ -52,7 +52,8 @@ def create_app() -> FastAPI:
         )
 
         market_maker_scheduler = MarketMakerScheduler(
-            tick_interval_seconds=5.0,
+            driver=api_module._driver,
+            tick_interval_seconds=1.0,
             broadcaster=_make_news_broadcaster(hub),
         )
 

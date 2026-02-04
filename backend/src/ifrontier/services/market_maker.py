@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from typing import List, Dict, Any
 from ifrontier.infra.sqlite.ledger import create_account, get_snapshot
 from ifrontier.infra.sqlite.market import get_last_price
 from ifrontier.infra.sqlite.securities import list_securities
-from ifrontier.services.matching import submit_limit_order
+from ifrontier.services.matching import submit_limit_order, MatchResult
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,7 @@ class MarketMaker:
     def __init__(self, *, cfg: MarketMakerConfig) -> None:
         self._cfg = cfg
 
-    def tick_once(self) -> List[MatchResult]:
+    def tick_once(self, *, active_chains_count: int = 0) -> List[MatchResult]:
         create_account(self._cfg.account_id, owner_type="bot_institution", initial_cash=0.0)
 
         from ifrontier.infra.sqlite.orders import cancel_orders_by_account
@@ -27,14 +28,9 @@ class MarketMaker:
         cancel_orders_by_account(self._cfg.account_id)
 
         import random
-        # 检查是否有活跃的新闻链，如果有，大幅增加波动率
-        from ifrontier.infra.sqlite.db import get_connection
-        conn = get_connection()
-        active_chains = conn.execute("SELECT COUNT(*) FROM news_chains WHERE status = 'ACTIVE'").fetchone()[0]
-
         # 基础波动率 0.5%，如果有活跃事件，波动率翻倍甚至更多
         # 同时大幅提高成交深度，确保大额订单也能成交
-        volatility_multiplier = 1.0 + (active_chains * 1.5) 
+        volatility_multiplier = 1.0 + (active_chains_count * 1.5) 
 
         all_matches = []
         for sec in list_securities(status="TRADABLE"):
@@ -72,7 +68,7 @@ class MarketMaker:
 
             # --- 增加：做市商主动“跨盘”成交，制造市场底噪和流动性 ---
             # 基础概率 50%，随事件强度增加到 80%
-            noise_prob = min(0.5 + (active_chains * 0.1), 0.8)
+            noise_prob = min(0.5 + (active_chains_count * 0.1), 0.8)
             if random.random() < noise_prob: 
                 side = random.choice(["BUY", "SELL"])
                 # 噪声成交规模也随波动率放大，制造更大的成交量

@@ -41,25 +41,27 @@ def _score_decision(
     if news_text:
         text_upper = news_text.upper()
         # 战争/危机关键词
-        war_keywords = ["WAR", "CONFLICT", "CRISIS", "BATTLE", "MILITARY", "INVASION", "STRIKE"]
+        war_keywords = ["WAR", "CONFLICT", "CRISIS", "BATTLE", "MILITARY", "INVASION", "STRIKE", "GLOBAL WAR", "WORLD WAR"]
         if any(k in text_upper for k in war_keywords):
-            # 军工股看涨，金融/消费看跌
-            if sector == "MILITARY":
-                text_impact += 0.5
-            elif sector in ["FINANCE", "CONSUMER"]:
-                text_impact -= 0.4
+            # 军工和能源股看涨，金融/消费/技术/物流看跌
+            if sector in ["MILITARY", "ENERGY"]:
+                text_impact += 0.8  # 强烈看涨
+            elif sector in ["FINANCE", "CONSUMER", "TECH", "LOGISTICS", "HEALTHCARE"]:
+                text_impact -= 0.7  # 强烈看跌
             else:
-                text_impact -= 0.2 # 整体不确定性看跌
+                text_impact -= 0.3 # 整体不确定性
         
         # 增长关键词
         if any(k in text_upper for k in ["GROWTH", "BOOM", "SUCCESS", "RECOVERY"]):
-            text_impact += 0.3
+            text_impact += 0.4
             
     sector_adj = 0.0
     if sector == "MILITARY":
+        sector_adj = 0.15
+    elif sector == "ENERGY":
         sector_adj = 0.1
     elif sector == "FINANCE":
-        sector_adj = -0.05
+        sector_adj = -0.1
 
     trend = _price_trend(price_series)
     trend_adj = 0.0
@@ -124,7 +126,7 @@ def run_commonbot_for_earnings(
         decided_at=now,
     )
 
-    decision_envelope = EventEnvelope(
+    decision_envelope = EventEnvelope[AiCommonBotDecisionPayload](
         event_type=EventType.AI_COMMONBOT_DECISION,
         correlation_id=correlation_id,
         actor=EventActor(agent_id=bot_id),
@@ -155,18 +157,15 @@ def run_commonbot_for_earnings(
             side=action,
             size=float(round(size, 2)),
             price_hint=price_series[-1] if price_series else None,
+            confidence=confidence, # v0.2: 直接传入信心指数
             created_at=now,
         )
-        
-        # 将信心指数透传给执行引擎，用于计算价格偏移
-        intent_payload_dict = intent_payload.model_dump()
-        intent_payload_dict["confidence"] = confidence
 
-        intent_envelope = EventEnvelope(
+        intent_envelope = EventEnvelope[TradeIntentSubmittedPayload](
             event_type=EventType.TRADE_INTENT_SUBMITTED,
             correlation_id=correlation_id,
             actor=EventActor(agent_id=bot_id),
-            payload=intent_payload_dict,
+            payload=intent_payload,
         )
         trade_json = EventEnvelopeJson.from_envelope(intent_envelope)
 
@@ -205,16 +204,24 @@ def _llm_decide_from_news(
         f"price_trend: {trend}\n"
     )
 
-    resp = client.chat_completions(system=system, user=user, temperature=0.2, max_tokens=200)
+    # v0.2: 增加 max_tokens 防止 JSON 被截断，提升稳定性
+    resp = client.chat_completions(system=system, user=user, temperature=0.2, max_tokens=512)
     if not resp or "choices" not in resp:
         print(f"[LLM:CommonBot] LLM Request failed for {symbol}, falling back to heuristics.")
         return None
 
     text = extract_first_message_text(resp)
+    # v0.2: 使用更鲁棒的 JSON 提取方法，解决 Markdown 代码块或 LLM 废话干扰
+    clean_text = text.strip()
     try:
-        obj = __import__("json").loads(text)
+        start_idx = clean_text.find("{")
+        end_idx = clean_text.rfind("}")
+        if start_idx != -1 and end_idx != -1:
+            clean_text = clean_text[start_idx : end_idx + 1]
+        
+        obj = __import__("json").loads(clean_text)
     except Exception as e:
-        print(f"[LLM:CommonBot] JSON parse error for {symbol}: {e}. Text: {text[:100]}. Falling back to heuristics.")
+        print(f"[LLM:CommonBot] JSON parse error for {symbol}: {e}. Text: {text[:200]}. Falling back to heuristics.")
         return None
 
     if not isinstance(obj, dict):

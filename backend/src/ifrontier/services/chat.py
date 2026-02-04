@@ -63,7 +63,7 @@ class ChatService:
             "fee_cash": float(fee_cash),
             "quoted_at": datetime.now(timezone.utc),
         }
-        env = EventEnvelope(
+        env = EventEnvelope[_AnyPayload](
             event_type=EventType.CHAT_INTRO_FEE_QUOTED,
             correlation_id=uuid4(),
             actor=EventActor(user_id=actor_id),
@@ -140,7 +140,7 @@ class ChatService:
                     "fee_cash": float(fee_cash),
                     "paid_at": datetime.now(timezone.utc),
                 }
-                env_paid = EventEnvelope(
+                env_paid = EventEnvelope[_AnyPayload](
                     event_type=EventType.CHAT_INTRO_FEE_PAID,
                     correlation_id=uuid4(),
                     actor=EventActor(user_id=requester_id),
@@ -164,7 +164,7 @@ class ChatService:
             "participant_b": max(requester_id, target_id),
             "opened_at": datetime.now(timezone.utc),
         }
-        env_opened = EventEnvelope(
+        env_opened = EventEnvelope[_AnyPayload](
             event_type=EventType.CHAT_THREAD_OPENED,
             correlation_id=uuid4(),
             actor=EventActor(user_id=requester_id),
@@ -228,7 +228,7 @@ class ChatService:
             "payload": stored_payload,
             "sent_at": datetime.now(timezone.utc),
         }
-        env = EventEnvelope(
+        env = EventEnvelope[_AnyPayload](
             event_type=EventType.CHAT_MESSAGE_SENT,
             correlation_id=uuid4(),
             actor=EventActor(user_id=sender_id),
@@ -280,7 +280,7 @@ class ChatService:
             "payload": stored_payload,
             "sent_at": datetime.now(timezone.utc),
         }
-        env = EventEnvelope(
+        env = EventEnvelope[_AnyPayload](
             event_type=EventType.CHAT_MESSAGE_SENT,
             correlation_id=uuid4(),
             actor=EventActor(user_id=sender_id),
@@ -328,7 +328,7 @@ class ChatService:
                 len(conn.execute("SELECT user_id FROM wealth_public_cache").fetchall())
             ),
         }
-        env = EventEnvelope(
+        env = EventEnvelope[_AnyPayload](
             event_type=EventType.WEALTH_PUBLIC_REFRESHED,
             correlation_id=uuid4(),
             actor=EventActor(agent_id="system"),

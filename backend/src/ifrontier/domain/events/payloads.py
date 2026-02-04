@@ -140,6 +140,13 @@ class NewsOwnershipTransferredPayload(BaseModel):
     transferred_at: datetime
 
 
+class AiHostingStateChangedPayload(BaseModel):
+    user_id: str
+    enabled: bool
+    status: str
+    changed_at: datetime
+
+
 class TradeIntentSubmittedPayload(BaseModel):
     intent_id: str
     user_id: str
@@ -147,6 +154,7 @@ class TradeIntentSubmittedPayload(BaseModel):
     side: str  # BUY / SELL
     size: float
     price_hint: float | None = None
+    confidence: float = 0.5  # v0.2: 增加信心指数，用于后续计算价格偏移
     created_at: datetime
 
 

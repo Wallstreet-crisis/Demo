@@ -155,7 +155,7 @@ class ContractService:
             required_signers=required_signers,
             created_at=now,
         )
-        env = EventEnvelope(
+        env = EventEnvelope[ContractCreatedPayload](
             event_type=EventType.CONTRACT_CREATED,
             correlation_id=uuid4(),
             actor=EventActor(user_id=actor_id),
@@ -220,7 +220,7 @@ class ContractService:
                 required_signers=spec["required_signers"],
                 created_at=now,
             )
-            env = EventEnvelope(
+            env = EventEnvelope[ContractCreatedPayload](
                 event_type=EventType.CONTRACT_CREATED,
                 correlation_id=uuid4(),
                 actor=EventActor(user_id=actor_id),
@@ -242,7 +242,7 @@ class ContractService:
             raise ValueError("contract not found or not joinable")
 
         payload = ContractJoinedPayload(contract_id=contract_id, joiner=joiner, joined_at=now)
-        env = EventEnvelope(
+        env = EventEnvelope[ContractJoinedPayload](
             event_type=EventType.CONTRACT_JOINED,
             correlation_id=uuid4(),
             actor=EventActor(user_id=joiner),
@@ -284,7 +284,7 @@ class ContractService:
             details=details,
             created_at=now,
         )
-        env = EventEnvelope(
+        env = EventEnvelope[ContractProposalCreatedPayload](
             event_type=EventType.CONTRACT_PROPOSAL_CREATED,
             correlation_id=uuid4(),
             actor=EventActor(user_id=proposer),
@@ -322,7 +322,7 @@ class ContractService:
             approver=approver,
             approved_at=now,
         )
-        env = EventEnvelope(
+        env = EventEnvelope[ContractProposalApprovedPayload](
             event_type=EventType.CONTRACT_PROPOSAL_APPROVED,
             correlation_id=uuid4(),
             actor=EventActor(user_id=approver),
@@ -347,7 +347,7 @@ class ContractService:
         status = record["status"]
 
         payload = ContractSignedPayload(contract_id=contract_id, signer=signer, signed_at=now)
-        env = EventEnvelope(
+        env = EventEnvelope[ContractSignedPayload](
             event_type=EventType.CONTRACT_SIGNED,
             correlation_id=uuid4(),
             actor=EventActor(user_id=signer),
@@ -368,7 +368,7 @@ class ContractService:
             raise ValueError("contract not found or not signed")
 
         payload = ContractActivatedPayload(contract_id=contract_id, activated_at=now)
-        env = EventEnvelope(
+        env = EventEnvelope[ContractActivatedPayload](
             event_type=EventType.CONTRACT_ACTIVATED,
             correlation_id=uuid4(),
             actor=EventActor(user_id=actor_id),
@@ -433,7 +433,7 @@ class ContractService:
                 shortfall_by_from=shortfall_by_from,
                 defaulted_at=now,
             )
-            env = EventEnvelope(
+            env = EventEnvelope[ContractDefaultedPayload](
                 event_type=EventType.CONTRACT_DEFAULTED,
                 correlation_id=uuid4(),
                 actor=EventActor(user_id=actor_id),
@@ -442,7 +442,7 @@ class ContractService:
             self._event_store.append(EventEnvelopeJson.from_envelope(env))
 
         payload = ContractSettledPayload(contract_id=contract_id, settlement_event_id=settlement_event_id, settled_at=now)
-        env = EventEnvelope(
+        env = EventEnvelope[ContractSettledPayload](
             event_type=EventType.CONTRACT_SETTLED,
             correlation_id=uuid4(),
             actor=EventActor(user_id=actor_id),
@@ -518,7 +518,7 @@ class ContractService:
                     settlement_event_id=None,
                     executed_at=now,
                 )
-                env = EventEnvelope(
+                env = EventEnvelope[ContractRuleExecutedPayload](
                     event_type=EventType.CONTRACT_RULE_EXECUTED,
                     correlation_id=uuid4(),
                     actor=EventActor(user_id=actor_id),
@@ -539,7 +539,7 @@ class ContractService:
                     settlement_event_id=None,
                     executed_at=now,
                 )
-                env = EventEnvelope(
+                env = EventEnvelope[ContractRuleExecutedPayload](
                     event_type=EventType.CONTRACT_RULE_EXECUTED,
                     correlation_id=uuid4(),
                     actor=EventActor(user_id=actor_id),
@@ -581,7 +581,7 @@ class ContractService:
                 settlement_event_id=settlement_event_id,
                 executed_at=now,
             )
-            env = EventEnvelope(
+            env = EventEnvelope[ContractRuleExecutedPayload](
                 event_type=EventType.CONTRACT_RULE_EXECUTED,
                 correlation_id=uuid4(),
                 actor=EventActor(user_id=actor_id),
@@ -597,7 +597,7 @@ class ContractService:
                     shortfall_by_from=shortfall_by_from,
                     defaulted_at=now,
                 )
-                env = EventEnvelope(
+                env = EventEnvelope[ContractDefaultedPayload](
                     event_type=EventType.CONTRACT_DEFAULTED,
                     correlation_id=uuid4(),
                     actor=EventActor(user_id=actor_id),

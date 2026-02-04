@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 
 from ifrontier.infra.sqlite.market import get_last_price, get_last_price_before, get_price_series
 from ifrontier.services.game_time import game_time_now, load_game_time_config_from_env
+from ifrontier.services.market_session import get_market_session
+from ifrontier.services.commonbot_context import CommonBotMarketTrends
 
 
 @dataclass(frozen=True)
@@ -93,3 +95,25 @@ def get_quote(symbol: str, *, series_limit: int = 200) -> MarketQuote:
         ma_20=_ma(prices, 20),
         vol_20=_volatility(prices, 20),
     )
+
+
+def get_market_trends(symbols: List[str]) -> CommonBotMarketTrends:
+    """获取指定证券的市场趋势汇总，用于机器人决策"""
+    trends = CommonBotMarketTrends()
+    cfg = load_game_time_config_from_env()
+    session = get_market_session(cfg=cfg)
+    trends.market_phase = session.phase.value
+
+    for s in symbols:
+        q = get_quote(s)
+        trends.market_quotes[s] = {
+            "symbol": q.symbol,
+            "last_price": q.last_price,
+            "prev_price": q.prev_price,
+            "change_pct": q.change_pct,
+            "ma_5": q.ma_5,
+            "ma_20": q.ma_20,
+            "vol_20": q.vol_20,
+        }
+        trends.symbol_price_series[s] = get_price_series(symbol=s, limit=200)
+    return trends

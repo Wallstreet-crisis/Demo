@@ -68,7 +68,7 @@ def load_game_time_config_from_env() -> GameTimeConfig:
             with conn:
                 conn.execute("INSERT OR REPLACE INTO game_meta(key, value) VALUES ('epoch_utc', ?)", (epoch.isoformat(),))
 
-    seconds_per_game_day = int(os.getenv("IF_SECONDS_PER_GAME_DAY") or "1200")
+    seconds_per_game_day = int(os.getenv("IF_SECONDS_PER_GAME_DAY") or "120")  #120秒一天
     if seconds_per_game_day <= 0:
         seconds_per_game_day = 1200
 
@@ -77,8 +77,8 @@ def load_game_time_config_from_env() -> GameTimeConfig:
     if trading_ratio <= 0 or closing_ratio <= 0 or abs((trading_ratio + closing_ratio) - 1.0) > 1e-6:
         trading_ratio, closing_ratio = 0.85, 0.15
 
-    holiday_every_days = int(os.getenv("IF_HOLIDAY_EVERY_DAYS") or "5")
-    holiday_length_days = int(os.getenv("IF_HOLIDAY_LENGTH_DAYS") or "2")
+    holiday_every_days = int(os.getenv("IF_HOLIDAY_EVERY_DAYS") or "6")
+    holiday_length_days = int(os.getenv("IF_HOLIDAY_LENGTH_DAYS") or "1")
     if holiday_every_days < 0:
         holiday_every_days = 0
     if holiday_length_days < 0:

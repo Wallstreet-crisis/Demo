@@ -158,16 +158,24 @@ class UserHostingAgent:
                 "Output ONLY JSON tool_calls. If no action, output {\"tool_calls\":[]}."
             )
 
+            # v0.2: 增加 max_tokens 防止 JSON 被截断
             resp = llm.chat_completions(system=system, user=user, temperature=0.2, max_tokens=800)
             if not resp or "choices" not in resp:
                 print(f"[LLM:HostingAgent] LLM Request failed for user {self.user_id}, falling back to IDLE.")
                 return []
 
             text = extract_first_message_text(resp)
+            # v0.2: 使用更鲁棒的 JSON 提取方法
+            clean_text = text.strip()
             try:
-                calls = reg.parse_tool_calls(raw_json_text=text)
+                start_idx = clean_text.find("{")
+                end_idx = clean_text.rfind("}")
+                if start_idx != -1 and end_idx != -1:
+                    clean_text = clean_text[start_idx : end_idx + 1]
+                
+                calls = reg.parse_tool_calls(raw_json_text=clean_text)
             except Exception as e:
-                print(f"[LLM:HostingAgent] JSON parse error for user {self.user_id}: {e}. Text: {text[:100]}. Falling back to IDLE.")
+                print(f"[LLM:HostingAgent] JSON parse error for user {self.user_id}: {e}. Text: {text[:200]}. Falling back to IDLE.")
                 return []
             if calls:
                 action_type = "SKILLS"
@@ -195,7 +203,7 @@ class UserHostingAgent:
             results=results,
             taken_at=now,
         )
-        env = EventEnvelope(
+        env = EventEnvelope[AiHostingActionTakenPayload](
             event_type=EventType.AI_HOSTING_ACTION_TAKEN,
             correlation_id=uuid4(),
             actor=EventActor(agent_id=f"hosting:{self.user_id}"),

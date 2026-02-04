@@ -344,7 +344,15 @@ class ContractAgent:
             resp = llm.chat_completions(system=system, user=user, temperature=0.2, max_tokens=800)
             text = extract_first_message_text(resp)
             print(f"[ContractAgent] LLM Raw Response: {text[:200]}...")
-            obj = json.loads(text)
+            
+            # v0.2: 使用更鲁棒的 JSON 提取方法
+            clean_text = text.strip()
+            start_idx = clean_text.find("{")
+            end_idx = clean_text.rfind("}")
+            if start_idx != -1 and end_idx != -1:
+                clean_text = clean_text[start_idx : end_idx + 1]
+            
+            obj = json.loads(clean_text)
         except Exception as exc:
             print(f"[ContractAgent] LLM error or parsing failed: {exc}")
             return None

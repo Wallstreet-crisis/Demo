@@ -130,9 +130,7 @@ class NewsService:
             tags=tags or [],
             created_at=now,
         )
-        envelope = EventEnvelope[
-            NewsCardCreatedPayload
-        ](
+        envelope = EventEnvelope[NewsCardCreatedPayload](
             event_type=EventType.NEWS_CARD_CREATED,
             correlation_id=correlation_id or uuid4(),
             actor=EventActor(user_id=actor_id),
@@ -182,9 +180,7 @@ class NewsService:
             risk_roll=risk_roll,
             created_at=now,
         )
-        envelope = EventEnvelope[
-            NewsVariantEmittedPayload
-        ](
+        envelope = EventEnvelope[NewsVariantEmittedPayload](
             event_type=EventType.NEWS_VARIANT_EMITTED,
             correlation_id=correlation_id or uuid4(),
             actor=EventActor(user_id=author_id),
@@ -235,9 +231,7 @@ class NewsService:
             risk_roll=risk_roll,
             mutated_at=now,
         )
-        envelope = EventEnvelope[
-            NewsVariantMutatedPayload
-        ](
+        envelope = EventEnvelope[NewsVariantMutatedPayload](
             event_type=EventType.NEWS_VARIANT_MUTATED,
             correlation_id=correlation_id or uuid4(),
             actor=EventActor(user_id=editor_id),
@@ -288,9 +282,7 @@ class NewsService:
             delivery_reason=delivery_reason,
             delivered_at=now,
         )
-        envelope = EventEnvelope[
-            NewsDeliveredPayload
-        ](
+        envelope = EventEnvelope[NewsDeliveredPayload](
             event_type=EventType.NEWS_DELIVERED,
             correlation_id=correlation_id or uuid4(),
             actor=EventActor(user_id=from_actor_id),
@@ -374,9 +366,7 @@ class NewsService:
             delivered_count=count,
             broadcasted_at=self._now_game_utc(),
         )
-        envelope = EventEnvelope[
-            NewsBroadcastedPayload
-        ](
+        envelope = EventEnvelope[NewsBroadcastedPayload](
             event_type=EventType.NEWS_BROADCASTED,
             correlation_id=corr,
             actor=EventActor(user_id=actor_id),
