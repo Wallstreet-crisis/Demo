@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Api,
   WsClient,
@@ -17,6 +18,7 @@ interface ChatWsEvent {
 
 export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
   const { playerId } = useAppSession()
+  const nav = useNavigate()
   const [activeThread, setActiveThread] = useState<'global' | ChatThreadResponse>('global')
   const [messages, setMessages] = useState<ChatMessageResponse[]>([])
   const [threads, setThreads] = useState<ChatThreadResponse[]>([])
@@ -416,7 +418,7 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
                           }} 
                           onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--terminal-info)'}
                           onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)'}
-                          onClick={() => window.open(`/contracts/${payload.referenced_contract_id}`, '_blank')}
+                          onClick={() => nav(`/contracts/${payload.referenced_contract_id}`)}
                         >
                           <div style={{ 
                             width: '24px', height: '24px', 

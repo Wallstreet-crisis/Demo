@@ -6,6 +6,7 @@ import Layout from './app/Layout'
 import DashboardPage from './pages/DashboardPage'
 import AccountPage from './pages/AccountPage'
 import ChatPage from './pages/ChatPage'
+import ContractDetailPage from './pages/ContractDetailPage'
 import ContractsPage from './pages/ContractsPage'
 import HostingPage from './pages/HostingPage'
 import MarketPage from './pages/MarketPage'
@@ -78,6 +79,7 @@ function App() {
           <Route path="/news" element={<NewsPage />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/contracts" element={<ContractsPage />} />
+          <Route path="/contracts/:contractId" element={<ContractDetailPage />} />
           <Route path="/hosting" element={<HostingPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

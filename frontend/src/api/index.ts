@@ -14,6 +14,7 @@ import type {
   ContractAgentContextResponse,
   ContractAgentDraftRequest,
   ContractAgentDraftResponse,
+  ContractAgentAppendEditRequest,
   ContractBatchCreateRequest,
   ContractBatchCreateResponse,
   ContractCreateRequest,
@@ -137,6 +138,7 @@ export const Api = {
   contractProposalApprove: (contract_id: string, proposal_id: string, req: ContractProposalApproveRequest) => api.post<ContractProposalApproveResponse>(`/contracts/${encodeURIComponent(contract_id)}/proposals/${encodeURIComponent(proposal_id)}/approve`, req),
 
   contractAgentDraft: (req: ContractAgentDraftRequest) => api.post<ContractAgentDraftResponse>('/contract-agent/draft', req),
+  contractAgentAppendEdit: (req: ContractAgentAppendEditRequest) => api.post<ContractAgentDraftResponse>('/contract-agent/append_edit', req),
   contractAgentGetContext: (actor_id: string) => api.get<ContractAgentContextResponse>(`/contract-agent/context/${encodeURIComponent(actor_id)}`),
   contractAgentClearContext: (actor_id: string) => api.post<void>(`/contract-agent/context/${encodeURIComponent(actor_id)}/clear`),
 

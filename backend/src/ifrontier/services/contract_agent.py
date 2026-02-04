@@ -312,6 +312,32 @@ class ContractAgent:
             risk_rating=risk,
         )
 
+    def append_edit_context(
+        self,
+        *,
+        actor_id: str,
+        base_contract_create: Dict[str, Any],
+        instruction: str,
+    ) -> None:
+        ctx_rec = load_contract_agent_context(actor_id)
+        ctx = dict(ctx_rec.context) if ctx_rec is not None else {}
+
+        edits = ctx.get("edit_history")
+        if not isinstance(edits, list):
+            edits = []
+
+        edits.append(
+            {
+                "edit_id": str(uuid4()),
+                "instruction": str(instruction or ""),
+                "base_contract_create": dict(base_contract_create or {}),
+            }
+        )
+
+        ctx["edit_history"] = edits
+        ctx["working_contract"] = dict(base_contract_create or {})
+        save_contract_agent_context(actor_id=actor_id, context=ctx)
+
     def _draft_with_llm(
         self,
         *,

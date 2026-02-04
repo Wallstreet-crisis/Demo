@@ -1197,6 +1197,34 @@ async def contract_agent_draft(req: ContractAgentDraftRequest) -> ContractAgentD
     )
 
 
+class ContractAgentAppendEditRequest(BaseModel):
+    actor_id: str
+    base_contract_create: Dict[str, Any]
+    instruction: str
+
+
+@router.post("/contract-agent/append_edit")
+async def contract_agent_append_edit(req: ContractAgentAppendEditRequest) -> ContractAgentDraftResponse:
+    try:
+        _contract_agent.append_edit_context(
+            actor_id=req.actor_id,
+            base_contract_create=req.base_contract_create,
+            instruction=req.instruction,
+        )
+        res = _contract_agent.draft(actor_id=req.actor_id, natural_language=req.instruction)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return ContractAgentDraftResponse(
+        draft_id=str(res.draft_id),
+        template_id=str(res.template_id),
+        contract_create=dict(res.contract_create),
+        explanation=str(res.explanation),
+        questions=list(res.questions),
+        risk_rating=str(res.risk_rating),
+    )
+
+
 class ContractAgentContextResponse(BaseModel):
     actor_id: str
     context: Dict[str, Any]
@@ -1607,6 +1635,88 @@ async def contract_batch_create(req: ContractBatchCreateRequest) -> ContractBatc
         for idx, cid in enumerate(ids)
     ]
     return ContractBatchCreateResponse(contracts=items)
+
+
+class ContractResponse(BaseModel):
+    contract_id: str
+    kind: str
+    title: str
+    terms: Dict[str, Any]
+    status: str
+    parties: List[str]
+    required_signers: List[str]
+    signatures: Dict[str, str]  # signer -> signed_at
+    participation_mode: str
+    invited_parties: List[str]
+    created_at: str
+    updated_at: str
+    activated_at: str | None = None
+
+
+@router.get("/contracts/{contract_id}")
+async def contract_get(contract_id: str) -> ContractResponse:
+    try:
+        def _tx(tx, params):
+            res = tx.run(
+                """
+                MATCH (c:Contract {contract_id: $contract_id})
+                RETURN c.contract_id AS contract_id,
+                       c.kind AS kind,
+                       c.title AS title,
+                       c.terms_json AS terms_json,
+                       c.status AS status,
+                       c.parties AS parties,
+                       c.required_signers AS required_signers,
+                       c.signatures AS signatures,
+                       c.participation_mode AS participation_mode,
+                       c.invited_parties AS invited_parties,
+                       c.created_at AS created_at,
+                       c.updated_at AS updated_at,
+                       c.activated_at AS activated_at
+                """,
+                **params
+            ).single()
+            if not res:
+                return None
+            return dict(res)
+
+        with _driver.session() as session:
+            record = session.execute_read(_tx, {"contract_id": contract_id})
+        
+        if not record:
+            raise HTTPException(status_code=404, detail="contract not found")
+        
+        terms = json.loads(record["terms_json"])
+        # signatures in Neo4j might be stored as list of strings "user:id|iso_time" or similar if not handled carefully.
+        # But looking at Service, it seems it's managed as a list in some places?
+        # Actually _create_contract_tx sets signatures to []
+        # _sign_contract_tx adds to list: new_sigs = sigs + $signer
+        # Wait, the models says Dict[str, str]. I should check how signatures are actually stored.
+        
+        sigs_raw = record.get("signatures") or []
+        # In contracts.py _sign_contract_tx, it's just a list of strings (signer IDs).
+        # To match the frontend expectation of Dict[str, str], I'll convert it.
+        sigs_dict = {s: "SIGNED" for s in sigs_raw} 
+
+        return ContractResponse(
+            contract_id=record["contract_id"],
+            kind=record["kind"],
+            title=record["title"],
+            terms=terms,
+            status=record["status"],
+            parties=record["parties"] or [],
+            required_signers=record["required_signers"] or [],
+            signatures=sigs_dict,
+            participation_mode=record["participation_mode"] or "ALL_SIGNERS",
+            invited_parties=record["invited_parties"] or [],
+            created_at=record["created_at"],
+            updated_at=record["updated_at"],
+            activated_at=record.get("activated_at")
+        )
+    except Exception as exc:
+        if isinstance(exc, HTTPException):
+            raise exc
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 class ContractJoinRequest(BaseModel):

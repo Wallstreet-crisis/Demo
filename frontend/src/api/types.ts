@@ -465,6 +465,12 @@ export type ContractAgentDraftRequest = {
   natural_language: string
 }
 
+export type ContractAgentAppendEditRequest = {
+  actor_id: string
+  base_contract_create: Record<string, unknown>
+  instruction: string
+}
+
 export type ContractAgentDraftResponse = {
   draft_id: string
   template_id: string

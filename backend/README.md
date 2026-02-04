@@ -5,12 +5,15 @@
   - `pip install -r requirements.txt`
 
 - 启动：
-  - `uvicorn ifrontier.app.main:app --reload --port 8000 --app-dir src`
+  - `uvicorn ifrontier.app.main:app --reload --port 8010 --app-dir src`  
 
 ## 数据与依赖
 
 ### SQLite
 - 本项目使用 SQLite 落盘到 `backend/data/ledger.db`（首次启动会自动创建表）。
+
+### 前端
+- frontend\vite.config.ts   去看这个配置
 
 ### Neo4j（必需）
 - 默认连接参数在 `src/ifrontier/core/settings.py`。
@@ -18,7 +21,7 @@
   - `IF_NEO4J_URI`（默认 `bolt://localhost:7687`）
   - `IF_NEO4J_USER`（默认 `neo4j`）
   - `IF_NEO4J_PASSWORD`（默认 `password`）
-- 初始化 Cypher：`backend/scripts/neo4j/init.cypher`
+- 初始化 Cypher：`backend/scripts/neo4j/init.cypher`   这个文件需要粘贴到前端的neo4j数据库中 有个对应入口，AI知道
 
 ### 大模型（可选，但托管AI/ContractAgent会用到）
 - 通过 OpenRouter 调用（代码在 `src/ifrontier/infra/llm/openrouter.py`）。

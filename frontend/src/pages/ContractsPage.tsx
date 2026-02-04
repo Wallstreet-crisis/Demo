@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Api, ApiError, type ContractAgentDraftResponse, type ContractResponse, type ContractParty } from '../api'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Api, ApiError, type ContractAgentDraftResponse, type ContractResponse, type ContractParty, type ContractBriefResponse } from '../api'
 import { useAppSession } from '../app/context'
 import { useNotification } from '../app/NotificationContext'
 
@@ -17,14 +17,106 @@ export default function ContractsPage() {
   const { notify } = useNotification()
   const [loading, setLoading] = useState(false)
 
-  // AI Drafting
-  const [naturalLanguage, setNaturalLanguage] = useState('')
-  const [draft, setDraft] = useState<ContractAgentDraftResponse | null>(null)
-
   // Contract Management (by ID)
   const [targetId, setTargetId] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
   const [contractDetail, setContractDetail] = useState<ContractResponse | null>(null)
+
+  // AI Drafting
+  const [naturalLanguage, setNaturalLanguage] = useState('')
+  const [draft, setDraft] = useState<ContractAgentDraftResponse | null>(null)
+  const [isEditingDraft, setIsEditingDraft] = useState(false)
+  const [editedDraftJson, setEditedDraftJson] = useState('')
+
+  // Mentions state
+  const [showMentionList, setShowMentionList] = useState(false)
+  const [mentionType, setMentionType] = useState<'PLAYER' | 'CONTRACT' | null>(null)
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [mentionIndex, setMentionIndex] = useState(0)
+  const [players, setPlayers] = useState<string[]>([])
+  const [contracts, setContracts] = useState<ContractBriefResponse[]>([])
+  
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  const fetchMentionsData = useCallback(async () => {
+    if (!playerId) return
+    try {
+      const [pRes, cRes] = await Promise.all([
+        Api.listPlayers(50),
+        Api.listContracts(playerId, 50)
+      ])
+      setPlayers(pRes.items)
+      setContracts(cRes.items)
+    } catch (e) {
+      console.error('Mention data fetch failed', e)
+    }
+  }, [playerId])
+
+  useEffect(() => {
+    fetchMentionsData()
+  }, [fetchMentionsData])
+
+  const handleInputChange = (val: string) => {
+    setNaturalLanguage(val)
+    const cursor = inputRef.current?.selectionStart || 0
+
+    // Detect @ for players
+    const lastAt = val.lastIndexOf('@', cursor - 1)
+    if (lastAt !== -1 && (lastAt === 0 || val[lastAt - 1] === ' ')) {
+      const query = val.slice(lastAt + 1, cursor)
+      if (!query.includes(' ')) {
+        setMentionType('PLAYER')
+        setMentionQuery(query)
+        setMentionIndex(0)
+        setShowMentionList(true)
+        return
+      }
+    }
+
+    // Detect # for contracts
+    const lastHash = val.lastIndexOf('#', cursor - 1)
+    if (lastHash !== -1 && (lastHash === 0 || val[lastHash - 1] === ' ')) {
+      const query = val.slice(lastHash + 1, cursor)
+      if (!query.includes(' ')) {
+        setMentionType('CONTRACT')
+        setMentionQuery(query)
+        setMentionIndex(0)
+        setShowMentionList(true)
+        return
+      }
+    }
+
+    setShowMentionList(false)
+  }
+
+  const filteredItems = useMemo(() => {
+    if (mentionType === 'PLAYER') {
+      return players.filter(p => p.toLowerCase().includes(mentionQuery.toLowerCase()));
+    } else if (mentionType === 'CONTRACT') {
+      return contracts.filter(c => c.title.toLowerCase().includes(mentionQuery.toLowerCase()) || c.contract_id.includes(mentionQuery));
+    }
+    return [];
+  }, [mentionType, players, contracts, mentionQuery]);
+
+  const selectMention = (item: string | ContractBriefResponse) => {
+    const cursor = inputRef.current?.selectionStart || 0
+    let replacement = ''
+    let startIdx = 0
+
+    if (mentionType === 'PLAYER') {
+      replacement = `@${item} `
+      startIdx = naturalLanguage.lastIndexOf('@', cursor - 1)
+    } else {
+      const c = item as ContractBriefResponse
+      replacement = `#${c.contract_id} `
+      startIdx = naturalLanguage.lastIndexOf('#', cursor - 1)
+    }
+
+    const newVal = naturalLanguage.slice(0, startIdx) + replacement + naturalLanguage.slice(cursor)
+    setNaturalLanguage(newVal)
+    setShowMentionList(false)
+    inputRef.current?.focus()
+  }
 
   const handleDraft = async () => {
     if (!naturalLanguage.trim()) return
@@ -36,6 +128,8 @@ export default function ContractsPage() {
         natural_language: naturalLanguage
       })
       setDraft(res)
+      setEditedDraftJson(JSON.stringify(res.contract_create, null, 2))
+      setIsEditingDraft(false)
       notify('success', '合约草案已生成')
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
@@ -56,14 +150,90 @@ export default function ContractsPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           {/* Left: AI Drafting */}
-          <div style={{ borderRight: '1px solid #eee', paddingRight: 20 }}>
+          <div style={{ borderRight: '1px solid #eee', paddingRight: 20, position: 'relative' }}>
             <h4 style={{ margin: '0 0 10px' }}>AI 智能草拟</h4>
+            
+            {/* Mention List UI */}
+            {showMentionList && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                right: 20,
+                background: '#fff',
+                border: '1px solid #ddd',
+                boxShadow: '0 -5px 15px rgba(0,0,0,0.1)',
+                zIndex: 100,
+                maxHeight: '150px',
+                overflowY: 'auto',
+                marginBottom: '5px',
+                borderRadius: '4px'
+              }}>
+                {mentionType === 'PLAYER' ? (
+                  (filteredItems as string[]).map((p, idx) => {
+                    const isSelected = mentionIndex === idx;
+                    return (
+                      <div 
+                        key={p} 
+                        onClick={() => selectMention(p)}
+                        style={{ 
+                          padding: '8px 12px', 
+                          cursor: 'pointer', 
+                          borderBottom: '1px solid #eee',
+                          fontSize: '12px',
+                          background: isSelected ? '#f0f7ff' : '#fff',
+                        }}
+                      >
+                        @{p}
+                      </div>
+                    );
+                  })
+                ) : (
+                  (filteredItems as ContractBriefResponse[]).map((c, idx) => {
+                    const isSelected = mentionIndex === idx;
+                    return (
+                      <div 
+                        key={c.contract_id} 
+                        onClick={() => selectMention(c)}
+                        style={{ 
+                          padding: '8px 12px', 
+                          cursor: 'pointer', 
+                          borderBottom: '1px solid #eee',
+                          background: isSelected ? '#f0f7ff' : '#fff',
+                        }}
+                      >
+                        #{c.title} ({c.contract_id.slice(0, 8)})
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
             <div style={{ display: 'grid', gap: 10 }}>
               <textarea
+                ref={inputRef}
                 style={{ width: '100%', minHeight: 100, padding: 10, boxSizing: 'border-box' }}
-                placeholder="例如: 我想和 user:bob 签署一份对赌协议，如果 BLUEGOLD 价格超过 150，他付给我 1000 现金..."
+                placeholder="例如: 我想和 @bob 签署一份对赌协议，如果 #BLUEGOLD 价格超过 150..."
                 value={naturalLanguage}
-                onChange={e => setNaturalLanguage(e.target.value)}
+                onChange={e => handleInputChange(e.target.value)}
+                onKeyDown={e => {
+                  if (showMentionList && filteredItems.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setMentionIndex(prev => (prev + 1) % filteredItems.length);
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setMentionIndex(prev => (prev - 1 + filteredItems.length) % filteredItems.length);
+                    } else if (e.key === 'Enter' || e.key === 'Tab') {
+                      e.preventDefault();
+                      selectMention(filteredItems[mentionIndex]);
+                    } else if (e.key === 'Escape') {
+                      setShowMentionList(false);
+                    }
+                    return;
+                  }
+                }}
               />
               <button 
                 onClick={handleDraft} 
@@ -191,27 +361,43 @@ export default function ContractsPage() {
 
       {draft && (
         <div className="card" style={{ textAlign: 'left', border: '2px solid #52c41a' }}>
-          <h3 style={{ marginTop: 0, color: '#52c41a' }}>合约草案已生成</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <h3 style={{ margin: 0, color: '#52c41a' }}>合约草案已生成</h3>
+            <button 
+              className="cyber-button"
+              onClick={() => setIsEditingDraft(!isEditingDraft)}
+              style={{ fontSize: '11px', padding: '4px 12px' }}
+            >
+              {isEditingDraft ? '查看 AI 解释' : '手动编辑 JSON'}
+            </button>
+          </div>
+
           <div style={{ display: 'grid', gap: 10 }}>
-            <div><strong>草案 ID:</strong> <code>{draft.draft_id}</code></div>
             <div><strong>风险评估:</strong> <span style={{ color: draft.risk_rating === 'HIGH' ? 'red' : 'green' }}>{draft.risk_rating}</span></div>
-            <div style={{ background: '#f6ffed', padding: 15, borderRadius: 8 }}>
-              <div style={{ fontWeight: 600, marginBottom: 5 }}>AI 解释:</div>
-              {draft.explanation}
-            </div>
-            <details>
-              <summary style={{ cursor: 'pointer', color: '#888' }}>查看 JSON 定义</summary>
-              <pre style={{ fontSize: 11, background: '#f8f8f8', padding: 10, marginTop: 10 }}>
-                {JSON.stringify(draft.contract_create, null, 2)}
-              </pre>
-            </details>
+            
+            {isEditingDraft ? (
+              <textarea
+                style={{ 
+                  width: '100%', minHeight: 200, padding: 10, fontFamily: 'monospace', 
+                  fontSize: '12px', background: '#f8f8f8', border: '1px solid #ddd' 
+                }}
+                value={editedDraftJson}
+                onChange={e => setEditedDraftJson(e.target.value)}
+              />
+            ) : (
+              <div style={{ background: '#f6ffed', padding: 15, borderRadius: 8 }}>
+                <div style={{ fontWeight: 600, marginBottom: 5 }}>AI 解释:</div>
+                {draft.explanation}
+              </div>
+            )}
+
             <button 
               onClick={() => {
                 handleCreateContract()
               }}
-              style={{ width: '100%', padding: '12px', background: '#52c41a', color: '#fff', border: 'none', fontWeight: 700 }}
+              style={{ width: '100%', padding: '12px', background: '#52c41a', color: '#fff', border: 'none', fontWeight: 700, marginTop: 10 }}
             >
-              正式创建该合约
+              {isEditingDraft ? '保存并正式创建' : '正式创建该合约'}
             </button>
           </div>
         </div>
@@ -223,23 +409,48 @@ export default function ContractsPage() {
     if (!draft) return
     setLoading(true)
     try {
-      const parties: ContractParty[] = Array.isArray(draft.contract_create.parties) 
-        ? draft.contract_create.parties.map((p: string | ContractParty) => typeof p === 'string' ? { party_id: p, role: 'PARTY' } : p)
+      let finalContractCreate = draft.contract_create
+      if (isEditingDraft) {
+        try {
+          finalContractCreate = JSON.parse(editedDraftJson)
+        } catch {
+          notify('error', 'JSON 格式错误')
+          setLoading(false)
+          return
+        }
+      }
+
+      const parties: ContractParty[] = Array.isArray(finalContractCreate.parties) 
+        ? finalContractCreate.parties.map((p: string | ContractParty) => typeof p === 'string' ? { party_id: p, role: 'PARTY' } : p)
         : []
 
       const res = await Api.contractCreate({
         actor_id: `user:${playerId}`,
-        kind: draft.contract_create.kind as string,
-        title: draft.contract_create.title as string,
-        terms: draft.contract_create.terms as Record<string, unknown>,
+        kind: finalContractCreate.kind as string,
+        title: finalContractCreate.title as string,
+        terms: finalContractCreate.terms as Record<string, unknown>,
         parties: parties,
-        required_signers: draft.contract_create.required_signers as string[],
-        participation_mode: draft.contract_create.participation_mode as string || null,
-        invited_parties: draft.contract_create.invited_parties as string[] || null,
+        required_signers: finalContractCreate.required_signers as string[],
+        participation_mode: finalContractCreate.participation_mode as string || null,
+        invited_parties: finalContractCreate.invited_parties as string[] || null,
       })
       notify('success', `合约创建成功: ${res.contract_id}`)
+      
+      // Auto-share to chat
+      try {
+        await Api.chatPublicSend({
+          sender_id: `user:${playerId}`,
+          message_type: 'TEXT',
+          content: `建立新契约: #${res.contract_id} (${finalContractCreate.title})`,
+          payload: { referenced_contract_id: res.contract_id }
+        })
+      } catch (e) {
+        console.error('Failed to auto-share contract to chat', e)
+      }
+
       setTargetId(res.contract_id)
       setDraft(null)
+      setIsEditingDraft(false)
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
       notify('error', `创建失败: ${msg}`)

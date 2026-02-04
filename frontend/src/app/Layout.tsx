@@ -230,7 +230,6 @@ export default function Layout() {
           <nav style={{ display: 'flex', gap: '4px' }}>
             <NavItem to="/dashboard" label="DASHBOARD" />
             <NavItem to="/news" label="INTELLIGENCE" />
-            <NavItem to="/contracts" label="CONTRACTS" />
             <NavItem to="/account" label="PORTFOLIO" />
           </nav>
         </div>
