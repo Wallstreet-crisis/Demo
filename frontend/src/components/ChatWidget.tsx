@@ -539,6 +539,16 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
                 ) : (
                   (filteredItems as ContractBriefResponse[]).map((c, idx) => {
                     const isSelected = mentionIndex === idx;
+                    const partiesText = (c.parties && c.parties.length > 0) ? c.parties.join(',') : ''
+                    const total = (c.required_signers && c.required_signers.length > 0) ? c.required_signers.length : 0
+                    const signed = (c.signatures && c.signatures.length > 0) ? c.signatures.length : 0
+                    const signText = total > 0 ? `${signed}/${total}` : ''
+                    const timeText = c.created_at ? String(c.created_at).slice(11, 16) : ''
+                    const parts: string[] = []
+                    if (partiesText) parts.push(partiesText)
+                    if (signText) parts.push(`signed:${signText}`)
+                    if (timeText) parts.push(timeText)
+                    const summary = parts.length > 0 ? ` | ${parts.join(' | ')}` : ''
                     return (
                       <div 
                         key={c.contract_id} 
@@ -563,7 +573,7 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 'bold', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ color: isSelected ? 'var(--terminal-warn)' : '#64748b' }}>#</span>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}{summary}</span>
                           </div>
                           <div style={{ fontSize: '9px', opacity: 0.5, marginTop: '2px', fontFamily: 'monospace', display: 'flex', justifyContent: 'space-between' }}>
                             <span>ID: {c.contract_id.slice(0, 12)}...</span>

@@ -70,6 +70,10 @@ export type ContractBriefResponse = {
   title: string
   kind: string
   status: string
+  created_at?: string | null
+  parties?: string[]
+  required_signers?: string[]
+  signatures?: string[]
 }
 
 export type ContractListResponse = {

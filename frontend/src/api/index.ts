@@ -100,8 +100,8 @@ export const Api = {
   marketSummary: () => api.get<MarketSummaryResponse>('/market/summary'),
 
   listPlayers: (limit = 100) => api.get<PlayerListResponse>('/players', { limit }),
-  listContracts: (actor_id?: string, limit = 50) =>
-    api.get<ContractListResponse>('/contracts/list', { actor_id, limit }),
+  listContracts: (actor_id?: string, limit = 50, status?: string) =>
+    api.get<ContractListResponse>('/contracts/list', { actor_id, limit, status }),
 
   submitLimitOrder: (req: PlayerLimitOrderRequest) => api.post<PlayerOrderResponse>('/orders/limit', req),
   submitMarketOrder: async (req: PlayerMarketOrderRequest) => {

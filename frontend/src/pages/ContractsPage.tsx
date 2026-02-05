@@ -191,6 +191,16 @@ export default function ContractsPage() {
                 ) : (
                   (filteredItems as ContractBriefResponse[]).map((c, idx) => {
                     const isSelected = mentionIndex === idx;
+                    const partiesText = (c.parties && c.parties.length > 0) ? c.parties.join(',') : ''
+                    const total = (c.required_signers && c.required_signers.length > 0) ? c.required_signers.length : 0
+                    const signed = (c.signatures && c.signatures.length > 0) ? c.signatures.length : 0
+                    const signText = total > 0 ? `${signed}/${total}` : ''
+                    const timeText = c.created_at ? String(c.created_at).slice(11, 16) : ''
+                    const parts: string[] = []
+                    if (partiesText) parts.push(partiesText)
+                    if (signText) parts.push(`signed:${signText}`)
+                    if (timeText) parts.push(timeText)
+                    const summary = parts.length > 0 ? ` | ${parts.join(' | ')}` : ''
                     return (
                       <div 
                         key={c.contract_id} 
@@ -202,7 +212,7 @@ export default function ContractsPage() {
                           background: isSelected ? '#f0f7ff' : '#fff',
                         }}
                       >
-                        #{c.title} ({c.contract_id.slice(0, 8)})
+                        #{c.title}{summary} | {c.status} | {c.kind} ({c.contract_id.slice(0, 8)})
                       </div>
                     );
                   })
@@ -255,7 +265,7 @@ export default function ContractsPage() {
                 onChange={e => setTargetId(e.target.value)}
                 style={{ width: '100%', padding: '10px', boxSizing: 'border-box' }}
               />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <button 
                   onClick={() => handleAction('sign')} 
                   disabled={!targetId || actionLoading}
@@ -435,19 +445,13 @@ export default function ContractsPage() {
         invited_parties: finalContractCreate.invited_parties as string[] || null,
       })
       notify('success', `合约创建成功: ${res.contract_id}`)
-      
-      // Auto-share to chat
-      try {
-        await Api.chatPublicSend({
-          sender_id: `user:${playerId}`,
-          message_type: 'TEXT',
-          content: `建立新契约: #${res.contract_id} (${finalContractCreate.title})`,
-          payload: { referenced_contract_id: res.contract_id }
-        })
-      } catch (e) {
-        console.error('Failed to auto-share contract to chat', e)
-      }
 
+      try {
+        await fetchMentionsData()
+      } catch {
+        // ignore
+      }
+      
       setTargetId(res.contract_id)
       setDraft(null)
       setIsEditingDraft(false)

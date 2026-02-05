@@ -403,6 +403,16 @@ class ContractService:
             payload=payload,
         )
         self._event_store.append(EventEnvelopeJson.from_envelope(env))
+
+        if str(status) == ContractStatus.ACTIVE.value:
+            payload2 = ContractActivatedPayload(contract_id=contract_id, activated_at=now)
+            env2 = EventEnvelope[ContractActivatedPayload](
+                event_type=EventType.CONTRACT_ACTIVATED,
+                correlation_id=uuid4(),
+                actor=EventActor(user_id=signer),
+                payload=payload2,
+            )
+            self._event_store.append(EventEnvelopeJson.from_envelope(env2))
         return ContractStatus(status)
 
     def activate_contract(self, *, contract_id: str, actor_id: str) -> None:
@@ -858,7 +868,8 @@ class ContractService:
             WITH c, new_sigs, reqs,
                  ALL(x IN reqs WHERE x IN new_sigs) AS all_signed
             SET c.signatures = new_sigs,
-                c.status = CASE WHEN all_signed THEN 'SIGNED' ELSE c.status END,
+                c.status = CASE WHEN all_signed THEN 'ACTIVE' ELSE c.status END,
+                c.activated_at = CASE WHEN all_signed THEN $signed_at ELSE c.activated_at END,
                 c.updated_at = $signed_at
             RETURN c.status AS status
             """,

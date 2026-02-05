@@ -1602,6 +1602,10 @@ class ContractBriefResponse(BaseModel):
     title: str
     kind: str
     status: str
+    created_at: str | None = None
+    parties: List[str] = []
+    required_signers: List[str] = []
+    signatures: List[str] = []
 
 
 class ContractListResponse(BaseModel):
@@ -1609,14 +1613,28 @@ class ContractListResponse(BaseModel):
 
 
 @router.get("/contracts/list")
-async def list_contracts(actor_id: str | None = None, limit: int = 50) -> ContractListResponse:
+async def list_contracts(
+    actor_id: str | None = None,
+    limit: int = 50,
+    status: str | None = None,
+) -> ContractListResponse:
     """列出当前玩家相关的契约，用于聊天引用"""
     aid = actor_id
     if aid is not None:
         aid = str(aid)
         if ":" not in aid:
             aid = f"user:{aid}"
+        aid = aid.lower()
 
+
+    aid_plain: str | None = None
+    if aid is not None and str(aid).startswith("user:"):
+        aid_plain = str(aid)[len("user:") :].lower()
+
+
+    st = status
+    if st is not None:
+        st = str(st).upper()
     try:
         with _driver.session() as session:
             records = session.execute_read(
@@ -1624,22 +1642,31 @@ async def list_contracts(actor_id: str | None = None, limit: int = 50) -> Contra
                     tx.run(
                         """
                         MATCH (c:Contract)
-                        WHERE $actor_id IS NULL
+                        WHERE (
+                              $actor_id IS NULL
                            OR $actor_id IN coalesce(c.parties, [])
                            OR $actor_id IN coalesce(c.required_signers, [])
                            OR $actor_id IN coalesce(c.invited_parties, [])
+                           OR ($actor_id_plain IS NOT NULL AND $actor_id_plain IN coalesce(c.parties, []))
+                           OR ($actor_id_plain IS NOT NULL AND $actor_id_plain IN coalesce(c.required_signers, []))
+                           OR ($actor_id_plain IS NOT NULL AND $actor_id_plain IN coalesce(c.invited_parties, []))
+                        )
+                        AND ($status IS NULL OR c.status = $status)
                         RETURN c.contract_id AS contract_id,
                                c.title AS title,
                                c.kind AS kind,
                                c.status AS status,
-                               c.created_at AS created_at
+                               c.created_at AS created_at,
+                               coalesce(c.parties, []) AS parties,
+                               coalesce(c.required_signers, []) AS required_signers,
+                               coalesce(c.signatures, []) AS signatures
                         ORDER BY created_at DESC
                         LIMIT $limit
                         """,
                         **params,
                     )
                 ),
-                {"actor_id": aid, "limit": int(limit)},
+                {"actor_id": aid, "actor_id_plain": aid_plain, "limit": int(limit), "status": st},
             )
 
         items = [
@@ -1648,6 +1675,10 @@ async def list_contracts(actor_id: str | None = None, limit: int = 50) -> Contra
                 title=str(r.get("title") or ""),
                 kind=str(r.get("kind") or ""),
                 status=str(r.get("status") or ""),
+                created_at=str(r.get("created_at") or "") or None,
+                parties=list(r.get("parties") or []),
+                required_signers=list(r.get("required_signers") or []),
+                signatures=list(r.get("signatures") or []),
             )
             for r in records
             if (r.get("contract_id") is not None)

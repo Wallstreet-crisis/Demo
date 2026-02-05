@@ -208,18 +208,12 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
         participation_mode: finalContractCreate.participation_mode as string || null,
         invited_parties: finalContractCreate.invited_parties as string[] || null,
       })
-      notify('success', 'CONTRACT_ESTABLISHED')
-      
-      // Auto-share to chat if established
+      notify('success', `CONTRACT_ESTABLISHED: ${res.contract_id}`)
+
       try {
-        await Api.chatPublicSend({
-          sender_id: `user:${playerId}`,
-          message_type: 'TEXT',
-          content: `建立新契约: #${res.contract_id} (${finalContractCreate.title})`,
-          payload: { referenced_contract_id: res.contract_id }
-        })
-      } catch (e) {
-        console.error('Failed to auto-share contract to chat', e)
+        await fetchMentionsData()
+      } catch {
+        // ignore
       }
 
       setDraft(null)
@@ -282,6 +276,16 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
             ) : (
               (filteredItems as ContractBriefResponse[]).map((c, idx) => {
                 const isSelected = mentionIndex === idx;
+                const partiesText = (c.parties && c.parties.length > 0) ? c.parties.join(',') : ''
+                const total = (c.required_signers && c.required_signers.length > 0) ? c.required_signers.length : 0
+                const signed = (c.signatures && c.signatures.length > 0) ? c.signatures.length : 0
+                const signText = total > 0 ? `${signed}/${total}` : ''
+                const timeText = c.created_at ? String(c.created_at).slice(11, 16) : ''
+                const parts: string[] = []
+                if (partiesText) parts.push(partiesText)
+                if (signText) parts.push(`signed:${signText}`)
+                if (timeText) parts.push(timeText)
+                const summary = parts.length > 0 ? ` | ${parts.join(' | ')}` : ''
                 return (
                   <div 
                     key={c.contract_id} 
@@ -295,7 +299,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
                       color: isSelected ? '#fff' : '#cbd5e1',
                     }}
                   >
-                    #{c.title} ({c.contract_id.slice(0, 8)})
+                    #{c.title}{summary} ({c.contract_id.slice(0, 8)})
                   </div>
                 );
               })
