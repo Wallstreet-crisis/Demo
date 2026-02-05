@@ -59,6 +59,8 @@ import type {
   NewsOwnershipTransferRequest,
   NewsPropagateRequest,
   NewsPropagateResponse,
+  NewsPropagateQuoteRequest,
+  NewsPropagateQuoteResponse,
   NewsStoreCatalogResponse,
   NewsStorePurchaseRequest,
   NewsStorePurchaseResponse,
@@ -157,6 +159,8 @@ export const Api = {
   newsEmitVariant: (req: NewsEmitVariantRequest) => api.post<NewsEmitVariantResponse>('/news/variants/emit', req),
   newsMutateVariant: (req: NewsMutateVariantRequest) => api.post<NewsMutateVariantResponse>('/news/variants/mutate', req),
   newsPropagate: (req: NewsPropagateRequest) => api.post<NewsPropagateResponse>('/news/propagate', req),
+  newsPropagateQuote: (req: NewsPropagateQuoteRequest) =>
+    api.post<NewsPropagateQuoteResponse>('/news/propagate/quote', req),
   newsInbox: (player_id: string, limit = 50) => api.get<NewsInboxResponse>(`/news/inbox/${encodeURIComponent(player_id)}`, { limit }),
   newsPublicFeed: (limit = 20) => api.get<NewsFeedResponse>('/news/public/feed', { limit }),
   newsBroadcast: (req: NewsBroadcastRequest) => api.post<NewsBroadcastResponse>('/news/broadcast', req),

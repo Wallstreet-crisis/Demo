@@ -10,6 +10,20 @@ export default function PropagandaWidget({ isFocused }: { isFocused?: boolean })
   const { notify } = useNotification()
   
   const [loading, setLoading] = useState(false)
+  const [boostModalOpen, setBoostModalOpen] = useState(false)
+  const [boostVariantId, setBoostVariantId] = useState<string>('')
+  const [boostSpendCash, setBoostSpendCash] = useState<string>('')
+  const [boostLimit, setBoostLimit] = useState<number>(100)
+  const [boostQuote, setBoostQuote] = useState<{
+    mutation_depth: number
+    per_delivery_cost: number
+    requested_limit: number
+    affordable_limit: number
+    estimated_total_cost: number
+  } | null>(null)
+  const [suppressModalOpen, setSuppressModalOpen] = useState(false)
+  const [suppressChainId, setSuppressChainId] = useState<string>('')
+  const [suppressSpendInfluence, setSuppressSpendInfluence] = useState<string>('500')
   const [inboxItems, setInboxItems] = useState<NewsInboxResponseItem[]>([])
   const [storeItems, setStoreItems] = useState<NewsStoreCatalogItem[]>([])
   const [loadingStore, setLoadingStore] = useState(false)
@@ -108,17 +122,59 @@ export default function PropagandaWidget({ isFocused }: { isFocused?: boolean })
     }
   }
 
-  const handleBoost = async (variantId: string) => {
+  const openBoostModal = (variantId: string) => {
+    setBoostVariantId(variantId)
+    setBoostSpendCash(propSpendCash)
+    setBoostLimit(propLimit)
+    setBoostQuote(null)
+    setBoostModalOpen(true)
+
+    const budget = Number(propSpendCash)
+    const limit = Number(propLimit)
+    if (!playerId) return
+    if (!Number.isFinite(budget) || budget <= 0) return
+    if (!Number.isFinite(limit) || limit <= 0) return
+
+    setLoading(true)
+    void (async () => {
+      try {
+        const r = await Api.newsPropagateQuote({
+          variant_id: variantId,
+          from_actor_id: `user:${playerId}`,
+          spend_cash: budget,
+          limit,
+        })
+        setBoostQuote(r)
+      } catch (e) {
+        const msg = e instanceof ApiError ? e.message : String(e)
+        notify('error', msg)
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }
+
+  const handleBoostQuote = async () => {
+    if (!playerId) return
+    const budget = Number(boostSpendCash)
+    if (!Number.isFinite(budget) || budget <= 0) {
+      notify('error', '请填写正数预算')
+      return
+    }
+    const limit = Number(boostLimit)
+    if (!Number.isFinite(limit) || limit <= 0) {
+      notify('error', '请填写正数目标覆盖人数')
+      return
+    }
     setLoading(true)
     try {
-      const r = await Api.newsPropagate({
-        variant_id: variantId,
+      const r = await Api.newsPropagateQuote({
+        variant_id: boostVariantId,
         from_actor_id: `user:${playerId}`,
-        visibility_level: 'NORMAL',
-        spend_cash: propSpendCash ? Number(propSpendCash) : 0,
-        limit: propLimit,
+        spend_cash: budget,
+        limit,
       })
-      notify('success', `BOOST_SUCCESS: REACHED_${r.delivered}`)
+      setBoostQuote(r)
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : String(e)
       notify('error', msg)
@@ -127,7 +183,41 @@ export default function PropagandaWidget({ isFocused }: { isFocused?: boolean })
     }
   }
 
-  const handleSuppress = async (item: NewsInboxResponseItem) => {
+  const handleBoostConfirm = async () => {
+    if (!playerId) return
+    const budget = Number(boostSpendCash)
+    if (!Number.isFinite(budget) || budget <= 0) {
+      notify('error', '请填写正数预算')
+      return
+    }
+    const limit = Number(boostLimit)
+    if (!Number.isFinite(limit) || limit <= 0) {
+      notify('error', '请填写正数目标覆盖人数')
+      return
+    }
+    setLoading(true)
+    try {
+      const r = await Api.newsPropagate({
+        variant_id: boostVariantId,
+        from_actor_id: `user:${playerId}`,
+        visibility_level: 'NORMAL',
+        spend_cash: budget,
+        limit,
+      })
+      notify('success', `BOOST_SUCCESS: REACHED_${r.delivered}`)
+      setBoostModalOpen(false)
+      setBoostVariantId('')
+      setBoostQuote(null)
+      refreshInbox()
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : String(e)
+      notify('error', msg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const openSuppressModal = (item: NewsInboxResponseItem) => {
     // Current API newsSuppress requires chain_id
     // We try to extract it from truth_payload if present
     const truth = (item.truth_payload && typeof item.truth_payload === 'object')
@@ -140,14 +230,29 @@ export default function PropagandaWidget({ isFocused }: { isFocused?: boolean })
       return
     }
 
+    setSuppressChainId(chainId)
+    setSuppressSpendInfluence(propSpendCash ? String(propSpendCash) : '500')
+    setSuppressModalOpen(true)
+  }
+
+  const handleSuppressConfirm = async () => {
+    if (!playerId) return
+    const spend = Number(suppressSpendInfluence)
+    if (!Number.isFinite(spend) || spend <= 0) {
+      notify('error', '请填写正数影响力投入')
+      return
+    }
     setLoading(true)
     try {
       await Api.newsSuppress({
         actor_id: `user:${playerId}`,
-        chain_id: chainId,
-        spend_influence: propSpendCash ? Number(propSpendCash) : 500,
+        chain_id: suppressChainId,
+        spend_influence: spend,
       })
-      notify('success', `SUPPRESSION_ENGAGED: CHAIN_${chainId.slice(0,8)}`)
+      notify('success', `SUPPRESSION_ENGAGED: CHAIN_${suppressChainId.slice(0, 8)}`)
+      setSuppressModalOpen(false)
+      setSuppressChainId('')
+      refreshInbox()
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : String(e)
       notify('error', msg)
@@ -175,6 +280,178 @@ export default function PropagandaWidget({ isFocused }: { isFocused?: boolean })
         </div>
       }
     >
+      {boostModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+          onClick={() => {
+            if (loading) return
+            setBoostModalOpen(false)
+            setBoostVariantId('')
+            setBoostQuote(null)
+          }}
+        >
+          <div
+            style={{
+              width: 420,
+              maxWidth: '92vw',
+              background: 'rgba(10, 14, 18, 0.95)',
+              border: '1px solid var(--terminal-border)',
+              padding: 12,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: '11px', opacity: 0.8, marginBottom: 8 }}>PAID_BOOST</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: '9px', opacity: 0.7, marginBottom: 4 }}>BUDGET_CASH</div>
+                <input
+                  className="cyber-input"
+                  type="number"
+                  value={boostSpendCash}
+                  onChange={(e) => setBoostSpendCash(e.target.value)}
+                  style={{ fontSize: '10px', width: '100%', height: '24px' }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: '9px', opacity: 0.7, marginBottom: 4 }}>TARGET_REACH</div>
+                <input
+                  className="cyber-input"
+                  type="number"
+                  value={boostLimit}
+                  onChange={(e) => setBoostLimit(Number(e.target.value))}
+                  style={{ fontSize: '10px', width: '100%', height: '24px' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+              <button className="cyber-button" onClick={handleBoostQuote} disabled={loading} style={{ fontSize: '10px' }}>
+                REFRESH_QUOTE
+              </button>
+              <button
+                className="cyber-button"
+                onClick={handleBoostConfirm}
+                disabled={loading}
+                style={{ fontSize: '10px', borderColor: 'var(--terminal-success)', color: 'var(--terminal-success)' }}
+              >
+                CONFIRM
+              </button>
+              <button
+                className="cyber-button"
+                onClick={() => {
+                  if (loading) return
+                  setBoostModalOpen(false)
+                  setBoostVariantId('')
+                  setBoostQuote(null)
+                }}
+                disabled={loading}
+                style={{ fontSize: '10px', opacity: 0.9 }}
+              >
+                CANCEL
+              </button>
+            </div>
+
+            <div style={{ fontSize: '10px', opacity: 0.85 }}>
+              <div style={{ opacity: 0.7, marginBottom: 4 }}>VARIANT: {boostVariantId ? boostVariantId.slice(0, 8) : ''}</div>
+              {boostQuote ? (
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'end', gap: 8 }}>
+                    <div style={{ opacity: 0.7 }}>EST_REACH</div>
+                    <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--terminal-success)', lineHeight: 1 }}>
+                      {boostQuote.affordable_limit}
+                      <span style={{ fontSize: '12px', fontWeight: 400, opacity: 0.8, marginLeft: 6, color: 'inherit' }}>
+                        / {boostQuote.requested_limit}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, opacity: 0.9 }}>
+                    <div>DEPTH: {boostQuote.mutation_depth}</div>
+                    <div>UNIT_COST: {boostQuote.per_delivery_cost.toFixed(2)}</div>
+                    <div style={{ gridColumn: '1 / -1' }}>EST_TOTAL: {boostQuote.estimated_total_cost.toFixed(2)}</div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ opacity: 0.6 }}>正在获取报价...</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {suppressModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+          onClick={() => {
+            if (loading) return
+            setSuppressModalOpen(false)
+            setSuppressChainId('')
+          }}
+        >
+          <div
+            style={{
+              width: 420,
+              maxWidth: '92vw',
+              background: 'rgba(10, 14, 18, 0.95)',
+              border: '1px solid var(--terminal-border)',
+              padding: 12,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: '11px', opacity: 0.8, marginBottom: 8 }}>SUPPRESS_CONFIRM</div>
+            <div style={{ fontSize: '10px', opacity: 0.85, marginBottom: 10 }}>
+              <div style={{ opacity: 0.7, marginBottom: 4 }}>CHAIN: {suppressChainId ? suppressChainId.slice(0, 8) : ''}</div>
+              <div style={{ marginBottom: 6 }}>CASH_COST: 100000</div>
+              <div style={{ opacity: 0.7, marginBottom: 4 }}>SPEND_INFLUENCE</div>
+              <input
+                className="cyber-input"
+                type="number"
+                value={suppressSpendInfluence}
+                onChange={(e) => setSuppressSpendInfluence(e.target.value)}
+                style={{ fontSize: '10px', width: '100%', height: '24px' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                className="cyber-button"
+                onClick={handleSuppressConfirm}
+                disabled={loading}
+                style={{ fontSize: '10px', borderColor: 'var(--terminal-error)', color: 'var(--terminal-error)' }}
+              >
+                CONFIRM
+              </button>
+              <button
+                className="cyber-button"
+                onClick={() => {
+                  if (loading) return
+                  setSuppressModalOpen(false)
+                  setSuppressChainId('')
+                }}
+                disabled={loading}
+                style={{ fontSize: '10px', opacity: 0.9 }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '8px' }}>
         
         {/* Global Settings - Only show when focused */}
@@ -237,13 +514,13 @@ export default function PropagandaWidget({ isFocused }: { isFocused?: boolean })
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <button 
                       className="cyber-button" 
-                      onClick={() => handleBoost(item.variant_id)}
+                      onClick={() => openBoostModal(item.variant_id)}
                       disabled={loading}
                       style={{ flex: 1, fontSize: '9px', padding: '2px 0', borderColor: 'var(--terminal-success)', color: 'var(--terminal-success)' }}
                     >BOOST</button>
                     <button 
                       className="cyber-button" 
-                      onClick={() => handleSuppress(item)}
+                      onClick={() => openSuppressModal(item)}
                       disabled={loading || !itemChainId}
                       style={{ flex: 1, fontSize: '9px', padding: '2px 0', borderColor: 'var(--terminal-error)', color: 'var(--terminal-error)' }}
                     >SUPPRESS</button>

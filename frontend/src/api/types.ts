@@ -264,6 +264,21 @@ export type NewsPropagateResponse = {
   correlation_id: string | null
 }
 
+export type NewsPropagateQuoteRequest = {
+  variant_id: string
+  from_actor_id: string
+  spend_cash: number
+  limit?: number
+}
+
+export type NewsPropagateQuoteResponse = {
+  mutation_depth: number
+  per_delivery_cost: number
+  requested_limit: number
+  affordable_limit: number
+  estimated_total_cost: number
+}
+
 export type NewsInboxResponseItem = {
   delivery_id: string
   card_id: string

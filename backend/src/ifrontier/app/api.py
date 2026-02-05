@@ -2180,6 +2180,55 @@ class NewsPropagateResponse(BaseModel):
     correlation_id: UUID | None
 
 
+class NewsPropagateQuoteRequest(BaseModel):
+    variant_id: str
+    from_actor_id: str
+    spend_cash: float
+    limit: int = 50
+
+
+class NewsPropagateQuoteResponse(BaseModel):
+    mutation_depth: int
+    per_delivery_cost: float
+    requested_limit: int
+    affordable_limit: int
+    estimated_total_cost: float
+
+
+@router.post("/news/propagate/quote")
+async def news_propagate_quote(req: NewsPropagateQuoteRequest) -> NewsPropagateQuoteResponse:
+    requested_limit = int(req.limit)
+    if requested_limit <= 0:
+        raise HTTPException(status_code=400, detail="limit must be > 0")
+
+    budget = float(req.spend_cash)
+    if budget <= 0:
+        raise HTTPException(status_code=400, detail="spend_cash must be > 0")
+
+    ctx = _news_service.get_variant_context(variant_id=req.variant_id) or {}
+    depth = int(ctx.get("mutation_depth") or 0)
+
+    base_unit = float(os.getenv("IF_NEWS_PROPAGATE_CASH_PER_DELIVERY") or "500.0")
+    per_delivery_cost = base_unit * (2.0 ** depth)
+
+    affordable = int(budget // per_delivery_cost)
+    if affordable < 0:
+        affordable = 0
+
+    affordable_limit = min(requested_limit, affordable)
+    if affordable_limit < 0:
+        affordable_limit = 0
+
+    estimated_total_cost = float(per_delivery_cost) * float(affordable_limit)
+    return NewsPropagateQuoteResponse(
+        mutation_depth=int(depth),
+        per_delivery_cost=float(per_delivery_cost),
+        requested_limit=int(requested_limit),
+        affordable_limit=int(affordable_limit),
+        estimated_total_cost=float(estimated_total_cost),
+    )
+
+
 @router.post("/news/propagate")
 async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
     requested_limit = int(req.limit)
