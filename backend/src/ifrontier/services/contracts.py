@@ -187,7 +187,7 @@ class ContractService:
                     "has_rules": bool(has_rules),
                     "parties": parties,
                     "required_signers": required_signers,
-                    "signatures": {}, # 改为字典存储签名: {user_id: timestamp}
+                    "signatures": [], # 改为列表存储签名
                     "participation_mode": mode,
                     "invited_parties": invited,
                     "created_at": now.isoformat(),

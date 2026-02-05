@@ -196,6 +196,78 @@ class UserHostingAgent:
             log_ai_action(agent_id=f"hosting:{self.user_id}", action_type="OBSERVATION_ERROR", detail=str(e))
             return []
 
+        llm_cooldown_seconds = int(os.getenv("IF_HOSTING_LLM_COOLDOWN_SECONDS") or "45")
+        obs_sig = {
+            "pub": [
+                {
+                    "thread_id": str(m.get("thread_id") or ""),
+                    "created_at": str(m.get("created_at") or ""),
+                }
+                for m in (observation.get("recent_public_messages") or [])[:5]
+            ],
+            "priv": [
+                {
+                    "thread_id": str(m.get("thread_id") or ""),
+                    "created_at": str(m.get("created_at") or ""),
+                }
+                for m in (observation.get("recent_private_messages") or [])[:5]
+            ],
+            "news": [
+                {
+                    "delivered_at": str((n or {}).get("delivered_at") or ""),
+                    "text": str((n or {}).get("text") or "")[:120],
+                }
+                for n in (observation.get("recent_news") or [])[:5]
+            ],
+            "contracts_n": int(len(observation.get("my_contracts") or [])),
+            "held": list(observation.get("held_symbols") or [])[:5],
+            "q": {
+                s: float(((observation.get("market_quotes") or {}).get(s) or {}).get("last_price") or 0.0)
+                for s in list(observation.get("held_symbols") or [])[:3]
+            },
+        }
+        obs_digest = hashlib.sha1(
+            json.dumps(obs_sig, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+
+        last_obs_digest = str(ctx.get("last_obs_digest") or "")
+        last_llm_at_s = str(ctx.get("last_llm_at") or "")
+        last_llm_ts = None
+        if last_llm_at_s:
+            try:
+                last_llm_ts = datetime.fromisoformat(last_llm_at_s).timestamp()
+            except Exception:
+                last_llm_ts = None
+
+        if last_obs_digest and last_obs_digest == obs_digest and last_llm_ts is not None:
+            if (now.timestamp() - float(last_llm_ts)) < float(llm_cooldown_seconds):
+                log_ai_action(
+                    agent_id=f"hosting:{self.user_id}",
+                    action_type="SKIP_LLM_COOLDOWN",
+                    detail=f"cooldown={llm_cooldown_seconds}s",
+                )
+
+                ctx["last_tick_at"] = now.isoformat()
+                ctx["ticks"] = int(ctx.get("ticks") or 0) + 1
+                ctx["last_obs_digest"] = obs_digest
+                save_hosting_context(user_id=self.user_id, context=ctx)
+
+                payload = AiHostingActionTakenPayload(
+                    as_user_id=str(self.user_id),
+                    action_id=action_id,
+                    action_type="IDLE",
+                    decision={"note": "llm_cooldown"},
+                    results=[],
+                    taken_at=now,
+                )
+                env = EventEnvelope[AiHostingActionTakenPayload](
+                    event_type=EventType.AI_HOSTING_ACTION_TAKEN,
+                    correlation_id=uuid4(),
+                    actor=EventActor(agent_id=f"hosting:{self.user_id}"),
+                    payload=payload,
+                )
+                return [EventEnvelopeJson.from_envelope(env)]
+
         # 获取技能清单
         skills = []
         for s in reg.list_specs():
@@ -213,7 +285,9 @@ class UserHostingAgent:
             "2. ACTIVE SOCIAL: You must monitor private messages (recent_private_messages) and public chat. Respond to offers, negotiate, or deceive to your advantage. Use chat.send_pm_message or chat.send_public_message.\n"
             "3. CONTRACT STRATEGY: Check 'my_contracts'. Sign (contracts.sign) immediately if beneficial. Join (contracts.join) invited ones. Propose new ones (contract_agent.draft -> contracts.create) to lock in deals or hedge risks.\n"
             "4. NEWS RESPONSE: Analyze 'recent_news' with timestamps. Consider panic levels. Major events require immediate, high-magnitude reactions.\n"
-            "5. ANTI-SPAM: Do NOT repeat identical or near-identical public messages. If a similar proposal already appeared in recent_public_messages, do not send it again.\n"
+            "5. SOCIAL WARFARE: Behave like a real human trader. You may bluff, mislead, spread rumors, bait, refuse unreasonable offers, and strategically lie to manipulate prices or extract concessions.\n"
+            "6. TRASH TALK (SAFE): You may taunt and argue to apply pressure, but NEVER use hate speech/slurs, NEVER attack protected groups, and NEVER threaten violence. Keep it within game-style trash talk.\n"
+            "7. ANTI-SPAM: Do NOT repeat identical or near-identical public messages. If a similar proposal already appeared in recent_public_messages, do not send it again.\n"
             "Output ONLY JSON. Use skills via: {\"tool_calls\":[{\"name\":...,\"arguments\":{...}}, ...]}."
         )
 
@@ -245,6 +319,9 @@ class UserHostingAgent:
         except Exception as e:
             log_ai_action(agent_id=f"hosting:{self.user_id}", action_type="LLM_PARSE_ERROR", detail=str(e))
             return []
+
+        ctx["last_llm_at"] = now.isoformat()
+        ctx["last_obs_digest"] = obs_digest
 
         if calls:
             action_type = "SKILLS"
