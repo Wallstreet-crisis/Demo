@@ -6,7 +6,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional
 from ifrontier.infra.sqlite.hosting import list_enabled_hosting_users, upsert_hosting_state
 from ifrontier.services.user_capabilities import UserCapabilityFacade
 from ifrontier.services.user_hosting_agent import UserHostingAgent
-
+from ifrontier.core.ai_logger import log_ai_action
 
 class HostingScheduler:
     def __init__(
@@ -60,38 +60,56 @@ class HostingScheduler:
 
     async def tick_once(self) -> None:
         humans = int(await self._get_channel_size(self._channel_for_online_stats))
-        missing = max(0, self._min_players - humans)
         
-        print(f"[HostingScheduler] Tick: humans={humans}, min_required={self._min_players}, missing={missing}")
-
-        if missing <= 0:
-            # 在线人数充足：把托管用户状态刷新为 IDLE
-            return
-
-        quota = min(int(missing), int(self._max_per_tick))
+        # 允许一定比例或固定数量的 AI 始终在线，不受人类数量干扰（除非人类真的非常多）
+        # 目标：保持世界活跃，陪玩 bot 和 玩家托管应该平衡分配 quota
         enabled = list_enabled_hosting_users(limit=200)
+        if not enabled:
+            return
 
         bot_candidates = [st for st in enabled if str(st.user_id).startswith("bot:")]
         human_candidates = [st for st in enabled if not str(st.user_id).startswith("bot:")]
 
+        # 计算配额：
+        # 1. 补足最低人数所需的 missing 
+        # 2. 加上一个基础活跃额度（比如 4 个），确保世界不冷清
+        missing = max(0, self._min_players - humans)
+        base_activity = 4 
+        total_quota = min(len(enabled), missing + base_activity, 15) # 上限 15 个并发，防止压垮 LLM
+
         print(
-            f"[HostingScheduler] Available enabled bots: {len(bot_candidates)}; enabled non-bot: {len(human_candidates)}"
+            f"[HostingScheduler] Tick: humans={humans}, missing={missing}, total_quota={total_quota}. "
+            f"Available: bots={len(bot_candidates)}, humans={len(human_candidates)}"
         )
 
-        picked = bot_candidates[:quota]
-        if not picked:
-            print("[HostingScheduler] No enabled bots found to pick.")
+        # 混合采样：优先保证机器人，剩余给人类托管
+        picked_sts = []
+        
+        # 尽量保证机器人（陪玩）的参与度，占 quota 的 70%
+        bot_quota = max(1, int(total_quota * 0.7))
+        picked_sts.extend(bot_candidates[:bot_quota])
+        
+        # 剩余 quota 给人类托管
+        rem_quota = total_quota - len(picked_sts)
+        if rem_quota > 0:
+            picked_sts.extend(human_candidates[:rem_quota])
+
+        if not picked_sts:
             return
 
-        for st in picked:
-            print(f"[HostingScheduler] Activating bot: {st.user_id}")
+        for st in picked_sts:
+            print(f"[HostingScheduler] Activating agent: {st.user_id}")
             upsert_hosting_state(user_id=st.user_id, enabled=True, status="ON_ACTIVE")
 
-            facade = self._make_facade(st.user_id)
-            agent = UserHostingAgent(user_id=st.user_id, facade=facade)
+            try:
+                facade = self._make_facade(st.user_id)
+                agent = UserHostingAgent(user_id=st.user_id, facade=facade)
 
-            evs = await asyncio.to_thread(agent.tick)
-            for ev in evs:
-                await self._broadcaster(ev.model_dump())
-
-            upsert_hosting_state(user_id=st.user_id, enabled=True, status="ON_IDLE")
+                # 异步执行，不阻塞调度循环
+                evs = await asyncio.to_thread(agent.tick)
+                for ev in evs:
+                    await self._broadcaster(ev.model_dump())
+            except Exception as exc:
+                print(f"[HostingScheduler] Failed to tick agent {st.user_id}: {exc}")
+            finally:
+                upsert_hosting_state(user_id=st.user_id, enabled=True, status="ON_IDLE")

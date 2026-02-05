@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
 from ifrontier.domain.events.envelope import EventEnvelopeJson
@@ -76,7 +76,9 @@ class CommonBotEmergencyRunner:
 
         payload = broadcast_event.payload or {}
         channel = str(payload.get("channel") or "")
-        if not force and channel != "GLOBAL_MANDATORY":
+        # 放宽限制：除了 GLOBAL_MANDATORY，非强制频道也有概率触发（模拟机器人注意力）
+        import random
+        if not force and channel != "GLOBAL_MANDATORY" and random.random() > 0.4:
             return []
 
         variant_id = str(payload.get("variant_id") or "")
@@ -92,22 +94,39 @@ class CommonBotEmergencyRunner:
 
         if not symbols:
             # v0.1: 对于 WORLD_EVENT 等可能影响全局的新闻，如果没定义符号，则赋予默认关键证券
-            # 确保 CommonBot 能够对重大新闻产生市场反应
             symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
             print(f"[CommonBotEmergency:maybe_react] News {variant_id} has no symbols, using defaults: {symbols}")
 
         emitted: List[EventEnvelopeJson] = []
         corr = broadcast_event.correlation_id or uuid4()
-        print(f"[CommonBotEmergency:maybe_react] Reacting to {variant_id} for {len(self._cohorts)} cohorts. Symbols: {symbols}")
-
+        
         cfg = load_game_time_config_from_env()
         session = get_market_session(cfg=cfg)
         market_phase = session.phase
 
         for cohort in self._cohorts:
-            ctx = self._build_shared_context(cohort=cohort, variant_id=variant_id, news_text=variant_text, symbols=symbols)
+            # 获取该机器人的新闻窗口（带时间戳）
+            recent_news_items = []
+            try:
+                # 获取机器人收件箱中的最近新闻
+                inbox = self._news.list_inbox(player_id=cohort.account_id, limit=5)
+                recent_news_items = [
+                    {"text": item["text"], "delivered_at": item["created_at"]} 
+                    for item in inbox
+                ]
+            except Exception:
+                recent_news_items = []
+
+            ctx = self._build_shared_context(
+                cohort=cohort, 
+                variant_id=variant_id, 
+                news_text=variant_text, 
+                symbols=symbols,
+                recent_news_items=recent_news_items
+            )
             if ctx is None:
                 continue
+            
             for symbol in symbols:
                 decision_json, trade_json = run_commonbot_for_earnings(
                     symbol=symbol,
@@ -115,7 +134,8 @@ class CommonBotEmergencyRunner:
                     price_series=ctx.trends.symbol_price_series.get(symbol, []),
                     bot_id=cohort.bot_id,
                     correlation_id=corr,
-                    news_text="\n".join(ctx.recent_news_texts),
+                    news_text=variant_text,
+                    news_window=ctx.recent_news_items, # 传入新闻序列
                     use_llm=cohort.use_llm,
                     truth_payload=truth_payload,
                     is_insider=cohort.is_insider,
@@ -205,11 +225,23 @@ class CommonBotEmergencyRunner:
 
         emitted: List[EventEnvelopeJson] = []
         for cohort in self._cohorts:
+            # 获取该机器人的新闻窗口（带时间戳）
+            recent_news_items = []
+            try:
+                inbox = self._news.list_inbox(player_id=cohort.account_id, limit=5)
+                recent_news_items = [
+                    {"text": item["text"], "delivered_at": item["created_at"]} 
+                    for item in inbox
+                ]
+            except Exception:
+                recent_news_items = []
+
             ctx = self._build_shared_context(
                 cohort=cohort,
                 variant_id=pending.variant_id,
                 news_text=pending.news_text,
                 symbols=pending.symbols,
+                recent_news_items=recent_news_items
             )
             if ctx is None:
                 continue
@@ -221,7 +253,8 @@ class CommonBotEmergencyRunner:
                     price_series=ctx.trends.symbol_price_series.get(symbol, []),
                     bot_id=cohort.bot_id,
                     correlation_id=pending.correlation_id,
-                    news_text="\n".join(ctx.recent_news_texts),
+                    news_text=pending.news_text,
+                    news_window=ctx.recent_news_items,
                     use_llm=cohort.use_llm,
                     truth_payload=pending.truth_payload,
                     is_insider=cohort.is_insider,
@@ -287,6 +320,7 @@ class CommonBotEmergencyRunner:
         variant_id: str,
         news_text: str,
         symbols: List[str],
+        recent_news_items: List[Dict[str, Any]] | None = None,
     ) -> CommonBotSharedContext | None:
         try:
             snap = load_account_snapshot(cohort.account_id)
@@ -321,6 +355,7 @@ class CommonBotEmergencyRunner:
             account_snapshot=snap,
             recent_news_texts=recent_news_texts[: cohort.max_news_items],
             recent_variant_ids=recent_variant_ids[: cohort.max_news_items],
+            recent_news_items=recent_news_items,
             trends=trends,
         )
 
@@ -361,7 +396,24 @@ class CommonBotEmergencyRunner:
         cfg = load_game_time_config_from_env()
         session = get_market_session(cfg=cfg)
         
-        ctx = self._build_shared_context(cohort=target_cohort, variant_id=variant_id, news_text=variant_text, symbols=symbols)
+        # 获取该机器人的新闻窗口（带时间戳）
+        recent_news_items = []
+        try:
+            inbox = self._news.list_inbox(player_id=to_player_id, limit=5)
+            recent_news_items = [
+                {"text": item["text"], "delivered_at": item["created_at"]} 
+                for item in inbox
+            ]
+        except Exception:
+            recent_news_items = []
+
+        ctx = self._build_shared_context(
+            cohort=target_cohort, 
+            variant_id=variant_id, 
+            news_text=variant_text, 
+            symbols=symbols,
+            recent_news_items=recent_news_items
+        )
         if ctx is None:
             return []
 
@@ -372,7 +424,8 @@ class CommonBotEmergencyRunner:
                 price_series=ctx.trends.symbol_price_series.get(symbol, []),
                 bot_id=target_cohort.bot_id,
                 correlation_id=corr,
-                news_text="\n".join(ctx.recent_news_texts),
+                news_text=variant_text,
+                news_window=ctx.recent_news_items,
                 use_llm=target_cohort.use_llm,
                 truth_payload=truth_payload,
                 is_insider=target_cohort.is_insider,

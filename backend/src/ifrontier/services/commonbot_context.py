@@ -24,6 +24,7 @@ class CommonBotSharedContext:
     pnl: Optional[float]
     updated_at: datetime
     recent_news_texts: List[str] = field(default_factory=list)
+    recent_news_items: List[Dict[str, Any]] = field(default_factory=list) # [{text, delivered_at}]
     recent_variant_ids: List[str] = field(default_factory=list)
     trends: CommonBotMarketTrends = field(default_factory=CommonBotMarketTrends)
 
@@ -34,6 +35,7 @@ def build_context_from_account_snapshot(
     account_snapshot: AccountSnapshot,
     recent_news_texts: List[str],
     recent_variant_ids: List[str],
+    recent_news_items: List[Dict[str, Any]] | None = None,
     trends: CommonBotMarketTrends | None = None,
 ) -> CommonBotSharedContext:
     return CommonBotSharedContext(
@@ -44,6 +46,7 @@ def build_context_from_account_snapshot(
         pnl=None,
         updated_at=datetime.now(timezone.utc),
         recent_news_texts=list(recent_news_texts),
+        recent_news_items=list(recent_news_items or []),
         recent_variant_ids=list(recent_variant_ids),
         trends=trends or CommonBotMarketTrends(),
     )

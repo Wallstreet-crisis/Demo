@@ -7,6 +7,7 @@ from ifrontier.infra.sqlite.ledger import create_account, get_snapshot
 from ifrontier.infra.sqlite.market import get_last_price
 from ifrontier.infra.sqlite.securities import list_securities
 from ifrontier.services.matching import submit_limit_order, MatchResult
+from ifrontier.core.ai_logger import log_ai_action
 
 
 @dataclass(frozen=True)
@@ -29,8 +30,18 @@ class MarketMaker:
 
         import random
         # 基础波动率 0.5%，如果有活跃事件，波动率翻倍甚至更多
-        # 同时大幅提高成交深度，确保大额订单也能成交
+        # 模拟做市商对新闻的恐慌反应：活跃事件越多，价差越大，规避风险
         volatility_multiplier = 1.0 + (active_chains_count * 1.5) 
+        
+        # 恐慌程度影响：当 active_chains_count 很高时，做市商会收缩深度或大幅拉开价差
+        panic_factor = min(1.0, active_chains_count / 5.0)
+
+        if active_chains_count > 0:
+            log_ai_action(
+                agent_id=self._cfg.account_id,
+                action_type="MM_ADJUST",
+                detail=f"News Chains: {active_chains_count} | Panic: {panic_factor:.2f} | Vol Multiplier: {volatility_multiplier:.2f}"
+            )
 
         all_matches = []
         for sec in list_securities(status="TRADABLE"):
@@ -39,17 +50,22 @@ class MarketMaker:
                 continue
 
             # 模拟价格呼吸效应，随事件强度增加
-            breathing_range = 0.01 * volatility_multiplier # 提升基础呼吸到 1%
+            breathing_range = 0.01 * volatility_multiplier 
             breathing = 1.0 + random.uniform(-breathing_range, breathing_range)
             mid *= breathing
 
-            # 价差随波动率扩大
-            spread = 0.002 * volatility_multiplier # 缩小基础价差到 0.2%，增加竞争性
+            # 价差随波动率和恐慌感拉开：规避逆向选择风险
+            spread = 0.002 * (1.0 + panic_factor * 10.0) * volatility_multiplier 
             bid = float(mid) * (1.0 - spread)
             ask = float(mid) * (1.0 + spread)
 
-            # 动态深度：活跃期间深度翻倍，机构做市商提供更深盘口
-            qty = float(self._cfg.min_qty) * volatility_multiplier * 5.0 
+            # 动态深度：正常期间提供深度，极端恐慌期间深度收缩，但活跃（非恐慌）期间深度翻倍
+            # 这里的逻辑是：如果只是活跃（有新闻但链数不多），增加流动性；如果链数爆炸，说明有极端行情，收缩深度保命
+            base_qty = float(self._cfg.min_qty) * 5.0
+            if panic_factor > 0.8:
+                qty = base_qty * 0.2 # 深度收缩
+            else:
+                qty = base_qty * volatility_multiplier
 
             if bid <= 0 or ask <= 0 or qty <= 0:
                 continue

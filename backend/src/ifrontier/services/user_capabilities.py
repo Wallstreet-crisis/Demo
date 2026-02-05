@@ -46,6 +46,10 @@ class UserCapabilityFacade:
     def list_market_active_symbols(self, *, limit: int = 20) -> List[str]:
         return list_active_symbols(limit=int(limit))
 
+    def get_recent_trades(self, *, symbol: str, limit: int = 20):
+        """获取某标的最近的成交记录。"""
+        return list_trades(symbol=str(symbol), limit=int(limit))
+
     def get_recent_public_messages(self, *, limit: int = 10):
         return self.chat_service.list_public_messages(limit=int(limit), before=None)
 
@@ -97,6 +101,10 @@ class UserCapabilityFacade:
 
     def list_pm_messages(self, *, thread_id: str, limit: int = 50, before: str | None = None):
         return self.chat_service.list_pm_messages(thread_id=thread_id, limit=limit, before=before)
+
+    def list_my_contracts(self, *, limit: int = 50):
+        """获取与我相关的合约。"""
+        return self.contract_service.list_contracts(player_id=self.user_id, limit=limit)
 
     # --- Contract agent (draft) ---
 

@@ -106,6 +106,50 @@ class ContractService:
         self._driver = driver
         self._event_store = event_store
 
+    def list_contracts(self, *, player_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """列出与特定玩家相关的合约：参与的、受邀的、作为签署者的。"""
+        pid = str(player_id).lower()
+        with self._driver.session() as session:
+            records = session.execute_read(self._list_contracts_tx, {"player_id": pid, "limit": int(limit)})
+        
+        out = []
+        for r in records:
+            d = dict(r)
+            try:
+                d["terms"] = json.loads(d.get("terms_json") or "{}")
+            except Exception:
+                d["terms"] = {}
+            out.append(d)
+        return out
+
+    @staticmethod
+    def _list_contracts_tx(tx, params: Dict[str, Any]):
+        # 查询：对 player_id 做不区分大小写的匹配（或者假设已经归一化）
+        res = tx.run(
+            """
+            MATCH (c:Contract)
+            WHERE $player_id IN c.parties 
+               OR $player_id IN c.required_signers 
+               OR $player_id IN c.invited_parties
+            RETURN c.contract_id AS contract_id,
+                   c.kind AS kind,
+                   c.title AS title,
+                   c.terms_json AS terms_json,
+                   c.status AS status,
+                   c.parties AS parties,
+                   c.required_signers AS required_signers,
+                   c.signatures AS signatures,
+                   c.participation_mode AS participation_mode,
+                   c.invited_parties AS invited_parties,
+                   c.created_at AS created_at,
+                   c.updated_at AS updated_at
+            ORDER BY c.updated_at DESC
+            LIMIT $limit
+            """,
+            **params
+        )
+        return [dict(r) for r in res]
+
     def create_contract(
         self,
         *,
@@ -124,7 +168,12 @@ class ContractService:
         has_rules = isinstance(terms.get("rules"), list) and len(terms.get("rules")) > 0
 
         mode = (participation_mode or ParticipationMode.ALL_SIGNERS.value).upper()
-        invited = invited_parties or []
+        
+        # ID 归一化
+        parties = [str(p).lower() for p in (parties or [])]
+        required_signers = [str(s).lower() for s in (required_signers or [])]
+        invited = [str(i).lower() for i in (invited_parties or [])]
+        aid = str(actor_id).lower()
 
         with self._driver.session() as session:
             session.execute_write(
@@ -138,7 +187,7 @@ class ContractService:
                     "has_rules": bool(has_rules),
                     "parties": parties,
                     "required_signers": required_signers,
-                    "signatures": [],
+                    "signatures": {}, # 改为字典存储签名: {user_id: timestamp}
                     "participation_mode": mode,
                     "invited_parties": invited,
                     "created_at": now.isoformat(),

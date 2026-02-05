@@ -159,6 +159,22 @@ def default_skills_registry() -> SkillsRegistry:
     )
 
     reg.register(
+        name="chat.open_pm",
+        description="Open a new private message thread with another user.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "target_id": {"type": "string"},
+            },
+            "required": ["target_id"],
+        },
+        handler=lambda f, a: f.chat_service.open_pm(
+            requester_id=f.user_id,
+            target_id=str(a.get("target_id") or ""),
+        ),
+    )
+
+    reg.register(
         name="contract_agent.draft",
         description="Draft a contract from natural language as the user.",
         input_schema={

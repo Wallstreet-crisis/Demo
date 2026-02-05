@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -14,6 +15,7 @@ from ifrontier.infra.llm.openrouter import OpenRouterClient, extract_first_messa
 from ifrontier.infra.sqlite.hosting import load_hosting_context, save_hosting_context
 from ifrontier.services.skills import default_skills_registry
 from ifrontier.services.user_capabilities import UserCapabilityFacade
+from ifrontier.core.ai_logger import log_ai_action, log_ai_thought
 
 
 class AiHostingActionTakenPayload(BaseModel):
@@ -39,6 +41,9 @@ class UserHostingAgent:
     facade: UserCapabilityFacade
 
     def tick(self) -> List[EventEnvelopeJson]:
+        import json
+        import hashlib
+
         ctx_rec = load_hosting_context(self.user_id)
         ctx = dict(ctx_rec.context) if ctx_rec is not None else {}
 
@@ -48,146 +53,280 @@ class UserHostingAgent:
         reg = default_skills_registry()
         llm = OpenRouterClient.from_env()
 
+        # 记录 Tick 进入
+        log_ai_action(agent_id=f"hosting:{self.user_id}", action_type="TICK_ENTRY", detail=f"LLM_READY: {llm is not None}")
+
         results: List[Dict[str, Any]] = []
         action_type = "IDLE"
-        decision: Dict[str, Any] = {"note": "mvp"}
+        decision: Dict[str, Any] = {"note": "idle"}
 
-        if llm is not None:
-            # 用户可见观测（必须只经由 facade 获取，避免越权）
-            observation: Dict[str, Any] = {"as_user_id": str(self.user_id)}
+        if llm is None:
+            log_ai_action(agent_id=f"hosting:{self.user_id}", action_type="LLM_NOT_CONFIGURED", detail="OpenRouter API key might be missing")
+            return []
+
+        # 用户可见观测（必须只经由 facade 获取，避免越权）
+        observation: Dict[str, Any] = {"as_user_id": str(self.user_id)}
+        try:
+            snap = self.facade.get_account_snapshot()
+            valuation = self.facade.get_account_valuation()
+
+            # 限制持仓标的数量，避免 prompt 过长
+            held_symbols = [
+                str(sym)
+                for sym, qty in (snap.positions or {}).items()
+                if sym and abs(float(qty)) > 1e-12
+            ][:5]
+
+            market_active_symbols: List[str] = []
             try:
-                snap = self.facade.get_account_snapshot()
-                valuation = self.facade.get_account_valuation()
-
-                # 限制持仓标的数量，避免 prompt 过长
-                held_symbols = [
-                    str(sym)
-                    for sym, qty in (snap.positions or {}).items()
-                    if sym and abs(float(qty)) > 1e-12
-                ][:5]
-
-                market_active_symbols: List[str] = []
-                try:
-                    market_active_symbols = self.facade.list_market_active_symbols(limit=12)
-                except Exception:
-                    market_active_symbols = []
-
-                quotes: Dict[str, Any] = {}
-                for sym in (held_symbols + [s for s in market_active_symbols if s not in held_symbols])[:12]:
-                    try:
-                        q = self.facade.get_market_quote(symbol=sym)
-                        quotes[sym] = {
-                            "symbol": q.symbol,
-                            "last_price": q.last_price,
-                            "prev_price": q.prev_price,
-                            "change_pct": q.change_pct,
-                            "ma_5": q.ma_5,
-                            "ma_20": q.ma_20,
-                            "vol_20": q.vol_20,
-                        }
-                    except Exception:
-                        continue
-
-                recent_msgs = []
-                try:
-                    for m in self.facade.get_recent_public_messages(limit=5):
-                        payload = m.payload or {}
-                        recent_msgs.append(
-                            {
-                                "thread_id": m.thread_id,
-                                "message_type": m.message_type,
-                                "content": m.content,
-                                "sender_display": str(payload.get("sender_display") or ""),
-                                "created_at": m.created_at,
-                            }
-                        )
-                except Exception:
-                    recent_msgs = []
-
-                observation.update(
-                    {
-                        "account_snapshot": {
-                            "cash": float(snap.cash),
-                            "positions": dict(snap.positions or {}),
-                        },
-                        "account_valuation": {
-                            "cash": float(valuation.cash),
-                            "equity_value": float(valuation.equity_value),
-                            "total_value": float(valuation.total_value),
-                            "prices": dict(valuation.prices or {}),
-                        },
-                        "held_symbols": held_symbols,
-                        "market_active_symbols": market_active_symbols,
-                        "market_quotes": quotes,
-                        "recent_public_messages": recent_msgs,
-                    }
-                )
+                market_active_symbols = self.facade.list_market_active_symbols(limit=12)
             except Exception:
-                # 观测失败不应阻断托管 tick
-                pass
+                market_active_symbols = []
 
-            # 只给出“用户视角可见”的上下文（避免越权）：
-            # - hosting context（本模块维护）
-            # - skills 清单（白名单）
-            skills = [
+            quotes: Dict[str, Any] = {}
+            for sym in (held_symbols + [s for s in market_active_symbols if s not in held_symbols])[:12]:
+                try:
+                    q = self.facade.get_market_quote(symbol=sym)
+                    quotes[sym] = {
+                        "symbol": q.symbol,
+                        "last_price": q.last_price,
+                        "prev_price": q.prev_price,
+                        "change_pct": q.change_pct,
+                        "ma_5": q.ma_5,
+                        "ma_20": q.ma_20,
+                        "vol_20": q.vol_20,
+                    }
+                except Exception:
+                    continue
+
+            recent_msgs = []
+            try:
+                for m in self.facade.get_recent_public_messages(limit=10):
+                    payload = m.payload or {}
+                    recent_msgs.append(
+                        {
+                            "thread_id": m.thread_id,
+                            "message_type": m.message_type,
+                            "content": m.content,
+                            "sender_display": str(payload.get("sender_display") or ""),
+                            "created_at": m.created_at,
+                        }
+                    )
+            except Exception:
+                recent_msgs = []
+
+            recent_private_msgs = []
+            try:
+                for m in self.facade.get_recent_private_messages(limit=10):
+                    recent_private_msgs.append(
+                        {
+                            "thread_id": m.thread_id,
+                            "sender_id": m.sender_id,
+                            "content": m.content,
+                            "created_at": m.created_at,
+                        }
+                    )
+            except Exception:
+                recent_private_msgs = []
+
+            my_contracts = []
+            try:
+                my_contracts = self.facade.list_my_contracts(limit=10)
+            except Exception:
+                my_contracts = []
+
+            recent_news = []
+            try:
+                # 获取收件箱新闻作为市场新闻来源
+                inbox = self.facade.chat_service._event_store.driver.session().execute_read(
+                    lambda tx: tx.run(
+                        "MATCH (u:User {user_id: $uid})-[:INBOX_ITEM]->(d:NewsDelivery)-[:DELIVERS_VARIANT]->(v:NewsVariant) "
+                        "RETURN v.text as text, d.delivered_at as delivered_at "
+                        "ORDER BY d.delivered_at DESC LIMIT 5",
+                        {"uid": self.user_id}
+                    ).data()
+                )
+                recent_news = inbox
+            except Exception:
+                recent_news = []
+
+            # 观测最近市场成交动态
+            market_activity = {}
+            try:
+                active_symbols = held_symbols + [s for s in market_active_symbols if s not in held_symbols]
+                for sym in active_symbols[:3]: # 限制观测范围，重点关注前3个
+                    trades = self.facade.get_recent_trades(symbol=sym, limit=5)
+                    market_activity[sym] = [
+                        {"price": t.price, "qty": t.quantity, "time": t.occurred_at}
+                        for t in trades
+                    ]
+            except Exception:
+                market_activity = {}
+
+            observation.update(
                 {
-                    "name": s.name,
-                    "description": s.description,
-                    "input_schema": s.input_schema,
+                    "account_snapshot": {
+                        "cash": float(snap.cash),
+                        "positions": dict(snap.positions or {}),
+                    },
+                    "account_valuation": {
+                        "cash": float(valuation.cash),
+                        "equity_value": float(valuation.equity_value),
+                        "total_value": float(valuation.total_value),
+                        "prices": dict(valuation.prices or {}),
+                    },
+                    "held_symbols": held_symbols,
+                    "market_active_symbols": market_active_symbols,
+                    "market_quotes": quotes,
+                    "market_activity": market_activity,
+                    "recent_public_messages": recent_msgs,
+                    "recent_private_messages": recent_private_msgs,
+                    "my_contracts": my_contracts,
+                    "recent_news": recent_news,
+                    "current_time_utc": now.isoformat(),
                 }
-                for s in reg.list_specs()
-            ]
-
-            system = (
-                "You are an elite, aggressive hedge fund manager operating a user-hosting agent. "
-                "Your goal is to dominate the market during this financial crisis. "
-                "You MUST ONLY output JSON. No extra text. "
-                "You can only act via the provided skills. "
-                "Be decisive: if there's a major event, take large positions. Don't be afraid of volatility. "
-                "Return tool calls as: {\"tool_calls\":[{\"name\":...,\"arguments\":{...}}, ...]}."
             )
-
-            user = (
-                "Decide next actions for the user to maximize winning. "
-                "User-visible observation_json: "
-                f"{__import__('json').dumps(observation or {}, ensure_ascii=False)}\n"
-                "Current hosting_context_json: "
-                f"{__import__('json').dumps(ctx or {}, ensure_ascii=False)}\n"
-                "Available skills json: "
-                f"{__import__('json').dumps(skills, ensure_ascii=False)}\n"
-                "Output ONLY JSON tool_calls. If no action, output {\"tool_calls\":[]}."
+            
+            log_ai_action(
+                agent_id=f"hosting:{self.user_id}",
+                action_type="OBSERVATION",
+                detail=f"PubMsgs: {len(recent_msgs)}, PrivMsgs: {len(recent_private_msgs)}, Contracts: {len(my_contracts)}, News: {len(recent_news)}"
             )
+        except Exception as e:
+            log_ai_action(agent_id=f"hosting:{self.user_id}", action_type="OBSERVATION_ERROR", detail=str(e))
+            return []
 
-            # v0.2: 增加 max_tokens 防止 JSON 被截断
-            resp = llm.chat_completions(system=system, user=user, temperature=0.2, max_tokens=800)
+        # 获取技能清单
+        skills = []
+        for s in reg.list_specs():
+            skills.append({
+                "name": s.name,
+                "description": s.description,
+                "input_schema": s.input_schema,
+            })
+
+        system = (
+            "You are an elite, aggressive hedge fund manager operating a user-hosting agent in a global financial crisis. "
+            "Your goal: Dominate the market, accumulate wealth by ANY means necessary. "
+            "Behavioral Directives:\n"
+            "1. AGGRESSIVE TRADING: If news or trends indicate opportunity, take large positions. Use limit orders to capture best prices.\n"
+            "2. ACTIVE SOCIAL: You must monitor private messages (recent_private_messages) and public chat. Respond to offers, negotiate, or deceive to your advantage. Use chat.send_pm_message or chat.send_public_message.\n"
+            "3. CONTRACT STRATEGY: Check 'my_contracts'. Sign (contracts.sign) immediately if beneficial. Join (contracts.join) invited ones. Propose new ones (contract_agent.draft -> contracts.create) to lock in deals or hedge risks.\n"
+            "4. NEWS RESPONSE: Analyze 'recent_news' with timestamps. Consider panic levels. Major events require immediate, high-magnitude reactions.\n"
+            "5. ANTI-SPAM: Do NOT repeat identical or near-identical public messages. If a similar proposal already appeared in recent_public_messages, do not send it again.\n"
+            "Output ONLY JSON. Use skills via: {\"tool_calls\":[{\"name\":...,\"arguments\":{...}}, ...]}."
+        )
+
+        user_content = (
+            "Decide next actions for the user to maximize winning. "
+            "User-visible observation_json: "
+            f"{json.dumps(observation or {}, ensure_ascii=False)}\n"
+            "Current hosting_context_json: "
+            f"{json.dumps(ctx or {}, ensure_ascii=False)}\n"
+            "Available skills json: "
+            f"{json.dumps(skills, ensure_ascii=False)}\n"
+            "Output ONLY JSON tool_calls. If no action, output {\"tool_calls\":[]}."
+        )
+
+        try:
+            resp = llm.chat_completions(system=system, user=user_content, temperature=0.2, max_tokens=800)
             if not resp or "choices" not in resp:
-                print(f"[LLM:HostingAgent] LLM Request failed for user {self.user_id}, falling back to IDLE.")
+                log_ai_action(agent_id=f"hosting:{self.user_id}", action_type="LLM_ERROR", detail="LLM request failed")
                 return []
 
             text = extract_first_message_text(resp)
-            # v0.2: 使用更鲁棒的 JSON 提取方法
             clean_text = text.strip()
-            try:
-                start_idx = clean_text.find("{")
-                end_idx = clean_text.rfind("}")
-                if start_idx != -1 and end_idx != -1:
-                    clean_text = clean_text[start_idx : end_idx + 1]
-                
-                calls = reg.parse_tool_calls(raw_json_text=clean_text)
-            except Exception as e:
-                print(f"[LLM:HostingAgent] JSON parse error for user {self.user_id}: {e}. Text: {text[:200]}. Falling back to IDLE.")
-                return []
-            if calls:
-                action_type = "SKILLS"
-                decision = {"tool_calls": [{"name": c.name, "arguments": c.arguments} for c in calls]}
+            start_idx = clean_text.find("{")
+            end_idx = clean_text.rfind("}")
+            if start_idx != -1 and end_idx != -1:
+                clean_text = clean_text[start_idx : end_idx + 1]
+            
+            calls = reg.parse_tool_calls(raw_json_text=clean_text)
+        except Exception as e:
+            log_ai_action(agent_id=f"hosting:{self.user_id}", action_type="LLM_PARSE_ERROR", detail=str(e))
+            return []
+
+        if calls:
+            action_type = "SKILLS"
+            decision = {"tool_calls": [{"name": c.name, "arguments": c.arguments} for c in calls]}
+            
+            log_ai_thought(
+                agent_id=f"hosting:{self.user_id}",
+                news_context=f"OBS: {len(recent_msgs)} msgs, {len(recent_news)} news",
+                decision=str(decision)
+            )
 
             max_tools = int(os.getenv("IF_HOSTING_MAX_SKILLS_PER_TICK") or "5")
-            if max_tools < 0:
-                max_tools = 0
-
             for c in calls[:max_tools]:
-                # 单 tick 执行上限，避免过度激进导致副作用爆炸
-                results.append(reg.execute_one(facade=self.facade, call=c))
+                if c.name == "chat.send_public_message":
+                    msg_type = str((c.arguments or {}).get("message_type") or "")
+                    content = str((c.arguments or {}).get("content") or "")
+
+                    def _norm_text(s: str) -> str:
+                        return " ".join((s or "").strip().lower().split())
+
+                    norm = _norm_text(content)
+                    try:
+                        content_hash = hashlib.sha1(norm.encode("utf-8"), usedforsecurity=False).hexdigest()
+                    except TypeError:
+                        content_hash = hashlib.sha1(norm.encode("utf-8")).hexdigest()
+
+                    anti_spam = dict(ctx.get("anti_spam") or {})
+                    last_hash = str(anti_spam.get("last_public_msg_hash") or "")
+                    last_at_s = str(anti_spam.get("last_public_msg_at") or "")
+
+                    cooldown_seconds = int(os.getenv("IF_HOSTING_PUBLIC_MSG_COOLDOWN_SECONDS") or "90")
+                    now_ts = now.timestamp()
+                    last_ts = None
+                    if last_at_s:
+                        try:
+                            last_ts = datetime.fromisoformat(last_at_s).timestamp()
+                        except Exception:
+                            last_ts = None
+
+                    recent_public_msgs = observation.get("recent_public_messages") or []
+                    seen_similar = False
+                    if norm:
+                        for m in recent_public_msgs:
+                            m_norm = _norm_text(str((m or {}).get("content") or ""))
+                            if not m_norm:
+                                continue
+                            if norm in m_norm or m_norm in norm:
+                                seen_similar = True
+                                break
+
+                    if (last_hash and last_hash == content_hash) or seen_similar:
+                        results.append({"ok": True, "skipped": True, "reason": "duplicate_public_message"})
+                        log_ai_action(
+                            agent_id=f"hosting:{self.user_id}",
+                            action_type="SKIP_SPAM_PUBLIC_MESSAGE",
+                            detail=f"type={msg_type} duplicate_or_similar=True",
+                        )
+                        continue
+
+                    if last_ts is not None and (now_ts - last_ts) < float(cooldown_seconds):
+                        results.append({"ok": True, "skipped": True, "reason": "cooldown_public_message"})
+                        log_ai_action(
+                            agent_id=f"hosting:{self.user_id}",
+                            action_type="SKIP_COOLDOWN_PUBLIC_MESSAGE",
+                            detail=f"type={msg_type} cooldown={cooldown_seconds}s",
+                        )
+                        continue
+
+                    anti_spam["last_public_msg_hash"] = content_hash
+                    anti_spam["last_public_msg_at"] = now.isoformat()
+                    ctx["anti_spam"] = anti_spam
+
+                res = reg.execute_one(facade=self.facade, call=c)
+                results.append(res)
+                log_ai_action(
+                    agent_id=f"hosting:{self.user_id}",
+                    action_type=f"SKILL_EXE:{c.name}",
+                    detail=f"ARGS: {c.arguments} | RES: {res.get('ok')}",
+                    context={"error": res.get("error")} if not res.get("ok") else None
+                )
+        else:
+            log_ai_action(agent_id=f"hosting:{self.user_id}", action_type="IDLE", detail="No actions decided")
 
         ctx["last_tick_at"] = now.isoformat()
         ctx["ticks"] = int(ctx.get("ticks") or 0) + 1
