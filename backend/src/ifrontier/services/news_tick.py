@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import random as py_random
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -259,6 +260,7 @@ class NewsTickEngine:
     async def _periodic_spawn(self, *, now: datetime) -> List[Dict[str, Any]]:
         """系统自动投放逻辑：每隔一段时间尝试生成一条新闻"""
         spawned_events: List[Dict[str, Any]] = []
+        verbose = str(os.getenv("IF_SCHEDULER_VERBOSE") or "").strip().lower() in {"1", "true", "yes", "on"}
         
         # 1) 小新闻投放 (每 60s 触发)
         if self._last_small_news_at is None or (now - self._last_small_news_at).total_seconds() >= 60:
@@ -316,7 +318,8 @@ class NewsTickEngine:
                         for eev in emergency_events:
                             spawned_events.append(eev.model_dump(mode="json"))
                             
-                    print(f"[NewsTick:Spawn] Spawned {kind} for {target_symbol} to {len(lucky_ones)} users. Bias: {impact_direction}")
+                    if verbose:
+                        print(f"[NewsTick:Spawn] Spawned {kind} for {target_symbol} to {len(lucky_ones)} users. Bias: {impact_direction}")
 
         # 2) 重大事件链投放 (每 600s 触发)
         if self._last_chain_at is None or (now - self._last_chain_at).total_seconds() >= 600:
@@ -394,7 +397,8 @@ class NewsTickEngine:
                 target_symbols = py_random.sample(target_symbols, min(len(target_symbols), 6))
                 final_impact_map = {s: impact_map[s] for s in target_symbols}
 
-                print(f"[NewsTick:Spawn] Starting system chain: {kind} ({theme}) for {target_symbols}")
+                if verbose:
+                    print(f"[NewsTick:Spawn] Starting system chain: {kind} ({theme}) for {target_symbols}")
                 res = self.start_chain(
                     kind=kind,
                     actor_id="system",

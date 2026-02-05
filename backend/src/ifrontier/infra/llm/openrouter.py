@@ -46,7 +46,9 @@ class OpenRouterClient:
         max_tokens: int = 300,
         extra_headers: Dict[str, str] | None = None,
     ) -> Dict[str, Any]:
-        print(f"[LLM] Calling OpenRouter with model: {self._cfg.model}")
+        verbose = str(os.getenv("IF_LLM_VERBOSE") or "").strip().lower() in {"1", "true", "yes", "on"}
+        if verbose:
+            print(f"[LLM] Calling OpenRouter with model: {self._cfg.model}")
         url = f"{self._cfg.base_url}/chat/completions"
         body = {
             "model": self._cfg.model,
@@ -62,7 +64,8 @@ class OpenRouterClient:
             "Authorization": f"Bearer {self._cfg.api_key[:8]}...{self._cfg.api_key[-4:]}",
             "Content-Type": "application/json",
         }
-        print(f"[LLM] Request Headers (masked): {headers}")
+        if verbose:
+            print(f"[LLM] Request Headers (masked): {headers}")
         
         # 恢复真实 headers 用于发送
         headers["Authorization"] = f"Bearer {self._cfg.api_key}"
@@ -79,22 +82,27 @@ class OpenRouterClient:
 
         try:
             with request.urlopen(req, timeout=self._cfg.timeout_seconds) as resp:
-                print(f"[LLM] OpenRouter Response Status: {resp.status}")
+                if verbose:
+                    print(f"[LLM] OpenRouter Response Status: {resp.status}")
                 raw = resp.read().decode("utf-8")
         except Exception as exc:
-            print(f"[LLM] OpenRouter Connection Error: {exc}")
+            if verbose:
+                print(f"[LLM] OpenRouter Connection Error: {exc}")
             if hasattr(exc, 'read'):
                 err_body = exc.read().decode("utf-8")
-                print(f"[LLM] Error Body: {err_body}")
+                if verbose:
+                    print(f"[LLM] Error Body: {err_body}")
             raise OpenRouterError(str(exc)) from exc
 
         try:
             res = json.loads(raw)
             if "error" in res:
-                print(f"[LLM] OpenRouter API Error: {res['error']}")
+                if verbose:
+                    print(f"[LLM] OpenRouter API Error: {res['error']}")
             return res
         except Exception as exc:
-            print(f"[LLM] JSON Parse Error. Raw: {raw[:500]}...")
+            if verbose:
+                print(f"[LLM] JSON Parse Error. Raw: {raw[:500]}...")
             raise OpenRouterError(f"invalid json response: {raw[:2000]}") from exc
 
 

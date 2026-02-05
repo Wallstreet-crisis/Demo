@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from ifrontier.infra.sqlite.hosting import list_enabled_hosting_users, upsert_hosting_state
@@ -77,10 +78,12 @@ class HostingScheduler:
         base_activity = 4 
         total_quota = min(len(enabled), missing + base_activity, 15) # 上限 15 个并发，防止压垮 LLM
 
-        print(
-            f"[HostingScheduler] Tick: humans={humans}, missing={missing}, total_quota={total_quota}. "
-            f"Available: bots={len(bot_candidates)}, humans={len(human_candidates)}"
-        )
+        verbose = str(os.getenv("IF_SCHEDULER_VERBOSE") or "").strip().lower() in {"1", "true", "yes", "on"}
+        if verbose:
+            print(
+                f"[HostingScheduler] Tick: humans={humans}, missing={missing}, total_quota={total_quota}. "
+                f"Available: bots={len(bot_candidates)}, humans={len(human_candidates)}"
+            )
 
         # 混合采样：优先保证机器人，剩余给人类托管
         picked_sts = []
@@ -94,11 +97,15 @@ class HostingScheduler:
         if rem_quota > 0:
             picked_sts.extend(human_candidates[:rem_quota])
 
+        # 关键保护：每轮最多激活 max_per_tick 个托管代理，防止线程/LLM/DB 负载爆炸
+        picked_sts = picked_sts[: self._max_per_tick]
+
         if not picked_sts:
             return
 
         for st in picked_sts:
-            print(f"[HostingScheduler] Activating agent: {st.user_id}")
+            if verbose:
+                print(f"[HostingScheduler] Activating agent: {st.user_id}")
             upsert_hosting_state(user_id=st.user_id, enabled=True, status="ON_ACTIVE")
 
             try:
@@ -110,6 +117,7 @@ class HostingScheduler:
                 for ev in evs:
                     await self._broadcaster(ev.model_dump())
             except Exception as exc:
-                print(f"[HostingScheduler] Failed to tick agent {st.user_id}: {exc}")
+                if verbose:
+                    print(f"[HostingScheduler] Failed to tick agent {st.user_id}: {exc}")
             finally:
                 upsert_hosting_state(user_id=st.user_id, enabled=True, status="ON_IDLE")
