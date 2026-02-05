@@ -29,6 +29,70 @@ from ifrontier.services.contract_rules import eval_condition, parse_transfers, s
 class ContractService:
 
     @staticmethod
+    def _normalize_var_in_expr(v: Any, *, contract_id: str) -> Any:
+        if not isinstance(v, str):
+            return v
+        vv = str(v)
+        if vv == "contract.status" or (vv.startswith("contract.status") and ":" not in vv):
+            return f"contract.status:{contract_id}"
+        if vv.startswith("contract.runs:"):
+            parts = vv.split(":")
+            if len(parts) == 2 and parts[1]:
+                return f"contract.runs:{contract_id}:{parts[1]}"
+        return vv
+
+    @classmethod
+    def _normalize_condition_expr(cls, expr: Any, *, contract_id: str) -> Any:
+        if isinstance(expr, list):
+            return [cls._normalize_condition_expr(x, contract_id=contract_id) for x in expr]
+
+        if not isinstance(expr, dict):
+            return expr
+
+        if "var" in expr:
+            out = dict(expr)
+            out["var"] = cls._normalize_var_in_expr(out.get("var"), contract_id=contract_id)
+            return out
+
+        if "op" in expr:
+            op = str(expr.get("op") or "")
+            if op in {"and", "or"}:
+                args = cls._normalize_condition_expr(expr.get("args"), contract_id=contract_id)
+                return {"op": op, "args": args}
+            if op == "not":
+                arg = cls._normalize_condition_expr(expr.get("arg"), contract_id=contract_id)
+                return {"op": "not", "arg": arg}
+            if op in {"==", "!=", ">", ">=", "<", "<="}:
+                left = cls._normalize_condition_expr(expr.get("left"), contract_id=contract_id)
+                right = cls._normalize_condition_expr(expr.get("right"), contract_id=contract_id)
+                if op in {"==", "!="}:
+                    if isinstance(left, dict) and str(left.get("var") or "").startswith("contract.status:") and right == "SIGNED":
+                        right = "ACTIVE"
+                    if isinstance(right, dict) and str(right.get("var") or "").startswith("contract.status:") and left == "SIGNED":
+                        left = "ACTIVE"
+                return {"op": op, "left": left, "right": right}
+            return dict(expr)
+
+        if len(expr) == 1:
+            k = next(iter(expr.keys()))
+            v = expr.get(k)
+            if k in {"and", "or"} and isinstance(v, list):
+                return {"op": k, "args": [cls._normalize_condition_expr(x, contract_id=contract_id) for x in v]}
+            if k == "not":
+                return {"op": "not", "arg": cls._normalize_condition_expr(v, contract_id=contract_id)}
+            if k in {"==", "!=", ">", ">=", "<", "<="} and isinstance(v, list) and len(v) == 2:
+                left = cls._normalize_condition_expr(v[0], contract_id=contract_id)
+                right = cls._normalize_condition_expr(v[1], contract_id=contract_id)
+                if k in {"==", "!="}:
+                    if isinstance(left, dict) and str(left.get("var") or "").startswith("contract.status:") and right == "SIGNED":
+                        right = "ACTIVE"
+                    if isinstance(right, dict) and str(right.get("var") or "").startswith("contract.status:") and left == "SIGNED":
+                        left = "ACTIVE"
+                return {"op": k, "left": left, "right": right}
+
+        return {kk: cls._normalize_condition_expr(vv, contract_id=contract_id) for kk, vv in expr.items()}
+
+    @staticmethod
     def _apply_default_partial_fill(
         *,
         transfers: List[ContractTransfer],
@@ -425,7 +489,7 @@ class ContractService:
                     rec2 = session.execute_read(self._load_contract_for_rules_tx, {"contract_id": contract_id})
                 terms_json2 = str((rec2 or {}).get("terms_json") or "{}")
                 terms2 = json.loads(terms_json2)
-                rules_raw2 = terms2.get("rules") if isinstance(terms2, dict) else None
+                rules_raw2 = terms2.get("rules")
                 has_exec_rules = isinstance(rules_raw2, list) and any(isinstance(x, dict) for x in rules_raw2)
             except Exception:
                 has_exec_rules = False
@@ -468,7 +532,7 @@ class ContractService:
                 rec2 = session.execute_read(self._load_contract_for_rules_tx, {"contract_id": contract_id})
             terms_json2 = str((rec2 or {}).get("terms_json") or "{}")
             terms2 = json.loads(terms_json2)
-            rules_raw2 = terms2.get("rules") if isinstance(terms2, dict) else None
+            rules_raw2 = terms2.get("rules")
             has_exec_rules = isinstance(rules_raw2, list) and any(isinstance(x, dict) for x in rules_raw2)
         except Exception:
             has_exec_rules = False
@@ -645,7 +709,8 @@ class ContractService:
                 continue
 
             condition = rule.get("condition", True)
-            cond_ok = bool(eval_condition(condition))
+            condition_norm = self._normalize_condition_expr(condition, contract_id=contract_id)
+            cond_ok = bool(eval_condition(condition_norm))
             if not cond_ok:
                 payload = ContractRuleExecutedPayload(
                     contract_id=contract_id,
