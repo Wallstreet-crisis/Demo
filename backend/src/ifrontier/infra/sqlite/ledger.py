@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from ifrontier.infra.sqlite.db import get_connection
@@ -26,6 +26,7 @@ class ContractTransfer:
 
 
 def create_account(account_id: str, owner_type: str, initial_cash: float = 0.0, caste_id: str | None = None) -> None:
+    account_id = str(account_id).lower()
     conn = get_connection()
     with conn:
         conn.execute(
@@ -35,6 +36,7 @@ def create_account(account_id: str, owner_type: str, initial_cash: float = 0.0, 
 
 
 def get_snapshot(account_id: str) -> AccountSnapshot:
+    account_id = str(account_id).lower()
     conn = get_connection()
     cur = conn.cursor()
 
@@ -66,6 +68,9 @@ def apply_trade_executed(
 ) -> None:
     if quantity <= 0 or price <= 0:
         raise ValueError("price and quantity must be positive")
+
+    buy_account_id = str(buy_account_id).lower()
+    sell_account_id = str(sell_account_id).lower()
 
     conn = get_connection()
     now = datetime.now(timezone.utc).isoformat()
@@ -143,6 +148,8 @@ def spend_cash(*, account_id: str, amount: float, event_id: str) -> None:
     if amount <= 0:
         raise ValueError("amount must be positive")
 
+    account_id = str(account_id).lower()
+
     conn = get_connection()
     now = datetime.now(timezone.utc).isoformat()
 
@@ -178,6 +185,18 @@ def _insert_ledger(cur, account_id: str, asset_type: str, symbol: str, delta: fl
 def apply_contract_transfers(*, transfers: List[ContractTransfer], event_id: str) -> None:
     if not transfers:
         raise ValueError("transfers must be non-empty")
+
+    # Normalize account ids early
+    transfers = [
+        ContractTransfer(
+            from_account_id=str(t.from_account_id).lower(),
+            to_account_id=str(t.to_account_id).lower(),
+            asset_type=str(t.asset_type).upper(),
+            symbol=str(t.symbol),
+            quantity=float(t.quantity),
+        )
+        for t in transfers
+    ]
 
     for t in transfers:
         if t.quantity <= 0:
@@ -267,3 +286,36 @@ def apply_contract_transfers(*, transfers: List[ContractTransfer], event_id: str
             ).fetchone()
             if neg_pos_row is not None:
                 raise ValueError("negative position after transfer")
+
+
+def list_ledger_entries(*, account_id: str, limit: int = 200, before: Optional[str] = None) -> List[Dict[str, Any]]:
+    account_id = str(account_id).lower()
+    conn = get_connection()
+    cur = conn.cursor()
+
+    q = (
+        "SELECT entry_id, account_id, asset_type, symbol, delta, event_id, created_at "
+        "FROM ledger_entries WHERE account_id = ? "
+    )
+    params: list[Any] = [str(account_id)]
+    if before:
+        q += "AND created_at < ? "
+        params.append(str(before))
+    q += "ORDER BY created_at DESC LIMIT ?"
+    params.append(int(limit))
+
+    rows = cur.execute(q, tuple(params)).fetchall()
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        out.append(
+            {
+                "entry_id": str(r["entry_id"]),
+                "account_id": str(r["account_id"]),
+                "asset_type": str(r["asset_type"]),
+                "symbol": str(r["symbol"]),
+                "delta": float(r["delta"]),
+                "event_id": str(r["event_id"]),
+                "created_at": str(r["created_at"]),
+            }
+        )
+    return out

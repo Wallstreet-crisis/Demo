@@ -384,6 +384,9 @@ class ContractService:
     def sign_contract(self, *, contract_id: str, signer: str) -> ContractStatus:
         now = datetime.now(timezone.utc)
 
+        contract_id = str(contract_id).strip()
+        signer = str(signer).lower()
+
         with self._driver.session() as session:
             record = session.execute_write(
                 self._sign_contract_tx,
@@ -861,12 +864,17 @@ class ContractService:
             WITH c,
                  CASE WHEN c.signatures IS NULL THEN [] ELSE c.signatures END AS sigs,
                  CASE WHEN c.required_signers IS NULL THEN [] ELSE c.required_signers END AS reqs
-            WHERE c.status IN ['DRAFT','SIGNED']
-            WITH c,
-                 CASE WHEN $signer IN sigs THEN sigs ELSE sigs + $signer END AS new_sigs,
-                 reqs
-            WITH c, new_sigs, reqs,
-                 ALL(x IN reqs WHERE x IN new_sigs) AS all_signed
+            WHERE toUpper(trim(coalesce(c.status, ''))) IN ['DRAFT','SIGNED']
+            WITH c, sigs, reqs,
+                 [x IN sigs | toLower(toString(x))] AS sigs_lc,
+                 [x IN reqs | toLower(toString(x))] AS reqs_lc,
+                 toLower(toString($signer)) AS signer_lc
+            WITH c, sigs, reqs_lc, sigs_lc, signer_lc,
+                 CASE WHEN signer_lc IN sigs_lc THEN sigs ELSE sigs + $signer END AS new_sigs
+            WITH c, new_sigs, reqs_lc,
+                 [x IN new_sigs | toLower(toString(x))] AS new_sigs_lc
+            WITH c, new_sigs, reqs_lc,
+                 ALL(x IN reqs_lc WHERE x IN new_sigs_lc) AS all_signed
             SET c.signatures = new_sigs,
                 c.status = CASE WHEN all_signed THEN 'ACTIVE' ELSE c.status END,
                 c.activated_at = CASE WHEN all_signed THEN $signed_at ELSE c.activated_at END,

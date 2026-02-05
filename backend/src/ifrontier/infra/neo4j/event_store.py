@@ -29,6 +29,10 @@ class Neo4jEventStore:
         actor_user_id = (event.actor or {}).get("user_id")
         actor_agent_id = (event.actor or {}).get("agent_id")
 
+        contract_id = None
+        if isinstance(event.payload, dict):
+            contract_id = event.payload.get("contract_id")
+
         payload_json = json.dumps(event.payload, ensure_ascii=False)
         actor_json = json.dumps(event.actor or {}, ensure_ascii=False)
 
@@ -45,6 +49,7 @@ class Neo4jEventStore:
                     "actor_json": actor_json,
                     "actor_user_id": actor_user_id,
                     "actor_agent_id": actor_agent_id,
+                    "contract_id": str(contract_id) if contract_id else None,
                 },
             )
 
@@ -59,6 +64,11 @@ class Neo4jEventStore:
                 e.causation_id = $causation_id,
                 e.payload_json = $payload_json,
                 e.actor_json = $actor_json
+
+            WITH e
+            FOREACH (_ IN CASE WHEN $contract_id IS NULL THEN [] ELSE [1] END |
+              SET e.contract_id = $contract_id
+            )
 
             WITH e
             FOREACH (_ IN CASE WHEN $actor_user_id IS NULL THEN [] ELSE [1] END |
@@ -108,6 +118,45 @@ class Neo4jEventStore:
                    e.actor_json AS actor_json,
                    e.payload_json AS payload_json
             ORDER BY e.occurred_at ASC
+            LIMIT $limit
+            """,
+            **params,
+        )
+        return [dict(r) for r in result]
+
+    def list_by_contract_id_and_type(self, *, contract_id: str, event_type: str, limit: int = 200) -> List[StoredEvent]:
+        with self._driver.session() as session:
+            records = session.execute_read(
+                self._list_by_contract_id_and_type_tx,
+                {"contract_id": str(contract_id), "event_type": str(event_type), "limit": int(limit)},
+            )
+
+        return [
+            StoredEvent(
+                event_id=r["event_id"],
+                event_type=r["event_type"],
+                occurred_at=r["occurred_at"],
+                correlation_id=r.get("correlation_id"),
+                causation_id=r.get("causation_id"),
+                actor=json.loads(r.get("actor_json") or "{}") or None,
+                payload=json.loads(r.get("payload_json") or "{}"),
+            )
+            for r in records
+        ]
+
+    @staticmethod
+    def _list_by_contract_id_and_type_tx(tx, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        result = tx.run(
+            """
+            MATCH (e:Event {contract_id: $contract_id, event_type: $event_type})
+            RETURN e.event_id AS event_id,
+                   e.event_type AS event_type,
+                   e.occurred_at AS occurred_at,
+                   e.correlation_id AS correlation_id,
+                   e.causation_id AS causation_id,
+                   e.actor_json AS actor_json,
+                   e.payload_json AS payload_json
+            ORDER BY e.occurred_at DESC
             LIMIT $limit
             """,
             **params,

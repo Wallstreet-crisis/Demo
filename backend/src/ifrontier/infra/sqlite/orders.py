@@ -63,6 +63,7 @@ def insert_limit_order(account_id: str, symbol: str, side: str, price: float, qu
         raise ValueError("price and quantity must be positive")
 
     conn = get_connection()
+    account_id = str(account_id).lower()
     order_id = str(uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
 
@@ -116,6 +117,7 @@ def update_order_quantity_and_status(order_id: str, new_quantity: float, new_sta
 
 def cancel_orders_by_account(account_id: str, symbol: Optional[str] = None) -> int:
     conn = get_connection()
+    account_id = str(account_id).lower()
     sql = "UPDATE orders SET status = 'CANCELLED', quantity_remaining = 0 WHERE account_id = ? AND status IN ('OPEN', 'PARTIAL_FILLED')"
     params = [account_id]
     if symbol:

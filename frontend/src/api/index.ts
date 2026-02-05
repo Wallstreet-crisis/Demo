@@ -1,6 +1,7 @@
 import { ApiClient } from './http'
 import type {
   AccountValuationResponse,
+  AccountLedgerResponse,
   ChatIntroFeeQuoteRequest,
   ChatIntroFeeQuoteResponse,
   ChatListMessagesResponse,
@@ -113,6 +114,9 @@ export const Api = {
   playerAccount: (player_id: string) => api.get<PlayerAccountResponse>(`/players/${encodeURIComponent(player_id)}/account`),
   accountValuation: (account_id: string, discount_factor = 1.0) =>
     api.get<AccountValuationResponse>(`/accounts/${encodeURIComponent(account_id)}/valuation`, { discount_factor }),
+
+  accountLedger: (account_id: string, limit = 200, before?: string) =>
+    api.get<AccountLedgerResponse>(`/accounts/${encodeURIComponent(account_id)}/ledger`, { limit, before }),
 
   chatIntroFeeQuote: (req: ChatIntroFeeQuoteRequest) =>
     api.post<ChatIntroFeeQuoteResponse>('/chat/intro-fee/quote', req),

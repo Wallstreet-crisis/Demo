@@ -98,6 +98,21 @@ export type AccountValuationResponse = {
   prices: Record<string, number | null>
 }
 
+export type LedgerEntryResponse = {
+  entry_id: string
+  account_id: string
+  asset_type: string
+  symbol: string
+  delta: number
+  event_id: string
+  created_at: string
+}
+
+export type AccountLedgerResponse = {
+  account_id: string
+  items: LedgerEntryResponse[]
+}
+
 export type PlayerLimitOrderRequest = {
   player_id: string
   symbol: string

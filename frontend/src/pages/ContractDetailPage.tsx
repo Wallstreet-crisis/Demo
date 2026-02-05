@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Api, ApiError, type ContractAgentAuditResponse, type ContractResponse } from '../api'
 import { useAppSession } from '../app/context'
@@ -15,6 +15,7 @@ export default function ContractDetailPage() {
   const [detail, setDetail] = useState<ContractResponse | null>(null)
   const [auditLoading, setAuditLoading] = useState(false)
   const [audit, setAudit] = useState<ContractAgentAuditResponse | null>(null)
+  const autoAuditRef = useRef<{ contractId: string; done: boolean }>({ contractId: '', done: false })
 
   const refresh = useCallback(async () => {
     if (!contractId) return
@@ -115,6 +116,11 @@ export default function ContractDetailPage() {
 
   useEffect(() => {
     if (!playerId || !contractId) return
+    if (autoAuditRef.current.contractId !== contractId) {
+      autoAuditRef.current = { contractId, done: false }
+    }
+    if (autoAuditRef.current.done) return
+    autoAuditRef.current.done = true
     refreshAudit(false)
   }, [playerId, contractId, refreshAudit])
 
@@ -312,31 +318,34 @@ export default function ContractDetailPage() {
             </div>
 
             {audit ? (
-              <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
-                <div style={{ color: '#e2e8f0', fontSize: '12px', lineHeight: 1.5 }}>{audit.summary}</div>
+              <details style={{ marginTop: 10 }}>
+                <summary style={{ cursor: 'pointer', color: '#94a3b8' }}>查看审计详情</summary>
+                <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
+                  <div style={{ color: '#e2e8f0', fontSize: '12px', lineHeight: 1.5 }}>{audit.summary}</div>
 
-                {audit.issues.length > 0 ? (
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#64748b', marginBottom: 4 }}>ISSUES</div>
-                    <div style={{ display: 'grid', gap: 4, fontSize: '12px', color: '#fecaca' }}>
-                      {audit.issues.map((x, i) => (
-                        <div key={i}>- {x}</div>
-                      ))}
+                  {audit.issues.length > 0 ? (
+                    <div>
+                      <div style={{ fontSize: '10px', color: '#64748b', marginBottom: 4 }}>ISSUES</div>
+                      <div style={{ display: 'grid', gap: 4, fontSize: '12px', color: '#fecaca' }}>
+                        {audit.issues.map((x, i) => (
+                          <div key={i}>- {x}</div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ) : null}
+                  ) : null}
 
-                {audit.questions.length > 0 ? (
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#64748b', marginBottom: 4 }}>QUESTIONS</div>
-                    <div style={{ display: 'grid', gap: 4, fontSize: '12px', color: '#e2e8f0' }}>
-                      {audit.questions.map((x, i) => (
-                        <div key={i}>- {x}</div>
-                      ))}
+                  {audit.questions.length > 0 ? (
+                    <div>
+                      <div style={{ fontSize: '10px', color: '#64748b', marginBottom: 4 }}>QUESTIONS</div>
+                      <div style={{ display: 'grid', gap: 4, fontSize: '12px', color: '#e2e8f0' }}>
+                        {audit.questions.map((x, i) => (
+                          <div key={i}>- {x}</div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ) : null}
-              </div>
+                  ) : null}
+                </div>
+              </details>
             ) : (
               <div style={{ marginTop: 10, opacity: 0.7, fontSize: 12 }}>
                 {auditLoading ? '审计中...' : (playerId ? '暂无审计结果' : '未登录，无法审计')}

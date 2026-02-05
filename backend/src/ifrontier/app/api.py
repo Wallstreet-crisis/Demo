@@ -18,7 +18,7 @@ from ifrontier.infra.neo4j.driver import create_driver
 from ifrontier.infra.neo4j.event_store import Neo4jEventStore
 from ifrontier.services.commonbot import run_commonbot_for_earnings
 from ifrontier.services.commonbot_emergency import CommonBotEmergencyRunner
-from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account, get_snapshot, spend_cash
+from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account, get_snapshot, list_ledger_entries, spend_cash
 from ifrontier.infra.sqlite.market import get_candles, get_last_price, get_price_series, record_trade
 from ifrontier.services.matching import submit_limit_order, submit_market_order
 from ifrontier.services.market_analytics import get_market_trends, get_quote
@@ -855,7 +855,7 @@ class AccountValuationResponse(BaseModel):
 @router.get("/accounts/{account_id}/valuation")
 async def account_valuation(account_id: str, discount_factor: float = 1.0) -> AccountValuationResponse:
     try:
-        v = value_account(account_id=account_id, discount_factor=discount_factor)
+        v = value_account(account_id=str(account_id).lower(), discount_factor=discount_factor)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return AccountValuationResponse(
@@ -866,6 +866,30 @@ async def account_valuation(account_id: str, discount_factor: float = 1.0) -> Ac
         total_value=v.total_value,
         discount_factor=v.discount_factor,
         prices=v.prices,
+    )
+
+
+class LedgerEntryResponse(BaseModel):
+    entry_id: str
+    account_id: str
+    asset_type: str
+    symbol: str
+    delta: float
+    event_id: str
+    created_at: str
+
+
+class AccountLedgerResponse(BaseModel):
+    account_id: str
+    items: List[LedgerEntryResponse]
+
+
+@router.get("/accounts/{account_id}/ledger")
+async def account_ledger(account_id: str, limit: int = 200, before: str | None = None) -> AccountLedgerResponse:
+    rows = list_ledger_entries(account_id=str(account_id).lower(), limit=int(limit), before=before)
+    return AccountLedgerResponse(
+        account_id=str(account_id).lower(),
+        items=[LedgerEntryResponse(**r) for r in rows],
     )
 
 
@@ -911,7 +935,7 @@ async def debug_submit_order(req: DebugSubmitOrderRequest) -> DebugSubmitOrderRe
     # 这里只是限价单提交入口，实际撮合和记账由 MatchingEngine + SQLite 账本处理
     try:
         order_id, _matches = submit_limit_order(
-        account_id=req.account_id,
+        account_id=req.account_id.lower(),
         symbol=req.symbol,
         side=req.side,
         price=req.price,
@@ -935,7 +959,7 @@ class CreatePlayerResponse(BaseModel):
 
 @router.post("/debug/create_player")
 async def create_player(req: CreatePlayerRequest) -> CreatePlayerResponse:
-    account_id = f"user:{req.player_id}"
+    account_id = f"user:{str(req.player_id).lower()}"
     # 如果提供 caste_id, 优先使用阶级配置; 否则回退到显式 initial_cash 或 0
     initial_cash = 0.0
     positions: Dict[str, float] = {}
@@ -978,7 +1002,7 @@ class PlayerOrderResponse(BaseModel):
 
 @router.post("/orders/limit")
 async def submit_player_limit_order(req: PlayerLimitOrderRequest) -> PlayerOrderResponse:
-    account_id = f"user:{req.player_id}"
+    account_id = f"user:{str(req.player_id).lower()}"
     try:
         order_id, matches = submit_limit_order(
             account_id=account_id,
@@ -1010,7 +1034,7 @@ class PlayerMarketOrderRequest(BaseModel):
 
 @router.post("/orders/market")
 async def submit_player_market_order(req: PlayerMarketOrderRequest) -> None:
-    account_id = f"user:{req.player_id}"
+    account_id = f"user:{str(req.player_id).lower()}"
     try:
         q = float(req.quantity)
         if q <= 0:
@@ -1050,7 +1074,7 @@ class PlayerBootstrapRequest(BaseModel):
 @router.post("/players/bootstrap")
 async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountResponse:
     # 幂等：如果已存在则返回现有数据，不报错也不重复发放初始资产
-    account_id = f"user:{req.player_id}"
+    account_id = f"user:{str(req.player_id).lower()}"
     
     # 检查是否已存在
     try:
@@ -1115,7 +1139,7 @@ async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountRespons
 
 @router.get("/players/{player_id}/account")
 async def get_player_account(player_id: str) -> PlayerAccountResponse:
-    account_id = f"user:{player_id}"
+    account_id = f"user:{str(player_id).lower()}"
     snap = get_snapshot(account_id)
     return PlayerAccountResponse(
         account_id=snap.account_id, 
@@ -1688,6 +1712,41 @@ async def list_contracts(
         return ContractListResponse(items=[])
 
 
+class ContractRuleEventItem(BaseModel):
+    event_id: str
+    occurred_at: str
+    actor: Dict[str, Any] | None = None
+    payload: Dict[str, Any]
+
+
+class ContractRuleEventsResponse(BaseModel):
+    items: List[ContractRuleEventItem]
+
+
+@router.get("/contracts/{contract_id}/rule_events")
+async def contract_rule_events(contract_id: str, limit: int = 200) -> ContractRuleEventsResponse:
+    try:
+        events = _event_store.list_by_contract_id_and_type(
+            contract_id=str(contract_id),
+            event_type=str(EventType.CONTRACT_RULE_EXECUTED.value),
+            limit=int(limit),
+        )
+    except Exception:
+        return ContractRuleEventsResponse(items=[])
+
+    return ContractRuleEventsResponse(
+        items=[
+            ContractRuleEventItem(
+                event_id=e.event_id,
+                occurred_at=e.occurred_at,
+                actor=e.actor,
+                payload=e.payload,
+            )
+            for e in events
+        ]
+    )
+
+
 class ContractBatchItem(BaseModel):
     kind: str
     title: str
@@ -1846,7 +1905,7 @@ class ContractSignResponse(BaseModel):
 @router.post("/contracts/{contract_id}/sign")
 async def contract_sign(contract_id: str, req: ContractSignRequest) -> ContractSignResponse:
     try:
-        status = _contract_service.sign_contract(contract_id=contract_id, signer=req.signer)
+        status = _contract_service.sign_contract(contract_id=contract_id, signer=str(req.signer).strip().lower())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return ContractSignResponse(status=status.value)

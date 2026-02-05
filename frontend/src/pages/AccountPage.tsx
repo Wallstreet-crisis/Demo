@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Api, ApiError, type AccountValuationResponse, type PlayerAccountResponse } from '../api'
+import { Api, ApiError, type AccountLedgerResponse, type AccountValuationResponse, type PlayerAccountResponse } from '../api'
 import { useAppSession } from '../app/context'
 
 export default function AccountPage() {
@@ -8,6 +8,7 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true)
   const [snap, setSnap] = useState<PlayerAccountResponse | null>(null)
   const [val, setVal] = useState<AccountValuationResponse | null>(null)
+  const [ledger, setLedger] = useState<AccountLedgerResponse | null>(null)
 
   async function refresh(): Promise<void> {
     setErr('')
@@ -17,6 +18,8 @@ export default function AccountPage() {
       setSnap(s)
       const v = await Api.accountValuation(`user:${playerId}`, 1.0)
       setVal(v)
+      const l = await Api.accountLedger(`user:${playerId}`, 200)
+      setLedger(l)
     } catch (e) {
       if (e instanceof ApiError) setErr(`${e.status}: ${e.message}`)
       else setErr(e instanceof Error ? e.message : String(e))
@@ -45,6 +48,8 @@ export default function AccountPage() {
     .sort((a, b) => b.qty - a.qty)
 
   const positionCount = positionItems.length
+
+  const ledgerItems = ledger?.items ?? []
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -118,6 +123,47 @@ export default function AccountPage() {
         <details style={{ marginTop: 12 }}>
           <summary>Raw JSON</summary>
           <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify({ snap, valuation: val }, null, 2)}</pre>
+        </details>
+      </div>
+
+      <div className="card" style={{ textAlign: 'left' }}>
+        <h3 style={{ marginTop: 0 }}>资产变动记录</h3>
+        <div style={{ color: '#666', fontSize: 12, marginBottom: 8 }}>仅记录交易/契约导致的账本变动，不包含股票价格波动。</div>
+
+        {loading && !ledger ? (
+          <div style={{ padding: 20, color: '#999' }}>加载中...</div>
+        ) : ledgerItems.length ? (
+          <div style={{ overflow: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 6 }}>Time</th>
+                  <th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 6 }}>Asset</th>
+                  <th style={{ textAlign: 'right', borderBottom: '1px solid #ddd', padding: 6 }}>Δ</th>
+                  <th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 6 }}>Event</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledgerItems.map((it) => (
+                  <tr key={it.entry_id}>
+                    <td style={{ padding: 6, borderBottom: '1px solid #eee', whiteSpace: 'nowrap' }}>{String(it.created_at).replace('T', ' ').slice(0, 19)}</td>
+                    <td style={{ padding: 6, borderBottom: '1px solid #eee' }}>{it.asset_type}:{it.symbol}</td>
+                    <td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #eee', color: it.delta >= 0 ? '#16a34a' : '#dc2626' }}>
+                      {it.delta >= 0 ? `+${it.delta}` : it.delta}
+                    </td>
+                    <td style={{ padding: 6, borderBottom: '1px solid #eee', fontFamily: 'monospace', fontSize: 12 }}>{String(it.event_id).slice(0, 12)}...</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ color: '#666' }}>暂无记录。</div>
+        )}
+
+        <details style={{ marginTop: 12 }}>
+          <summary>Raw JSON</summary>
+          <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify({ ledger }, null, 2)}</pre>
         </details>
       </div>
     </div>
