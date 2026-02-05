@@ -38,7 +38,11 @@ class ContractAgent:
     @staticmethod
     def _ensure_default_policies(terms: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(terms, dict):
-            terms = {"transfers": [], "rules": []}
+            terms = {"transfers": [], "rules": [], "clauses": []}
+
+        clauses = terms.get("clauses")
+        if not isinstance(clauses, list):
+            terms["clauses"] = []
 
         dp = terms.get("default_policy")
         if not isinstance(dp, dict):
@@ -484,19 +488,24 @@ class ContractAgent:
         print(f"[ContractAgent] Attempting LLM draft for {actor_id}...")
         system = (
             "你是财务经理(Contract Agent)，仅输出合规JSON，禁止输出任何额外文字、注释、符号。",
-            "契约为**纯结构化可执行合约**：所有履约/触发/计算逻辑**仅由transfers与expr表达式承载**，无其他可执行规则字段。",
+            "契约为**结构化可执行合约(DSL)**：履约/触发/时间/计算逻辑由 terms.rules 规则对象驱动执行。",
             "字段规范（强制严格执行）：",
             "1. 顶层结构固定：{\"template_id\":\"...\",\"contract_create\":{...},\"explanation\":\"...\",\"questions\":[],\"risk_rating\":\"LOW|MEDIUM|HIGH\"}",
             "2. contract_create必填：kind/title/terms/parties/required_signers/participation_mode/invited_parties",
-            "3. terms必填结构：parties/transfers/rules/default_policy/reserved_default_policies",
-            "   3.1 transfers为数组，元素必须包含from/to/asset_type(CASH|EQUITY)/symbol/quantity；quantity为数字或{\"expr\":<expr>}表达式",
-            "   3.2 expr仅支持：op(add/sub/mul/div/min/max)、args、变量{\"var\":\"cash:<account_id>\"}/{\"var\":\"pos:<account_id>:<symbol>\"}/{\"var\":\"price:<symbol>\"}",
-            "   3.3 【关键规则】rules字段**仅为人类可读文本**，是explanation的核心摘要整合，无任何机器执行逻辑，直接复用给定的条款文本，不修改、不结构化、不嵌套",
-            "   3.4 default_policy固定为DEFAULT_PARTIAL_FILL；reserved_default_policies固定包含DEFAULT_LIQUIDATE_THEN_HAIRCUT",
-            "4. parties为数组，元素含party_id/role；required_signers为签约方ID数组；invited_parties为受邀方数组",
-            "5. 【字段整合规则】explanation为rules所有条款的连贯通顺复述+业务场景简要说明，与rules内容完全对齐，无冲突、无新增信息",
+            "3. terms 必填结构：clauses/rules/transfers/default_policy/reserved_default_policies",
+            "   3.1 clauses: 人类可读条款文本数组(list[str])，用于展示与审计，不参与机器执行。",
+            "   3.2 rules: 可执行规则数组(list[object])。每条规则对象字段：",
+            "       - rule_id: 字符串，唯一标识",
+            "       - schedule: {type: 'once' | 'interval', interval_seconds?: number, max_runs?: number}；注意：type='interval' 时必须提供 interval_seconds 与 max_runs",
+            "       - condition: JSON 布尔表达式（and/or/not/==/!=/>/>=/</<=），支持变量 cash/pos/price/contract.status/contract.runs",
+            "       - actions: {transfers: [ {from,to,asset_type(CASH|EQUITY),symbol,quantity} ] }",
+            "   3.3 transfers: 仅用于兼容 legacy 一次性结算（可留空数组）。更推荐把所有履约动作放入 rules.actions.transfers。",
+            "   3.4 quantity 可为数字或 {\"expr\":<expr>}；expr 支持 op(add/sub/mul/div/min/max)、args、变量{\"var\":\"cash:<account_id>\"}/{\"var\":\"pos:<account_id>:<symbol>\"}/{\"var\":\"price:<symbol>\"}/{\"var\":\"contract.runs:<contract_id>:<rule_id>\"}",
+            "   3.5 default_policy 固定为 DEFAULT_PARTIAL_FILL；reserved_default_policies 固定包含 DEFAULT_LIQUIDATE_THEN_HAIRCUT",
+            "4. parties/required_signers/invited_parties 均为用户ID数组(list[str])，元素如 'user:alice'；不要输出对象数组。",
+            "5. explanation: 用中文解释契约将如何执行（重点解释 rules 的触发/时间/资金流向），可引用 clauses 摘要",
             "6. risk_rating仅可选LOW/MEDIUM/HIGH，questions可为空数组",
-            "禁止行为：禁止将rules转为结构化JSON、禁止在rules外新增可执行规则字段、禁止修改给定的rules文本、禁止输出非JSON内容"
+            "禁止行为：禁止输出非JSON内容；禁止把可执行逻辑塞进 clauses 文本；禁止输出无法解析为 JSON 的内容。"
         )
         # 将元组转换为单行或多行字符串，具体取决于模型偏好，此处合并
         system_str = "\n".join(system)
@@ -537,9 +546,9 @@ class ContractAgent:
 
         # 最小修正：确保 actor_id 写入草案，便于后续对接 /contracts/create
         contract_create.setdefault("actor_id", actor_id)
-        contract_create.setdefault("terms", {"transfers": [], "rules": []})
+        contract_create.setdefault("terms", {"transfers": [], "rules": [], "clauses": []})
         if not isinstance(contract_create.get("terms"), dict):
-            contract_create["terms"] = {"transfers": [], "rules": []}
+            contract_create["terms"] = {"transfers": [], "rules": [], "clauses": []}
         contract_create["terms"] = self._ensure_default_policies(dict(contract_create.get("terms") or {}))
 
         explanation = str(obj.get("explanation") or "")

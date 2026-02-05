@@ -70,8 +70,8 @@ class ContractRuleScheduler:
                     contract_id=contract_id,
                     actor_id="system:tick",
                 )
-            except Exception:
-                # 必须异常隔离：任何单契约失败不影响调度循环
+            except Exception as exc:
+                print(f"[ContractRuleScheduler] run_rules failed: {contract_id}: {exc}")
                 return
 
     def _fetch_active_contracts_with_rules(self, *, limit: int) -> List[str]:

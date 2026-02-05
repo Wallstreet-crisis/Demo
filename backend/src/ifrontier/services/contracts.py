@@ -165,8 +165,9 @@ class ContractService:
         now = datetime.now(timezone.utc)
         contract_id = str(uuid4())
 
-        has_rules = isinstance(terms.get("rules"), list) and len(terms.get("rules")) > 0
-
+        rules_raw = terms.get("rules") if isinstance(terms, dict) else None
+        has_rules = isinstance(rules_raw, list) and any(isinstance(x, dict) for x in rules_raw)
+        
         mode = (participation_mode or ParticipationMode.ALL_SIGNERS.value).upper()
         
         # ID 归一化
@@ -232,7 +233,8 @@ class ContractService:
             participation_mode = (c.get("participation_mode") or ParticipationMode.ALL_SIGNERS.value).upper()
             invited_parties = list(c.get("invited_parties") or [])
 
-            has_rules = isinstance(terms.get("rules"), list) and len(terms.get("rules")) > 0
+            rules_raw = terms.get("rules") if isinstance(terms, dict) else None
+            has_rules = isinstance(rules_raw, list) and any(isinstance(x, dict) for x in rules_raw)
 
             specs.append(
                 {
@@ -416,6 +418,28 @@ class ContractService:
                 payload=payload2,
             )
             self._event_store.append(EventEnvelopeJson.from_envelope(env2))
+
+            has_exec_rules = False
+            try:
+                with self._driver.session() as session:
+                    rec2 = session.execute_read(self._load_contract_for_rules_tx, {"contract_id": contract_id})
+                terms_json2 = str((rec2 or {}).get("terms_json") or "{}")
+                terms2 = json.loads(terms_json2)
+                rules_raw2 = terms2.get("rules") if isinstance(terms2, dict) else None
+                has_exec_rules = isinstance(rules_raw2, list) and any(isinstance(x, dict) for x in rules_raw2)
+            except Exception:
+                has_exec_rules = False
+
+            try:
+                self.run_rules(contract_id=contract_id, actor_id=signer)
+            except Exception as exc:
+                print(f"[ContractService] auto run_rules skipped/failed: {contract_id}: {exc}")
+
+            if not has_exec_rules:
+                try:
+                    self.settle_contract(contract_id=contract_id, actor_id=signer)
+                except Exception as exc:
+                    print(f"[ContractService] auto settle skipped/failed: {contract_id}: {exc}")
         return ContractStatus(status)
 
     def activate_contract(self, *, contract_id: str, actor_id: str) -> None:
@@ -437,6 +461,28 @@ class ContractService:
             payload=payload,
         )
         self._event_store.append(EventEnvelopeJson.from_envelope(env))
+
+        has_exec_rules = False
+        try:
+            with self._driver.session() as session:
+                rec2 = session.execute_read(self._load_contract_for_rules_tx, {"contract_id": contract_id})
+            terms_json2 = str((rec2 or {}).get("terms_json") or "{}")
+            terms2 = json.loads(terms_json2)
+            rules_raw2 = terms2.get("rules") if isinstance(terms2, dict) else None
+            has_exec_rules = isinstance(rules_raw2, list) and any(isinstance(x, dict) for x in rules_raw2)
+        except Exception:
+            has_exec_rules = False
+
+        try:
+            self.run_rules(contract_id=contract_id, actor_id=actor_id)
+        except Exception as exc:
+            print(f"[ContractService] auto run_rules skipped/failed: {contract_id}: {exc}")
+
+        if not has_exec_rules:
+            try:
+                self.settle_contract(contract_id=contract_id, actor_id=actor_id)
+            except Exception as exc:
+                print(f"[ContractService] auto settle skipped/failed: {contract_id}: {exc}")
 
     def settle_contract(self, *, contract_id: str, actor_id: str) -> None:
         now = datetime.now(timezone.utc)
@@ -543,6 +589,15 @@ class ContractService:
             raise ValueError("contract rules missing")
         if not isinstance(rules_raw, list):
             raise ValueError("contract rules invalid")
+
+        has_exec_rules = any(isinstance(x, dict) for x in rules_raw)
+        if not has_exec_rules:
+            with self._driver.session() as session:
+                session.execute_write(
+                    self._set_contract_has_rules_tx,
+                    {"contract_id": contract_id, "has_rules": False, "updated_at": now.isoformat()},
+                )
+            return
 
         rule_state_json = str(record.get("rule_state_json") or "{}")
         try:
@@ -737,6 +792,17 @@ class ContractService:
             """
             MATCH (c:Contract {contract_id: $contract_id})
             SET c.status = $status,
+                c.updated_at = $updated_at
+            """,
+            **params,
+        )
+
+    @staticmethod
+    def _set_contract_has_rules_tx(tx, params: Dict[str, Any]) -> None:
+        tx.run(
+            """
+            MATCH (c:Contract {contract_id: $contract_id})
+            SET c.has_rules = $has_rules,
                 c.updated_at = $updated_at
             """,
             **params,
