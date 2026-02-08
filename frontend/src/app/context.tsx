@@ -1,6 +1,8 @@
 import { createContext, useContext, useState } from 'react'
 import type { CasteId } from './constants'
 
+const PLAYER_ID_RE = /^[a-zA-Z0-9_]{3,20}$/
+
 export type AppSession = {
   playerId: string
   setPlayerId: (v: string) => void
@@ -21,14 +23,25 @@ export function useAppSession(): AppSession {
 }
 
 export function AppSessionProvider({ children }: { children: React.ReactNode }) {
-  const [playerId, setPlayerIdState] = useState<string>(() => localStorage.getItem('if_player_id') || '')
+  const [playerId, setPlayerIdState] = useState<string>(() => {
+    const raw = localStorage.getItem('if_player_id') || ''
+    const v = raw.trim()
+    if (!v) return ''
+    if (!PLAYER_ID_RE.test(v)) {
+      localStorage.removeItem('if_player_id')
+      return ''
+    }
+    return v
+  })
   const [casteId, setCasteIdState] = useState<CasteId | ''>(() => (localStorage.getItem('if_caste_id') as CasteId) || '')
   const [symbol, setSymbolState] = useState<string>(() => localStorage.getItem('if_symbol') || 'WST')
   const [aiHosting, setAiHostingState] = useState<boolean>(false)
 
   const setPlayerId = (v: string) => {
-    setPlayerIdState(v)
-    if (v) localStorage.setItem('if_player_id', v)
+    const vv = String(v ?? '').trim()
+    if (vv && !PLAYER_ID_RE.test(vv)) return
+    setPlayerIdState(vv)
+    if (vv) localStorage.setItem('if_player_id', vv)
     else localStorage.removeItem('if_player_id')
   }
 

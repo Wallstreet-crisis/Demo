@@ -19,15 +19,18 @@ import { useEffect, useState } from 'react'
 import { Api, ApiError } from './api'
 import { useAppSession } from './app/context'
 
+const PLAYER_ID_RE = /^[a-zA-Z0-9_]{3,20}$/
+
 function App() {
   const [bootstrapErr, setBootstrapErr] = useState<string>('')
 
   const { playerId, casteId } = useAppSession()
+  const playerIdOk = !!playerId && PLAYER_ID_RE.test(playerId)
 
   useEffect(() => {
     let canceled = false
 
-    if (!playerId) {
+    if (!playerIdOk) {
       return () => {
         canceled = true
       }
@@ -54,7 +57,7 @@ function App() {
     return () => {
       canceled = true
     }
-  }, [playerId, casteId])
+  }, [playerIdOk, playerId, casteId])
 
   return (
     <>
@@ -67,10 +70,10 @@ function App() {
       <Routes>
         <Route path="/onboarding" element={<OnboardingPage />} />
 
-        <Route element={<Layout />}>
+        <Route element={playerIdOk ? <Layout /> : <Navigate to="/onboarding" replace />}>
           <Route
             index
-            element={<Navigate to={playerId ? '/dashboard' : '/onboarding'} replace />}
+            element={<Navigate to={playerIdOk ? '/dashboard' : '/onboarding'} replace />}
           />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/market" element={<MarketPage />} />
