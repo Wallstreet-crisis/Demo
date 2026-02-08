@@ -89,12 +89,12 @@ def resolve_var(var: str) -> float:
 
     if kind == "pos":
         # pos:<account_id>:<symbol>  (account_id itself may contain ':')
-        parts = var.split(":", 2)
-        if len(parts) != 3:
+        rest_s = str(rest)
+        if ":" not in rest_s:
             raise ValueError("pos var requires symbol")
-        _, account_id, symbol = parts
+        account_id, symbol = rest_s.rsplit(":", 1)
         snap = get_snapshot(str(account_id).lower())
-        return float(snap.positions.get(symbol, 0.0))
+        return float(snap.positions.get(str(symbol).upper(), 0.0))
 
     # 预留空间：价格/盘口/波动率/外部数据等，由上层数据网关实现
     if kind == "price":
