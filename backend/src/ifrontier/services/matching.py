@@ -18,7 +18,7 @@ from ifrontier.domain.events.envelope import EventEnvelopeJson
 from ifrontier.domain.events.types import EventType
 from ifrontier.infra.neo4j.event_store import Neo4jEventStore
 from ifrontier.infra.neo4j.driver import create_driver
-from ifrontier.infra.sqlite.ledger import apply_trade_executed
+from ifrontier.infra.sqlite.ledger import apply_trade_executed, get_snapshot
 from ifrontier.infra.sqlite.market import record_trade
 from ifrontier.infra.sqlite.orders import (
     fetch_best_opposite_orders,
@@ -55,6 +55,23 @@ def submit_limit_order(
     assert_market_accepts_orders(cfg=cfg)
 
     assert_symbol_tradable(symbol)
+
+    try:
+        snap = get_snapshot(account_id)
+    except ValueError:
+        order = insert_limit_order(account_id, symbol, side, price, quantity)
+        update_order_quantity_and_status(order.order_id, 0.0, "CANCELLED")
+        return order.order_id, []
+    if side == "BUY":
+        if float(snap.cash) < float(price) * float(quantity) - 1e-9:
+            order = insert_limit_order(account_id, symbol, side, price, quantity)
+            update_order_quantity_and_status(order.order_id, 0.0, "CANCELLED")
+            return order.order_id, []
+    if side == "SELL":
+        if float(snap.positions.get(str(symbol).upper(), 0.0)) < float(quantity) - 1e-9:
+            order = insert_limit_order(account_id, symbol, side, price, quantity)
+            update_order_quantity_and_status(order.order_id, 0.0, "CANCELLED")
+            return order.order_id, []
 
     # 先插入订单
     order = insert_limit_order(account_id, symbol, side, price, quantity)
@@ -103,16 +120,47 @@ def submit_limit_order(
         if isinstance(event_dict.get("event_id"), UUID):
             event_dict["event_id"] = str(event_dict["event_id"])
 
-        print(f"[MatchingEngine] TRADE_EXECUTED: {symbol} {trade_qty} @ {trade_price} ({payload['buy_account_id']} <- {payload['sell_account_id']})")
+        try:
+            apply_trade_executed(
+                buy_account_id=payload["buy_account_id"],
+                sell_account_id=payload["sell_account_id"],
+                symbol=symbol,
+                price=trade_price,
+                quantity=trade_qty,
+                event_id=str(event_json.event_id),
+            )
+        except ValueError as e:
+            msg = str(e)
+            buyer_id = str(payload["buy_account_id"]).lower()
+            seller_id = str(payload["sell_account_id"]).lower()
 
-        # 账本记账
-        apply_trade_executed(
-            buy_account_id=payload["buy_account_id"],
-            sell_account_id=payload["sell_account_id"],
-            symbol=symbol,
-            price=trade_price,
-            quantity=trade_qty,
-            event_id=str(event_json.event_id),
+            # 计算“本单/对手单”分别是谁，用于精确取消无法交割的一方
+            opp_account_id = str(opp.account_id).lower()
+            incoming_is_buyer = side == "BUY"
+            incoming_is_seller = side == "SELL"
+
+            if "insufficient cash" in msg:
+                # 谁是买方，谁就无法成交；若是对手单买方，则取消对手单；若是本单买方，则取消本单并停止
+                if buyer_id == opp_account_id and not incoming_is_buyer:
+                    update_order_quantity_and_status(opp.order_id, 0.0, "CANCELLED")
+                    continue
+                update_order_quantity_and_status(order.order_id, 0.0, "CANCELLED")
+                return order.order_id, matches
+
+            if "insufficient position" in msg:
+                # 谁是卖方，谁就无法成交；若是对手单卖方，则取消对手单；若是本单卖方，则取消本单并停止
+                if seller_id == opp_account_id and not incoming_is_seller:
+                    update_order_quantity_and_status(opp.order_id, 0.0, "CANCELLED")
+                    continue
+                update_order_quantity_and_status(order.order_id, 0.0, "CANCELLED")
+                return order.order_id, matches
+
+            # 其他记账错误保留原行为
+            raise
+
+        print(
+            f"[MatchingEngine] TRADE_EXECUTED: {symbol} {trade_qty} @ {trade_price} ("
+            f"{payload['buy_account_id']} <- {payload['sell_account_id']})"
         )
 
         record_trade(
@@ -207,14 +255,36 @@ def submit_market_order(
         if isinstance(event_dict.get("event_id"), UUID):
             event_dict["event_id"] = str(event_dict["event_id"])
 
-        apply_trade_executed(
-            buy_account_id=payload["buy_account_id"],
-            sell_account_id=payload["sell_account_id"],
-            symbol=symbol,
-            price=trade_price,
-            quantity=trade_qty,
-            event_id=str(event_json.event_id),
-        )
+        try:
+            apply_trade_executed(
+                buy_account_id=payload["buy_account_id"],
+                sell_account_id=payload["sell_account_id"],
+                symbol=symbol,
+                price=trade_price,
+                quantity=trade_qty,
+                event_id=str(event_json.event_id),
+            )
+        except ValueError as e:
+            msg = str(e)
+            buyer_id = str(payload["buy_account_id"]).lower()
+            seller_id = str(payload["sell_account_id"]).lower()
+            opp_account_id = str(opp.account_id).lower()
+            incoming_is_buyer = side == "BUY"
+            incoming_is_seller = side == "SELL"
+
+            if "insufficient cash" in msg:
+                if buyer_id == opp_account_id and not incoming_is_buyer:
+                    update_order_quantity_and_status(opp.order_id, 0.0, "CANCELLED")
+                    continue
+                break
+
+            if "insufficient position" in msg:
+                if seller_id == opp_account_id and not incoming_is_seller:
+                    update_order_quantity_and_status(opp.order_id, 0.0, "CANCELLED")
+                    continue
+                break
+
+            raise
 
         record_trade(
             symbol=symbol,

@@ -50,13 +50,20 @@ def init_bot_accounts() -> None:
                 (500_000_000.0, "mm:1")
             )
 
+        if symbols:
+            for sym in symbols:
+                conn.execute(
+                    "INSERT INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?) "
+                    "ON CONFLICT(account_id, symbol) DO UPDATE SET quantity = CASE "
+                    "WHEN quantity < excluded.quantity THEN excluded.quantity ELSE quantity END",
+                    ("mm:1", sym, 1_000_000.0),
+                )
+
         for p in default_bot_profiles():
-            # 强制重置/同步机器人账户资金
             row = conn.execute("SELECT 1 FROM accounts WHERE account_id = ?", (p.account_id,)).fetchone()
             if not row:
                 create_account(p.account_id, owner_type=p.owner_type, initial_cash=p.initial_cash)
             else:
-                # 强制更新现有机器人的资金，制造惊涛骇浪
                 conn.execute(
                     "UPDATE accounts SET cash = ? WHERE account_id = ?",
                     (p.initial_cash, p.account_id)

@@ -22,7 +22,7 @@ class MarketMaker:
         self._cfg = cfg
 
     def tick_once(self, *, active_chains_count: int = 0) -> List[MatchResult]:
-        create_account(self._cfg.account_id, owner_type="bot_institution", initial_cash=0.0)
+        create_account(self._cfg.account_id, owner_type="market_maker", initial_cash=0.0)
 
         from ifrontier.infra.sqlite.orders import cancel_orders_by_account
         # 每次 Tick 前先清理旧挂单，保持盘口新鲜
@@ -93,13 +93,28 @@ class MarketMaker:
                 
                 from ifrontier.services.matching import submit_market_order
                 try:
-                    noise_matches = submit_market_order(
-                        account_id=self._cfg.account_id,
-                        symbol=sec.symbol,
-                        side=side,
-                        quantity=noise_qty
-                    )
-                    all_matches.extend(noise_matches)
+                    snap = get_snapshot(self._cfg.account_id)
+                    if side == "BUY":
+                        # 市价单最终成交价来自对手盘，这里用 mid 粗略估算成本做保护。
+                        est_cost = float(mid) * float(noise_qty)
+                        if float(snap.cash) >= est_cost - 1e-9:
+                            noise_matches = submit_market_order(
+                                account_id=self._cfg.account_id,
+                                symbol=sec.symbol,
+                                side=side,
+                                quantity=noise_qty,
+                            )
+                            all_matches.extend(noise_matches)
+                    else:
+                        avail = float(snap.positions.get(str(sec.symbol).upper(), 0.0))
+                        if avail >= float(noise_qty) - 1e-9:
+                            noise_matches = submit_market_order(
+                                account_id=self._cfg.account_id,
+                                symbol=sec.symbol,
+                                side=side,
+                                quantity=noise_qty,
+                            )
+                            all_matches.extend(noise_matches)
                 except Exception:
                     pass
             # -----------------------------------------------

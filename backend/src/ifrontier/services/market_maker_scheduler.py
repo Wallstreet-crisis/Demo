@@ -27,7 +27,7 @@ class MarketMakerScheduler:
         self._task: Optional[asyncio.Task[None]] = None
         
         cfg = MarketMakerConfig(
-            account_id=str(os.getenv("IF_MARKET_MAKER_ACCOUNT_ID") or "bot:inst:1"),
+            account_id=str(os.getenv("IF_MARKET_MAKER_ACCOUNT_ID") or "mm:1"),
             spread_pct=float(os.getenv("IF_MARKET_MAKER_SPREAD_PCT") or "0.02"),
             min_qty=float(os.getenv("IF_MARKET_MAKER_MIN_QTY") or "10.0"),
         )
