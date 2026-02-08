@@ -15,10 +15,15 @@ class MarketSessionScheduler:
         runner: CommonBotEmergencyRunner,
         tick_interval_seconds: float = 1.0,
         broadcaster: Callable[[Dict[str, Any]], Awaitable[None]],
+        channel_for_online_stats: Optional[str] = None,
+        get_channel_size: Optional[Callable[[str], Awaitable[int]]] = None,
     ) -> None:
         self._runner = runner
         self._tick_interval_seconds = float(tick_interval_seconds)
         self._broadcaster = broadcaster
+
+        self._channel_for_online_stats = str(channel_for_online_stats) if channel_for_online_stats else None
+        self._get_channel_size = get_channel_size
 
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task[None]] = None
@@ -40,6 +45,17 @@ class MarketSessionScheduler:
 
     async def _run_loop(self) -> None:
         while not self._stop.is_set():
+            if self._get_channel_size and self._channel_for_online_stats:
+                try:
+                    online = int(await self._get_channel_size(self._channel_for_online_stats))
+                except Exception:
+                    online = 0
+                if online <= 0:
+                    try:
+                        await asyncio.wait_for(self._stop.wait(), timeout=self._tick_interval_seconds)
+                    except asyncio.TimeoutError:
+                        pass
+                    continue
             try:
                 cfg = load_game_time_config_from_env()
                 snap = get_market_session(cfg=cfg)

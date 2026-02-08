@@ -39,6 +39,8 @@ def create_app() -> FastAPI:
             tick_interval_seconds=1.0,
             batch_size=50,
             max_concurrency=5,
+            channel_for_online_stats="presence",
+            get_channel_size=hub.get_channel_size,
         )
 
         news_scheduler = NewsTickScheduler(
@@ -46,25 +48,31 @@ def create_app() -> FastAPI:
             tick_interval_seconds=1.0,
             batch_size=50,
             broadcaster=_make_news_broadcaster(hub),
+            channel_for_online_stats="presence",
+            get_channel_size=hub.get_channel_size,
         )
 
         market_session_scheduler = MarketSessionScheduler(
             runner=api_module._commonbot_emergency_runner,
             tick_interval_seconds=1.0,
             broadcaster=_make_news_broadcaster(hub),
+            channel_for_online_stats="presence",
+            get_channel_size=hub.get_channel_size,
         )
 
         market_maker_scheduler = MarketMakerScheduler(
             driver=api_module._driver,
             tick_interval_seconds=1.0,
             broadcaster=_make_news_broadcaster(hub),
+            channel_for_online_stats="presence",
+            get_channel_size=hub.get_channel_size,
         )
 
         hosting_scheduler = HostingScheduler(
             min_players=8,
             tick_interval_seconds=1.0,
             max_per_tick=2,
-            channel_for_online_stats="events",
+            channel_for_online_stats="presence",
             get_channel_size=hub.get_channel_size,
             broadcaster=_make_news_broadcaster(hub),
             make_facade=api_module.make_user_facade,

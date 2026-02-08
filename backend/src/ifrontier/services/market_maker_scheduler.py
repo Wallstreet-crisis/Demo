@@ -14,10 +14,15 @@ class MarketMakerScheduler:
         driver: Any = None,
         tick_interval_seconds: float = 2.0,
         broadcaster: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
+        channel_for_online_stats: Optional[str] = None,
+        get_channel_size: Optional[Callable[[str], Awaitable[int]]] = None,
     ) -> None:
         self._driver = driver
         self._tick_interval_seconds = float(tick_interval_seconds)
         self._broadcaster = broadcaster
+
+        self._channel_for_online_stats = str(channel_for_online_stats) if channel_for_online_stats else None
+        self._get_channel_size = get_channel_size
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task[None]] = None
         
@@ -47,6 +52,17 @@ class MarketMakerScheduler:
         from ifrontier.services.market_session import get_market_session, MarketPhase
 
         while not self._stop.is_set():
+            if self._get_channel_size and self._channel_for_online_stats:
+                try:
+                    online = int(await self._get_channel_size(self._channel_for_online_stats))
+                except Exception:
+                    online = 0
+                if online <= 0:
+                    try:
+                        await asyncio.wait_for(self._stop.wait(), timeout=self._tick_interval_seconds)
+                    except asyncio.TimeoutError:
+                        pass
+                    continue
             try:
                 # 检查市场是否开市
                 gt_cfg = load_game_time_config_from_env()
@@ -68,6 +84,7 @@ class MarketMakerScheduler:
                             await self._broadcaster(m.executed_event.model_dump())
             except Exception as exc:
                 import traceback
+
                 traceback.print_exc()
                 print(f"[MarketMakerScheduler] Error: {exc}")
                 pass

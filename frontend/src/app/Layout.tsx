@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAppSession } from './context'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Api, type MarketSessionResponse } from '../api'
+import { Api, WsClient, type MarketSessionResponse } from '../api'
 
 import { CASTES } from './constants'
 
@@ -80,6 +80,8 @@ export default function Layout() {
   const [hostingLoading, setHostingLoading] = useState(false)
   const [marketSession, setMarketSession] = useState<MarketSessionResponse | null>(null)
 
+  const presenceWs = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
+
   const caste = useMemo(() => {
     return CASTES.find(c => c.id === sess.casteId)
   }, [sess.casteId])
@@ -103,6 +105,15 @@ export default function Layout() {
     const t = setInterval(fetchStatus, 10000)
     return () => clearInterval(t)
   }, [fetchStatus])
+
+  useEffect(() => {
+    const playerId = sess.playerId
+    if (!playerId) return
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(playerId)) return
+
+    presenceWs.connect('presence', () => {})
+    return () => presenceWs.close()
+  }, [sess.playerId, presenceWs])
 
   const toggleHosting = async () => {
     if (!sess.playerId || hostingLoading) return

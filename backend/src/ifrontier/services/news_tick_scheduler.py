@@ -15,11 +15,16 @@ class NewsTickScheduler:
         tick_interval_seconds: float = 1.0,
         batch_size: int = 50,
         broadcaster: Callable[[Dict[str, Any]], Awaitable[None]],
+        channel_for_online_stats: Optional[str] = None,
+        get_channel_size: Optional[Callable[[str], Awaitable[int]]] = None,
     ) -> None:
         self._tick_engine = tick_engine
         self._tick_interval_seconds = float(tick_interval_seconds)
         self._batch_size = int(batch_size)
         self._broadcaster = broadcaster
+
+        self._channel_for_online_stats = str(channel_for_online_stats) if channel_for_online_stats else None
+        self._get_channel_size = get_channel_size
 
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task[None]] = None
@@ -43,6 +48,17 @@ class NewsTickScheduler:
         if verbose:
             print(f"[NewsTickScheduler] Starting loop (interval={self._tick_interval_seconds}s)")
         while not self._stop.is_set():
+            if self._get_channel_size and self._channel_for_online_stats:
+                try:
+                    online = int(await self._get_channel_size(self._channel_for_online_stats))
+                except Exception:
+                    online = 0
+                if online <= 0:
+                    try:
+                        await asyncio.wait_for(self._stop.wait(), timeout=self._tick_interval_seconds)
+                    except asyncio.TimeoutError:
+                        pass
+                    continue
             try:
                 result = await self._tick_engine.tick(
                     now=None,

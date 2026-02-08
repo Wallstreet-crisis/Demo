@@ -61,6 +61,9 @@ class HostingScheduler:
 
     async def tick_once(self) -> None:
         humans = int(await self._get_channel_size(self._channel_for_online_stats))
+
+        if humans <= 0:
+            return
         
         # 允许一定比例或固定数量的 AI 始终在线，不受人类数量干扰（除非人类真的非常多）
         # 目标：保持世界活跃，陪玩 bot 和 玩家托管应该平衡分配 quota
