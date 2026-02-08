@@ -21,7 +21,12 @@ export default function TradeWidget({ isFocused }: { isFocused?: boolean }) {
   const [aiSuggestion, setAiSuggestion] = useState<{ action: string; confidence: number; reason: string } | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
 
+  const playerIdOk = useMemo(() => {
+    return !!playerId && /^[a-zA-Z0-9_]{3,20}$/.test(playerId)
+  }, [playerId])
+
   const refreshData = useCallback(async () => {
+    if (!playerIdOk) return
     try {
       const [q, v] = await Promise.all([
         Api.marketQuote(symbol),
@@ -35,13 +40,14 @@ export default function TradeWidget({ isFocused }: { isFocused?: boolean }) {
     } catch (e) {
       console.error('Failed to fetch trade data', e)
     }
-  }, [playerId, symbol, orderType, price])
+  }, [playerIdOk, playerId, symbol, orderType, price])
 
   useEffect(() => {
+    if (!playerIdOk) return
     refreshData()
     const t = setInterval(refreshData, 3000)
     return () => clearInterval(t)
-  }, [refreshData])
+  }, [playerIdOk, refreshData])
 
   useEffect(() => {
     if (!symbol) return

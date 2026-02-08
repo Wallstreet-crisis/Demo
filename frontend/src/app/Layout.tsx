@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAppSession } from './context'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Api, WsClient, type MarketSessionResponse } from '../api'
@@ -178,6 +178,11 @@ export default function Layout() {
       if (timer !== null) window.clearTimeout(timer)
     }
   }, [sess.playerId])
+
+  const playerId = sess.playerId
+  if (!playerId || !/^[a-zA-Z0-9_]{3,20}$/.test(playerId)) {
+    return <Navigate to="/onboarding" replace />
+  }
 
   return (
     <div style={{ 

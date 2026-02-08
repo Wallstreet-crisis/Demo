@@ -19,7 +19,12 @@ export default function TradePage() {
 
   const [recentOrders, setRecentOrders] = useState<Array<{ id: string; side: string; type: string; price?: number; qty: number; status: string; time: string }>>([])
 
+  const playerIdOk = useMemo(() => {
+    return !!playerId && /^[a-zA-Z0-9_]{3,20}$/.test(playerId)
+  }, [playerId])
+
   const refreshData = useMemo(() => async () => {
+    if (!playerIdOk) return
     try {
       const [q, v] = await Promise.all([
         Api.marketQuote(symbol),
@@ -33,13 +38,14 @@ export default function TradePage() {
     } catch (e) {
       console.error('Failed to fetch trade data', e)
     }
-  }, [playerId, symbol, orderType, price])
+  }, [playerIdOk, playerId, symbol, orderType, price])
 
   useEffect(() => {
+    if (!playerIdOk) return
     refreshData()
     const t = setInterval(refreshData, 3000)
     return () => clearInterval(t)
-  }, [refreshData])
+  }, [playerIdOk, refreshData])
 
   const availableCash = val?.cash ?? 0
   const availablePos = val?.positions ? (val.positions[symbol] ?? 0) : 0
