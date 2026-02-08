@@ -334,6 +334,7 @@ class UserHostingAgent:
             )
 
             max_tools = int(os.getenv("IF_HOSTING_MAX_SKILLS_PER_TICK") or "5")
+            tick_public_msg_hashes: set[str] = set()
             for c in calls[:max_tools]:
                 if c.name == "chat.send_public_message":
                     msg_type = str((c.arguments or {}).get("message_type") or "")
@@ -347,6 +348,16 @@ class UserHostingAgent:
                         content_hash = hashlib.sha1(norm.encode("utf-8"), usedforsecurity=False).hexdigest()
                     except TypeError:
                         content_hash = hashlib.sha1(norm.encode("utf-8")).hexdigest()
+
+                    if content_hash in tick_public_msg_hashes:
+                        results.append({"ok": True, "skipped": True, "reason": "duplicate_public_message_in_tick"})
+                        log_ai_action(
+                            agent_id=f"hosting:{self.user_id}",
+                            action_type="SKIP_DUPLICATE_PUBLIC_MESSAGE_IN_TICK",
+                            detail=f"type={msg_type}",
+                        )
+                        continue
+                    tick_public_msg_hashes.add(content_hash)
 
                     anti_spam = dict(ctx.get("anti_spam") or {})
                     last_hash = str(anti_spam.get("last_public_msg_hash") or "")
