@@ -1,0 +1,83 @@
+version: "3.9"
+
+services:
+  neo4j:
+    image: neo4j:5
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=${IF_NEO4J_USER:-neo4j}/${IF_NEO4J_PASSWORD:-password}
+      - NEO4J_server_memory_pagecache_size=1G
+      - NEO4J_server_memory_heap_initial__size=1G
+      - NEO4J_server_memory_heap_max__size=1G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - ../backend/scripts/neo4j/init.cypher:/import/init.cypher:ro
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u ${IF_NEO4J_USER:-neo4j} -p ${IF_NEO4J_PASSWORD:-password} \"RETURN 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks:
+      - app_net
+
+  neo4j-init:
+    image: neo4j:5
+    restart: "no"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    environment:
+      - IF_NEO4J_USER=${IF_NEO4J_USER:-neo4j}
+      - IF_NEO4J_PASSWORD=${IF_NEO4J_PASSWORD:-password}
+    volumes:
+      - ../backend/scripts/neo4j/init.cypher:/import/init.cypher:ro
+    command: >-
+      bash -lc "cypher-shell -a bolt://neo4j:7687 -u \"${IF_NEO4J_USER:-neo4j}\" -p \"${IF_NEO4J_PASSWORD:-password}\" -f /import/init.cypher"
+    networks:
+      - app_net
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      - IF_NEO4J_URI=bolt://neo4j:7687
+      - IF_NEO4J_USER=${IF_NEO4J_USER:-neo4j}
+      - IF_NEO4J_PASSWORD=${IF_NEO4J_PASSWORD:-password}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-2.5-flash}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - OPENROUTER_TIMEOUT_SECONDS=${OPENROUTER_TIMEOUT_SECONDS:-20}
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      neo4j-init:
+        condition: service_completed_successfully
+    volumes:
+      - backend_sqlite:/app/src/data
+    expose:
+      - "8010"
+    networks:
+      - app_net
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/nginx/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - app_net
+
+networks:
+  app_net:
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  backend_sqlite:

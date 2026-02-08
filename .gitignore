@@ -1,3 +1,9 @@
 *.pyc
 backend/src/data/
+backend/data/
 backend/logs/*
+
+.env
+.env.*
+deploy/.env
+deploy/.env.*
