@@ -335,15 +335,36 @@ export default function CandlestickChart({ candles }: CandlestickChartProps) {
 
           return (
             <g key={`c-${c.bucket_start}-${idx}`} style={{ filter: hoveredCandle === c ? 'drop-shadow(0 0 4px rgba(255,255,255,0.3))' : 'none' }}>
-              {/* Wick */}
-              <line 
-                x1={centerX} 
-                y1={yHigh} 
-                x2={centerX} 
-                y2={yLow} 
-                stroke={color} 
-                strokeWidth="1" 
-              />
+              {/* Wick: hollow up candle uses split wicks to avoid crossing body */}
+              {isUp ? (
+                <>
+                  <line
+                    x1={centerX}
+                    y1={yHigh}
+                    x2={centerX}
+                    y2={bodyTop}
+                    stroke={color}
+                    strokeWidth="1"
+                  />
+                  <line
+                    x1={centerX}
+                    y1={bodyTop + bodyHeight}
+                    x2={centerX}
+                    y2={yLow}
+                    stroke={color}
+                    strokeWidth="1"
+                  />
+                </>
+              ) : (
+                <line
+                  x1={centerX}
+                  y1={yHigh}
+                  x2={centerX}
+                  y2={yLow}
+                  stroke={color}
+                  strokeWidth="1"
+                />
+              )}
               {/* Body */}
               <rect 
                 x={x + (barWidth - bodyWidth) / 2} 

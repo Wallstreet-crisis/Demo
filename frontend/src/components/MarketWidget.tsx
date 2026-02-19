@@ -23,7 +23,10 @@ export default function MarketWidget({ isFocused }: { isFocused?: boolean }) {
   const [autoRefresh] = useState<boolean>(true)
   const [refreshSeconds] = useState<number>(3)
   const [candleInterval, setCandleInterval] = useState<number>(60)
-  const candleLimit = 50
+  const candleLimit = 200
+  const visibleCandlesCount = isFocused ? 70 : 50
+  const shiftStep = isFocused ? 20 : 10
+  const [candleOffset, setCandleOffset] = useState<number>(0)
 
   const refresh = useCallback(async (): Promise<void> => {
     setErr('')
@@ -78,7 +81,36 @@ export default function MarketWidget({ isFocused }: { isFocused?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol, candleInterval])
 
+  useEffect(() => {
+    setCandleOffset(0)
+  }, [symbol, candleInterval])
+
   const refreshMs = useMemo(() => Math.max(1, Number(refreshSeconds)) * 1000, [refreshSeconds])
+
+  const maxCandleOffset = useMemo(() => {
+    const total = candles?.candles?.length || 0
+    return Math.max(0, total - visibleCandlesCount)
+  }, [candles?.candles?.length, visibleCandlesCount])
+
+  const visibleCandles = useMemo(() => {
+    const all = candles?.candles || []
+    if (all.length === 0) return []
+    const offset = Math.min(candleOffset, maxCandleOffset)
+    const end = all.length - offset
+    const start = Math.max(0, end - visibleCandlesCount)
+    return all.slice(start, end)
+  }, [candles?.candles, candleOffset, maxCandleOffset, visibleCandlesCount])
+
+  const canStepBack = candleOffset < maxCandleOffset
+  const canStepForward = candleOffset > 0
+
+  const stepBackward = () => {
+    setCandleOffset((prev) => Math.min(maxCandleOffset, prev + shiftStep))
+  }
+
+  const stepForward = () => {
+    setCandleOffset((prev) => Math.max(0, prev - shiftStep))
+  }
 
   useEffect(() => {
     if (!autoRefresh) return
@@ -244,7 +276,56 @@ export default function MarketWidget({ isFocused }: { isFocused?: boolean }) {
           gap: '5px'
         }}>
           <div style={{ flex: 1, position: 'relative' }}>
-            <CandlestickChart candles={candles?.candles || []} />
+            <div style={{
+              position: 'absolute',
+              top: '6px',
+              right: '8px',
+              zIndex: 20,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '2px',
+              background: 'rgba(15, 23, 42, 0.82)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              borderRadius: '4px',
+              padding: '2px'
+            }}>
+              <button
+                className="cyber-button"
+                onClick={stepBackward}
+                disabled={!canStepBack}
+                title="回看更早K线"
+                style={{ fontSize: '10px', padding: '0 6px', height: '18px', lineHeight: 1, opacity: canStepBack ? 1 : 0.4 }}
+              >
+                ◀
+              </button>
+              <button
+                className="cyber-button"
+                onClick={stepForward}
+                disabled={!canStepForward}
+                title="向前回到更新K线"
+                style={{ fontSize: '10px', padding: '0 6px', height: '18px', lineHeight: 1, opacity: canStepForward ? 1 : 0.4 }}
+              >
+                ▶
+              </button>
+            </div>
+            {candleOffset > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '8px',
+                left: '8px',
+                zIndex: 20,
+                fontSize: '10px',
+                fontFamily: 'monospace',
+                color: '#94a3b8',
+                background: 'rgba(15, 23, 42, 0.82)',
+                border: '1px solid rgba(148, 163, 184, 0.2)',
+                borderRadius: '4px',
+                padding: '2px 6px'
+              }}>
+                HIST -{candleOffset}
+              </div>
+            )}
+            <CandlestickChart candles={visibleCandles} />
           </div>
           
           {isFocused && (
