@@ -336,42 +336,6 @@ export default function DashboardPage() {
         <span style={{ color: 'var(--terminal-warn)' }}>THREAT: NOMINAL</span>
       </div>
 
-      {/* Tactical Log Overlay */}
-      <div style={{
-        position: 'absolute',
-        top: '40px',
-        left: '10px',
-        zIndex: 5,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px',
-        pointerEvents: 'none',
-        opacity: focusWidget ? 0.1 : 0.8,
-        transition: 'opacity 0.3s'
-      }}>
-        {logs.map(log => (
-          <div key={log.id} style={{ 
-            fontSize: '8px', 
-            fontFamily: 'monospace',
-            color: log.type === 'warn' ? 'var(--terminal-warn)' : (log.type === 'err' ? 'var(--terminal-error)' : 'var(--terminal-info)'),
-            textShadow: '0 0 5px currentColor',
-            background: 'rgba(0,0,0,0.3)',
-            padding: '2px 6px',
-            borderLeft: `2px solid ${log.type === 'warn' ? 'var(--terminal-warn)' : (log.type === 'err' ? 'var(--terminal-error)' : 'var(--terminal-info)')}`,
-            animation: 'slide-in-left 0.3s ease-out forwards'
-          }}>
-            [{new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}] {log.text}
-          </div>
-        ))}
-      </div>
-
-      <style>{`
-        @keyframes slide-in-left {
-          from { transform: translateX(-20px); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-      `}</style>
-
       {/* Column 1: Left - Market & Account */}
       <div style={{ gridColumn: '1', gridRow: '1 / span 5' }}>
         {renderWidget('watch', MarketWatchWidget)}

@@ -22,7 +22,7 @@
   - `IF_NEO4J_USER`（默认 `neo4j`）
   - `IF_NEO4J_PASSWORD`（默认 `password`）
 - 初始化 Cypher：`backend/scripts/neo4j/init.cypher`   这个文件需要粘贴到前端的neo4j数据库中 有个对应入口，AI知道
-
+docker start neo4j   
 ### 大模型（可选，但托管AI/ContractAgent会用到）
 - 通过 OpenRouter 调用（代码在 `src/ifrontier/infra/llm/openrouter.py`）。
 - 环境变量：
