@@ -120,6 +120,7 @@ export default function DashboardPage() {
     props: Omit<P, 'isFocused'> = {} as Omit<P, 'isFocused'>
   ) => {
     const isFocused = focusWidget === id
+    const canFocus = id !== 'watch'
     
     const widgetContent = (
       <div 
@@ -132,7 +133,7 @@ export default function DashboardPage() {
           // Detect if clicking on the resize handle (bottom-right 24x24 area)
           const isResizeHandle = (e.clientX > rect.right - 24) && (e.clientY > rect.bottom - 24);
 
-          if (!isFocused && !interactiveTags.includes(target.tagName) && !target.closest('.cyber-button') && !isResizeHandle) {
+          if (canFocus && !isFocused && !interactiveTags.includes(target.tagName) && !target.closest('.cyber-button') && !isResizeHandle) {
             setFocusWidget(id);
           }
         }}
@@ -155,11 +156,11 @@ export default function DashboardPage() {
           boxSizing: 'border-box',
           overflow: isFocused ? 'auto' : 'hidden',
           boxShadow: isFocused ? '0 0 100px rgba(0, 0, 0, 0.9), 0 0 30px var(--terminal-glow)' : 'none',
-          resize: !isFocused ? 'both' : 'none',
-          cursor: isFocused ? 'default' : 'zoom-in',
+          resize: canFocus && !isFocused ? 'both' : 'none',
+          cursor: canFocus && !isFocused ? 'zoom-in' : 'default',
         }}
       >
-        {!isFocused && (
+        {canFocus && !isFocused && (
           <div style={{ 
             position: 'absolute', bottom: '2px', right: '2px', 
             width: '12px', height: '12px', 
