@@ -48,7 +48,8 @@ def get_market_session(*, cfg: GameTimeConfig, now: Optional[GameTimeSnapshot] =
     if is_holiday(cfg=cfg, day_index=gt.game_day_index):
         phase = MarketPhase.HOLIDAY
     else:
-        phase = MarketPhase.TRADING if gt.seconds_into_day < trading_seconds else MarketPhase.CLOSING_BUFFER
+        # 取消闭市时间限制：非假日全时段允许交易
+        phase = MarketPhase.TRADING
 
     return MarketSessionSnapshot(
         enabled=True,
@@ -65,5 +66,6 @@ def assert_market_accepts_orders(*, cfg: GameTimeConfig) -> None:
     snap = get_market_session(cfg=cfg)
     if not snap.enabled:
         return
-    if snap.phase != MarketPhase.TRADING:
+    # 保留假日停市，其余时间均允许下单
+    if snap.phase == MarketPhase.HOLIDAY:
         raise ValueError("market is closed")
