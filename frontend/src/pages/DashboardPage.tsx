@@ -18,7 +18,11 @@ export default function DashboardPage() {
   const [netSync, setNetSync] = useState(12)
   const [logs, setLogs] = useState<{ id: string; text: string; type: 'info' | 'warn' | 'err' }[]>([])
   const [aiHosting, setAiHosting] = useState(false)
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window === 'undefined' ? 1400 : window.innerWidth,
+  )
   const { playerId } = useAppSession()
+  const isTabletLayout = viewportWidth <= 1280
   
   // News Popup State
   const [activePopupNews, setActivePopupNews] = useState<NewsFeedItem | null>(null)
@@ -87,6 +91,12 @@ export default function DashboardPage() {
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
   }, [activePopupNews])
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Subscribe to news for auto-popup
   useEffect(() => {
@@ -208,16 +218,22 @@ export default function DashboardPage() {
 
   return (
     <div style={{ 
-      height: 'calc(100vh - 68px)', 
+      height: isTabletLayout ? 'auto' : 'calc(100vh - 68px)', 
+      minHeight: isTabletLayout ? 'calc(100vh - 68px)' : undefined,
       display: 'grid', 
-      gridTemplateColumns: 'minmax(300px, 1fr) 2fr minmax(350px, 1.2fr)', 
-      gridTemplateRows: 'repeat(12, 1fr)',
+      gridTemplateColumns: isTabletLayout
+        ? 'repeat(2, minmax(320px, 1fr))'
+        : 'minmax(300px, 1fr) 2fr minmax(350px, 1.2fr)', 
+      gridTemplateRows: isTabletLayout ? 'none' : 'repeat(12, 1fr)',
+      gridAutoRows: isTabletLayout ? 'minmax(260px, auto)' : undefined,
       gap: '10px',
-      overflow: 'hidden',
-      padding: '10px',
+      overflowX: 'hidden',
+      overflowY: isTabletLayout ? 'auto' : 'hidden',
+      padding: isTabletLayout ? '34px 10px 10px' : '10px',
       boxSizing: 'border-box',
       background: 'radial-gradient(circle at center, #1e293b 0%, #0f172a 100%)',
-      position: 'relative'
+      position: 'relative',
+      alignContent: 'start',
     }}>
       {/* HUD Background Decorations */}
       <div style={{ 
@@ -337,36 +353,40 @@ export default function DashboardPage() {
       </div>
 
       {/* Column 1: Left - Market & Account */}
-      <div style={{ gridColumn: '1', gridRow: '1 / span 5' }}>
+      <div style={isTabletLayout ? { gridColumn: 'span 1' } : { gridColumn: '1', gridRow: '1 / span 5' }}>
         {renderWidget('watch', MarketWatchWidget)}
       </div>
-      <div style={{ gridColumn: '1', gridRow: '6 / span 4' }}>
+      <div style={isTabletLayout ? { gridColumn: 'span 1' } : { gridColumn: '1', gridRow: '6 / span 4' }}>
         {renderWidget('summary', MarketSummaryWidget)}
       </div>
-      <div style={{ gridColumn: '1', gridRow: '10 / span 4' }}>
+      <div style={isTabletLayout ? { gridColumn: 'span 1' } : { gridColumn: '1', gridRow: '10 / span 4' }}>
         {renderWidget('account', AccountWidget)}
       </div>
 
       {/* Column 2: Center - Focus & Feed */}
-      <div style={{ gridColumn: '2', gridRow: '1 / span 6' }}>
+      <div style={isTabletLayout ? { gridColumn: '1 / -1' } : { gridColumn: '2', gridRow: '1 / span 6' }}>
         {renderWidget('market', MarketWidget)}
       </div>
-      <div style={{ gridColumn: '2', gridRow: '7 / span 3' }}>
+      <div style={isTabletLayout ? { gridColumn: '1 / -1' } : { gridColumn: '2', gridRow: '7 / span 3' }}>
         {renderWidget('broadcast', NewsBroadcastWidget, { onShowNews: setActivePopupNews })}
       </div>
-      <div style={{ gridColumn: '2', gridRow: '10 / span 2', display: 'flex', gap: '10px' }}>
+      <div
+        style={isTabletLayout
+          ? { gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }
+          : { gridColumn: '2', gridRow: '10 / span 2', display: 'flex', gap: '10px' }}
+      >
         <div style={{ flex: 1 }}>{renderWidget('trade', TradeWidget)}</div>
         <div style={{ flex: 1.2 }}>{renderWidget('contracts', ContractsWidget)}</div>
       </div>
 
       {/* Column 3: Right - Propaganda & Comms */}
-      <div style={{ gridColumn: '3', gridRow: '1 / span 5' }}>
+      <div style={isTabletLayout ? { gridColumn: 'span 1' } : { gridColumn: '3', gridRow: '1 / span 5' }}>
         {renderWidget('propaganda', PropagandaWidget)}
       </div>
-      <div style={{ gridColumn: '3', gridRow: '6 / span 3' }}>
+      <div style={isTabletLayout ? { gridColumn: 'span 1' } : { gridColumn: '3', gridRow: '6 / span 3' }}>
         {renderWidget('news', NewsWidget, { onShowNews: setActivePopupNews })}
       </div>
-      <div style={{ gridColumn: '3', gridRow: '9 / span 4' }}>
+      <div style={isTabletLayout ? { gridColumn: 'span 1' } : { gridColumn: '3', gridRow: '9 / span 4' }}>
         {renderWidget('chat', ChatWidget)}
       </div>
     </div>
