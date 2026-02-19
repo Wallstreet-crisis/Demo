@@ -374,7 +374,7 @@ export default function DashboardPage() {
       <div
         style={isTabletLayout
           ? { gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }
-          : { gridColumn: '2', gridRow: '10 / span 2', display: 'flex', gap: '10px' }}
+          : { gridColumn: '2', gridRow: '10 / span 3', display: 'flex', gap: '10px' }}
       >
         <div style={{ flex: 1 }}>{renderWidget('trade', TradeWidget)}</div>
         <div style={{ flex: 1.2 }}>{renderWidget('contracts', ContractsWidget)}</div>

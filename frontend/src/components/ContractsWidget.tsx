@@ -5,7 +5,6 @@ import { useNotification } from '../app/NotificationContext'
 import CyberWidget from './CyberWidget'
 
 export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) {
-  void isFocused
   const { playerId } = useAppSession()
   const { notify } = useNotification()
   const [loading, setLoading] = useState(false)
@@ -25,26 +24,27 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
   const [contracts, setContracts] = useState<ContractBriefResponse[]>([])
   
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const actorId = playerId ? `user:${playerId}` : ''
 
   const fetchMentionsData = useCallback(async () => {
-    if (!playerId) return
+    if (!actorId) return
     try {
       const [pRes, cRes] = await Promise.all([
         Api.listPlayers(50),
-        Api.listContracts(playerId, 50)
+        Api.listContracts(actorId, 100)
       ])
       setPlayers(pRes.items)
       setContracts(cRes.items)
     } catch (e) {
       console.error('Mention data fetch failed', e)
     }
-  }, [playerId])
+  }, [actorId])
 
   useEffect(() => {
-    if (playerId) {
+    if (actorId) {
       fetchMentionsData()
     }
-  }, [playerId, fetchMentionsData])
+  }, [actorId, fetchMentionsData])
 
   useEffect(() => {
     if (isFocused) {
@@ -114,13 +114,43 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
     inputRef.current?.focus()
   }
 
+  const pendingMySignContracts = useMemo(() => {
+    if (!actorId) return []
+    return [...contracts]
+      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+      .filter((c) => {
+        const required = new Set(c.required_signers || [])
+        if (!required.has(actorId)) return false
+        const signed = new Set(c.signatures || [])
+        return !signed.has(actorId)
+      })
+  }, [contracts, actorId])
+
+  const signedContracts = useMemo(() => {
+    if (!actorId) return []
+    return [...contracts]
+      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+      .filter((c) => {
+        const signed = new Set(c.signatures || [])
+        return signed.has(actorId)
+      })
+  }, [contracts, actorId])
+
+  const statusColor = (status: string) => {
+    const s = String(status || '').toUpperCase()
+    if (s === 'ACTIVE' || s === 'EXECUTING') return 'var(--terminal-success)'
+    if (s === 'SETTLED' || s === 'COMPLETED') return '#22c55e'
+    if (s === 'FAILED' || s === 'CANCELLED' || s === 'REJECTED') return 'var(--terminal-error)'
+    return 'var(--terminal-warn)'
+  }
+
   const handleDraft = async () => {
-    if (!naturalLanguage.trim()) return
+    if (!naturalLanguage.trim() || !actorId) return
     setDraft(null)
     setLoading(true)
     try {
       const res = await Api.contractAgentDraft({
-        actor_id: `user:${playerId}`,
+        actor_id: actorId,
         natural_language: naturalLanguage
       })
       setDraft(res)
@@ -138,7 +168,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
   }
 
   const handleAppendAiEdit = async () => {
-    if (!draft || !playerId) return
+    if (!draft || !actorId) return
     const instruction = aiEditInstruction.trim()
     if (!instruction) return
     setLoading(true)
@@ -152,7 +182,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
       }
 
       const res = await Api.contractAgentAppendEdit({
-        actor_id: `user:${playerId}`,
+        actor_id: actorId,
         base_contract_create: base,
         instruction,
       })
@@ -180,7 +210,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
   }
 
   const handleCreate = async () => {
-    if (!draft) return
+    if (!draft || !actorId) return
     setLoading(true)
     try {
       let finalContractCreate = draft.contract_create
@@ -199,7 +229,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
         : []
 
       const res = await Api.contractCreate({
-        actor_id: `user:${playerId}`,
+        actor_id: actorId,
         kind: finalContractCreate.kind as string,
         title: finalContractCreate.title as string,
         terms: finalContractCreate.terms as Record<string, unknown>,
@@ -359,6 +389,74 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
             {loading ? 'ANALYZING_PROTOCOL...' : 'GENERATE_LEGAL_DRAFT'}
           </button>
         )}
+
+        <div style={{ border: '1px solid rgba(100, 116, 139, 0.35)', borderRadius: '4px', background: 'rgba(15, 23, 42, 0.35)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderBottom: '1px solid rgba(100, 116, 139, 0.25)' }}>
+            <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>CONTRACT_OVERVIEW</span>
+            <button
+              className="cyber-button"
+              onClick={fetchMentionsData}
+              disabled={loading || !actorId}
+              style={{ fontSize: '10px', padding: '2px 8px' }}
+            >
+              REFRESH
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: isFocused ? '1fr 1fr' : '1fr', gap: '8px', padding: '8px' }}>
+            <div style={{ minHeight: 0 }}>
+              <div style={{ fontSize: '10px', color: 'var(--terminal-info)', marginBottom: '6px', fontWeight: 600 }}>
+                待我签署 ({pendingMySignContracts.length})
+              </div>
+              <div style={{ display: 'grid', gap: '6px', maxHeight: isFocused ? '180px' : '120px', overflowY: 'auto', paddingRight: '2px' }} className="custom-scrollbar">
+                {(isFocused ? pendingMySignContracts : pendingMySignContracts.slice(0, 3)).map((c) => {
+                  const total = (c.required_signers || []).length
+                  const signed = (c.signatures || []).length
+                  return (
+                    <div key={`pending-${c.contract_id}`} style={{ border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '4px', padding: '6px 8px', background: 'rgba(30, 41, 59, 0.35)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600 }}>{c.title || c.contract_id}</span>
+                        <span style={{ fontSize: '10px', color: statusColor(c.status) }}>EXEC: {c.status}</span>
+                      </div>
+                      <div style={{ marginTop: '4px', fontSize: '10px', color: '#94a3b8' }}>
+                        #{c.contract_id.slice(0, 10)} · 签署进度 {signed}/{Math.max(total, 1)}
+                      </div>
+                    </div>
+                  )
+                })}
+                {pendingMySignContracts.length === 0 && (
+                  <div style={{ fontSize: '10px', color: '#64748b', padding: '6px 2px' }}>暂无待你签署的契约</div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ minHeight: 0 }}>
+              <div style={{ fontSize: '10px', color: 'var(--terminal-success)', marginBottom: '6px', fontWeight: 600 }}>
+                已签约 ({signedContracts.length})
+              </div>
+              <div style={{ display: 'grid', gap: '6px', maxHeight: isFocused ? '180px' : '120px', overflowY: 'auto', paddingRight: '2px' }} className="custom-scrollbar">
+                {(isFocused ? signedContracts : signedContracts.slice(0, 3)).map((c) => {
+                  const total = (c.required_signers || []).length
+                  const signed = (c.signatures || []).length
+                  return (
+                    <div key={`signed-${c.contract_id}`} style={{ border: '1px solid rgba(16, 185, 129, 0.28)', borderRadius: '4px', padding: '6px 8px', background: 'rgba(15, 23, 42, 0.45)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600 }}>{c.title || c.contract_id}</span>
+                        <span style={{ fontSize: '10px', color: statusColor(c.status) }}>EXEC: {c.status}</span>
+                      </div>
+                      <div style={{ marginTop: '4px', fontSize: '10px', color: '#94a3b8' }}>
+                        #{c.contract_id.slice(0, 10)} · 全体签署 {signed}/{Math.max(total, 1)}
+                      </div>
+                    </div>
+                  )
+                })}
+                {signedContracts.length === 0 && (
+                  <div style={{ fontSize: '10px', color: '#64748b', padding: '6px 2px' }}>暂无你已签署的契约</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
 
         {!isFocused && !draft && (
           <div style={{ fontSize: '10px', color: '#64748b', textAlign: 'center', opacity: 0.6 }}>
