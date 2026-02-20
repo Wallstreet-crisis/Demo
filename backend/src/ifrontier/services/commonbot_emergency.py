@@ -20,7 +20,8 @@ from ifrontier.services.game_time import load_game_time_config_from_env
 from ifrontier.services.market_session import MarketPhase, get_market_session
 from ifrontier.infra.sqlite.market import get_price_series
 from ifrontier.services.news import NewsService
-from ifrontier.services.matching import submit_limit_order
+from ifrontier.services.matching import submit_limit_order, submit_market_order
+from ifrontier.services.news_intelligence import NewsIntelligenceEngine
 from ifrontier.app.ws import hub
 
 
@@ -32,6 +33,9 @@ class CommonBotCohortConfig:
     use_llm: bool
     is_insider: bool = False
     max_news_items: int = 10
+    rumor_sensitivity: float = 1.0
+    risk_appetite: float = 1.0
+    llm_preference: float = 0.2
 
 
 @dataclass(frozen=True)
@@ -55,14 +59,16 @@ class CommonBotEmergencyRunner:
         self._news = news
         self._event_store = event_store
         self._cohorts = cohorts or [
-            CommonBotCohortConfig(cohort_id=f"ret:{i}", bot_id=f"commonbot:ret:{i}", account_id=f"bot:ret:{i}", use_llm=True, is_insider=False)
-            for i in range(1, 11)
-        ] + [
-            CommonBotCohortConfig(cohort_id=f"inst:{i}", bot_id=f"commonbot:inst:{i}", account_id=f"bot:inst:{i}", use_llm=True, is_insider=True)
-            for i in range(1, 4)
+            CommonBotCohortConfig(cohort_id="ret_fast_1", bot_id="commonbot:ret_fast_1", account_id="bot:ret:1", use_llm=True, is_insider=False, rumor_sensitivity=1.35, risk_appetite=1.05, llm_preference=0.35),
+            CommonBotCohortConfig(cohort_id="ret_fast_2", bot_id="commonbot:ret_fast_2", account_id="bot:ret:2", use_llm=True, is_insider=False, rumor_sensitivity=1.3, risk_appetite=1.0, llm_preference=0.3),
+            CommonBotCohortConfig(cohort_id="ret_slow_1", bot_id="commonbot:ret_slow_1", account_id="bot:ret:3", use_llm=False, is_insider=False, rumor_sensitivity=1.1, risk_appetite=0.8, llm_preference=0.1),
+            CommonBotCohortConfig(cohort_id="inst_momentum", bot_id="commonbot:inst_momentum", account_id="bot:inst:1", use_llm=True, is_insider=True, rumor_sensitivity=0.65, risk_appetite=1.15, llm_preference=0.25),
+            CommonBotCohortConfig(cohort_id="inst_meanrev", bot_id="commonbot:inst_meanrev", account_id="bot:inst:2", use_llm=False, is_insider=True, rumor_sensitivity=0.7, risk_appetite=0.7, llm_preference=0.1),
+            CommonBotCohortConfig(cohort_id="insider_sector", bot_id="commonbot:insider_sector", account_id="bot:inst:3", use_llm=True, is_insider=True, rumor_sensitivity=0.55, risk_appetite=0.9, llm_preference=0.2),
         ]
         self._market_data_provider = market_data_provider
         self._pending_market_open: _PendingMarketOpenReaction | None = None
+        self._intel = NewsIntelligenceEngine()
 
     async def maybe_react(
         self,
@@ -97,6 +103,17 @@ class CommonBotEmergencyRunner:
             symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
             print(f"[CommonBotEmergency:maybe_react] News {variant_id} has no symbols, using defaults: {symbols}")
 
+        signal = self._intel.build_signal(
+            variant_id=variant_id,
+            news_text=variant_text,
+            symbols=symbols,
+            truth_payload=truth_payload,
+            author_id=author_id,
+            mutation_depth=mutation_depth,
+            force=force or channel == "GLOBAL_MANDATORY",
+        )
+        self._intel.ingest(signal)
+
         emitted: List[EventEnvelopeJson] = []
         corr = broadcast_event.correlation_id or uuid4()
         
@@ -128,6 +145,11 @@ class CommonBotEmergencyRunner:
                 continue
             
             for symbol in symbols:
+                outlook = self._intel.symbol_outlook(
+                    symbol=symbol,
+                    rumor_sensitivity=cohort.rumor_sensitivity,
+                    risk_appetite=cohort.risk_appetite,
+                )
                 decision_json, trade_json = run_commonbot_for_earnings(
                     symbol=symbol,
                     visual_truth="UNKNOWN",
@@ -141,6 +163,16 @@ class CommonBotEmergencyRunner:
                     is_insider=cohort.is_insider,
                     author_id=author_id,
                     mutation_depth=mutation_depth,
+                    strategy_signal={
+                        "net_bias": outlook.net_bias,
+                        "confidence": outlook.confidence,
+                        "urgency": outlook.urgency,
+                        "conflict": outlook.conflict,
+                    },
+                    llm_policy={
+                        "force_level": signal.force_level,
+                        "prefer_llm": bool(outlook.conflict >= 0.55 or cohort.llm_preference > 0.22),
+                    },
                 )
 
                 self._event_store.append(decision_json)
@@ -160,50 +192,14 @@ class CommonBotEmergencyRunner:
                 if trade_json is not None:
                     self._event_store.append(trade_json)
                     emitted.append(trade_json)
-                    
-                    # 真正提交订单进入撮合引擎
-                    try:
-                        side = str(trade_json.payload.get("side"))
-                        # 从 trade_json 获取由 run_commonbot_for_earnings 计算出的动态规模和价格
-                        last_price_val = trade_json.payload.get("price_hint")
-                        if last_price_val is None:
-                            from ifrontier.infra.sqlite.market import get_last_price
-                            last_price = get_last_price(symbol) or 0.0
-                        else:
-                            last_price = float(last_price_val)
-                            
-                        if last_price <= 0:
-                            print(f"[CommonBotEmergency:maybe_react] Skipping trade for {symbol}: invalid price {last_price}")
-                            continue
-
-                        size = float(trade_json.payload.get("size") or 1.0)
-                        confidence = float(trade_json.payload.get("confidence") or 0.5)
-
-                        # 使用相同的激进报价逻辑
-                        offset = 0.01 + (confidence * 0.04)
-                        if side == "BUY":
-                            order_price = last_price * (1.0 + offset)
-                        else:
-                            order_price = last_price * (1.0 - offset)
-
-                        print(f"[CommonBotEmergency:maybe_react] Bot {cohort.account_id} submitting {side} for {symbol} at {order_price:.2f} (size: {size}, offset: {offset:.2%})")
-                        
-                        _order_id, matches = submit_limit_order(
-                            account_id=cohort.account_id,
-                            symbol=symbol,
-                            side=side,
-                            price=float(order_price),
-                            quantity=size,
-                        )
-                        # 广播成交事件
-                        for m in matches:
-                            ev = m.executed_event.model_dump()
-                            await hub.broadcast_json("events", ev)
-                            ev_type = ev.get("event_type")
-                            if ev_type:
-                                await hub.broadcast_json(str(ev_type), ev)
-                    except Exception as e:
-                        print(f"[CommonBotEmergency:maybe_react] Order failed for {cohort.bot_id}: {e}")
+                    await self._submit_trade_from_intent(
+                        account_id=cohort.account_id,
+                        symbol=symbol,
+                        trade_payload=trade_json.payload,
+                        urgency=outlook.urgency,
+                        conflict=outlook.conflict,
+                        log_prefix="maybe_react",
+                    )
 
         return emitted
 
@@ -220,8 +216,21 @@ class CommonBotEmergencyRunner:
         self._pending_market_open = None
 
         ctx_news = self._load_variant_context(pending.variant_id)
+        variant_text = str(ctx_news.get("text") or pending.news_text)
+        symbols = list(ctx_news.get("symbols") or pending.symbols)
         author_id = str(ctx_news.get("author_id") or "system")
         mutation_depth = int(ctx_news.get("mutation_depth") or 0)
+
+        signal = self._intel.build_signal(
+            variant_id=pending.variant_id,
+            news_text=variant_text,
+            symbols=symbols,
+            truth_payload=pending.truth_payload,
+            author_id=author_id,
+            mutation_depth=mutation_depth,
+            force=True,
+        )
+        self._intel.ingest(signal)
 
         emitted: List[EventEnvelopeJson] = []
         for cohort in self._cohorts:
@@ -240,13 +249,18 @@ class CommonBotEmergencyRunner:
                 cohort=cohort,
                 variant_id=pending.variant_id,
                 news_text=pending.news_text,
-                symbols=pending.symbols,
+                symbols=symbols,
                 recent_news_items=recent_news_items
             )
             if ctx is None:
                 continue
 
-            for symbol in pending.symbols[:1]:
+            for symbol in symbols[:1]:
+                outlook = self._intel.symbol_outlook(
+                    symbol=symbol,
+                    rumor_sensitivity=cohort.rumor_sensitivity,
+                    risk_appetite=cohort.risk_appetite,
+                )
                 decision_json, trade_json = run_commonbot_for_earnings(
                     symbol=symbol,
                     visual_truth="UNKNOWN",
@@ -260,6 +274,16 @@ class CommonBotEmergencyRunner:
                     is_insider=cohort.is_insider,
                     author_id=author_id,
                     mutation_depth=mutation_depth,
+                    strategy_signal={
+                        "net_bias": outlook.net_bias,
+                        "confidence": outlook.confidence,
+                        "urgency": outlook.urgency,
+                        "conflict": outlook.conflict,
+                    },
+                    llm_policy={
+                        "force_level": signal.force_level,
+                        "prefer_llm": bool(outlook.conflict >= 0.5 or cohort.llm_preference > 0.2),
+                    },
                 )
                 self._event_store.append(decision_json)
                 emitted.append(decision_json)
@@ -267,49 +291,14 @@ class CommonBotEmergencyRunner:
                 if trade_json is not None:
                     self._event_store.append(trade_json)
                     emitted.append(trade_json)
-
-                    # 真正提交订单进入撮合引擎
-                    try:
-                        side = str(trade_json.payload.get("side"))
-                        last_price_val = trade_json.payload.get("price_hint")
-                        if last_price_val is None:
-                            from ifrontier.infra.sqlite.market import get_last_price
-                            last_price = get_last_price(symbol) or 0.0
-                        else:
-                            last_price = float(last_price_val)
-                            
-                        if last_price <= 0:
-                            print(f"[CommonBotEmergency:open] Skipping trade for {symbol}: invalid price {last_price}")
-                            continue
-
-                        size = float(trade_json.payload.get("size") or 1.0)
-                        confidence = float(trade_json.payload.get("confidence") or 0.5)
-
-                        # 使用相同的激进报价逻辑
-                        offset = 0.01 + (confidence * 0.04)
-                        if side == "BUY":
-                            order_price = last_price * (1.0 + offset)
-                        else:
-                            order_price = last_price * (1.0 - offset)
-
-                        print(f"[CommonBotEmergency:open] Bot {cohort.account_id} submitting {side} for {symbol} at {order_price:.2f} (size: {size}, offset: {offset:.2%})")
-
-                        _order_id, matches = submit_limit_order(
-                            account_id=cohort.account_id,
-                            symbol=symbol,
-                            side=side,
-                            price=float(order_price),
-                            quantity=size,
-                        )
-                        # 广播成交事件
-                        for m in matches:
-                            ev = m.executed_event.model_dump()
-                            await hub.broadcast_json("events", ev)
-                            ev_type = ev.get("event_type")
-                            if ev_type:
-                                await hub.broadcast_json(str(ev_type), ev)
-                    except Exception as e:
-                        print(f"[CommonBotEmergency:open] Order failed for {cohort.bot_id}: {e}")
+                    await self._submit_trade_from_intent(
+                        account_id=cohort.account_id,
+                        symbol=symbol,
+                        trade_payload=trade_json.payload,
+                        urgency=outlook.urgency,
+                        conflict=outlook.conflict,
+                        log_prefix="open",
+                    )
 
         return emitted
 
@@ -390,6 +379,17 @@ class CommonBotEmergencyRunner:
         if not symbols:
             symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
 
+        signal = self._intel.build_signal(
+            variant_id=variant_id,
+            news_text=variant_text,
+            symbols=symbols,
+            truth_payload=truth_payload,
+            author_id=author_id,
+            mutation_depth=mutation_depth,
+            force=False,
+        )
+        self._intel.ingest(signal)
+
         corr = delivery_event.correlation_id or uuid4()
         emitted: List[EventEnvelopeJson] = []
         
@@ -418,6 +418,11 @@ class CommonBotEmergencyRunner:
             return []
 
         for symbol in symbols:
+            outlook = self._intel.symbol_outlook(
+                symbol=symbol,
+                rumor_sensitivity=target_cohort.rumor_sensitivity,
+                risk_appetite=target_cohort.risk_appetite,
+            )
             decision_json, trade_json = run_commonbot_for_earnings(
                 symbol=symbol,
                 visual_truth="UNKNOWN",
@@ -431,6 +436,16 @@ class CommonBotEmergencyRunner:
                 is_insider=target_cohort.is_insider,
                 author_id=author_id,
                 mutation_depth=mutation_depth,
+                strategy_signal={
+                    "net_bias": outlook.net_bias,
+                    "confidence": outlook.confidence,
+                    "urgency": outlook.urgency,
+                    "conflict": outlook.conflict,
+                },
+                llm_policy={
+                    "force_level": signal.force_level,
+                    "prefer_llm": bool(outlook.conflict >= 0.5 or target_cohort.llm_preference > 0.2),
+                },
             )
             self._event_store.append(decision_json)
             emitted.append(decision_json)
@@ -438,45 +453,14 @@ class CommonBotEmergencyRunner:
             if session.phase == MarketPhase.TRADING and trade_json is not None:
                 self._event_store.append(trade_json)
                 emitted.append(trade_json)
-                try:
-                    side = str(trade_json.payload.get("side"))
-                    last_price_val = trade_json.payload.get("price_hint")
-                    if last_price_val is None:
-                        from ifrontier.infra.sqlite.market import get_last_price
-                        last_price = get_last_price(symbol) or 0.0
-                    else:
-                        last_price = float(last_price_val)
-                        
-                    if last_price <= 0:
-                        print(f"[CommonBotEmergency:delivery] Skipping trade for {symbol}: invalid price {last_price}")
-                        continue
-                    
-                    # 让机器人更具攻击性以促成成交：
-                    # 根据信心指数动态调整价格偏移，最高可达 5%
-                    # 这将确保能穿透做市商的盘口并直接拉升/砸盘
-                    confidence = float(trade_json.payload.get("confidence") or 0.5)
-                    # 基础偏移 1%，根据信心最高加成到 5%
-                    offset = 0.01 + (confidence * 0.04)
-                    
-                    if side == "BUY":
-                        order_price = last_price * (1.0 + offset)
-                    else:
-                        order_price = last_price * (1.0 - offset)
-
-                    print(f"[CommonBotEmergency:delivery] Bot {target_cohort.account_id} submitting {side} at {order_price:.2f} (last: {last_price:.2f}, offset: {offset:.2%}, conf: {confidence:.2f})")
-                    
-                    _order_id, matches = submit_limit_order(
-                        account_id=target_cohort.account_id,
-                        symbol=symbol,
-                        side=side,
-                        price=float(order_price),
-                        quantity=float(trade_json.payload.get("size") or 1.0),
-                    )
-                    for m in matches:
-                        ev = m.executed_event.model_dump()
-                        await hub.broadcast_json("events", ev)
-                except Exception as e:
-                    print(f"[CommonBotEmergency:delivery] Order failed: {e}")
+                await self._submit_trade_from_intent(
+                    account_id=target_cohort.account_id,
+                    symbol=symbol,
+                    trade_payload=trade_json.payload,
+                    urgency=outlook.urgency,
+                    conflict=outlook.conflict,
+                    log_prefix="delivery",
+                )
 
         return emitted
 
@@ -487,3 +471,75 @@ class CommonBotEmergencyRunner:
             str(EventType.NEWS_BROADCASTED),
             EventType.NEWS_BROADCASTED.value,
         }
+
+    async def _submit_trade_from_intent(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        trade_payload: Dict[str, Any],
+        urgency: float,
+        conflict: float,
+        log_prefix: str,
+    ) -> None:
+        side = str(trade_payload.get("side") or "").upper()
+        if side not in {"BUY", "SELL"}:
+            return
+
+        last_price_val = trade_payload.get("price_hint")
+        if last_price_val is None:
+            from ifrontier.infra.sqlite.market import get_last_price
+
+            last_price = get_last_price(symbol) or 0.0
+        else:
+            last_price = float(last_price_val)
+
+        if last_price <= 0:
+            print(f"[CommonBotEmergency:{log_prefix}] Skipping trade for {symbol}: invalid price {last_price}")
+            return
+
+        size = float(trade_payload.get("size") or 1.0)
+        confidence = float(trade_payload.get("confidence") or 0.5)
+        urgency = max(0.0, min(1.0, float(urgency)))
+        conflict = max(0.0, min(1.0, float(conflict)))
+
+        # 急切度越高越倾向市价；冲突越高越保守
+        use_market_order = urgency >= 0.75 and conflict <= 0.65
+
+        try:
+            if use_market_order:
+                print(
+                    f"[CommonBotEmergency:{log_prefix}] {account_id} submitting MARKET {side} {symbol} qty={size:.2f} "
+                    f"(urgency={urgency:.2f}, conflict={conflict:.2f})"
+                )
+                matches = submit_market_order(
+                    account_id=account_id,
+                    symbol=symbol,
+                    side=side,
+                    quantity=size,
+                )
+            else:
+                offset = 0.004 + (0.028 * confidence) + (0.018 * urgency)
+                offset *= max(0.5, 1.0 - 0.45 * conflict)
+                order_price = last_price * (1.0 + offset if side == "BUY" else 1.0 - offset)
+
+                print(
+                    f"[CommonBotEmergency:{log_prefix}] {account_id} submitting LIMIT {side} {symbol} px={order_price:.2f} qty={size:.2f} "
+                    f"(offset={offset:.2%}, conf={confidence:.2f})"
+                )
+                _order_id, matches = submit_limit_order(
+                    account_id=account_id,
+                    symbol=symbol,
+                    side=side,
+                    price=float(order_price),
+                    quantity=size,
+                )
+
+            for m in matches:
+                ev = m.executed_event.model_dump()
+                await hub.broadcast_json("events", ev)
+                ev_type = ev.get("event_type")
+                if ev_type:
+                    await hub.broadcast_json(str(ev_type), ev)
+        except Exception as exc:
+            print(f"[CommonBotEmergency:{log_prefix}] Order failed for {account_id}: {exc}")

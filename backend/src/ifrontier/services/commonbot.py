@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from datetime import datetime, timezone
+import os
 from typing import Any, Dict, List, Tuple
 from uuid import uuid4
 
@@ -14,6 +15,10 @@ from ifrontier.domain.events.payloads import (
 from ifrontier.domain.events.types import EventType
 from ifrontier.infra.llm.openrouter import OpenRouterClient, extract_first_message_text
 from ifrontier.core.ai_logger import log_ai_action, log_ai_thought
+
+
+_LLM_ANALYSIS_CACHE: Dict[str, Tuple[datetime, Dict[str, Any]]] = {}
+_LLM_CALL_WINDOW: List[datetime] = []
 
 
 def _price_trend(price_series: List[float]) -> float:
@@ -113,8 +118,17 @@ def run_commonbot_for_earnings(
     is_insider: bool = False,
     author_id: str = "system",
     mutation_depth: int = 0,
+    strategy_signal: Dict[str, Any] | None = None,
+    llm_policy: Dict[str, Any] | None = None,
 ) -> Tuple[EventEnvelopeJson, EventEnvelopeJson | None]:
     llm_result = None
+    strategy_signal = strategy_signal or {}
+    llm_policy = llm_policy or {}
+
+    strategy_bias = float(strategy_signal.get("net_bias") or 0.0)
+    strategy_conf = float(strategy_signal.get("confidence") or 0.0)
+    strategy_urgency = float(strategy_signal.get("urgency") or 0.0)
+    strategy_conflict = float(strategy_signal.get("conflict") or 0.0)
     
     # --- 核心博弈逻辑：真理与欺骗 ---
     # ... (保持原有的 trust logic) ...
@@ -143,6 +157,17 @@ def run_commonbot_for_earnings(
 
     is_rumor = (author_id != "system") or (news_kind in ["RUMOR", "LEAK", "OMEN"])
 
+    allow_llm = _allow_llm(
+        use_llm=use_llm,
+        news_kind=news_kind,
+        force_level=str(llm_policy.get("force_level") or "NONE"),
+        symbol=symbol,
+        news_text=news_text or "",
+        strategy_conflict=strategy_conflict,
+        now=datetime.now(timezone.utc),
+        llm_policy=llm_policy,
+    )
+
     if should_trust_truth and truth_payload:
         direction = truth_payload.get("direction")
         if not direction and truth_payload.get("impact_map"):
@@ -158,7 +183,7 @@ def run_commonbot_for_earnings(
                 action, score = "HOLD", 0.1
             confidence = score
             w_visual, w_text, w_trend = 0.05, 0.05, 0.9 
-        elif use_llm:
+        elif allow_llm:
             llm_result = _llm_decide_from_news(
                 symbol=symbol,
                 visual_truth=visual_truth,
@@ -168,7 +193,7 @@ def run_commonbot_for_earnings(
                 is_rumor=is_rumor,
             )
     else:
-        if use_llm:
+        if allow_llm:
             llm_result = _llm_decide_from_news(
                 symbol=symbol,
                 visual_truth=visual_truth,
@@ -204,6 +229,17 @@ def run_commonbot_for_earnings(
             context={"reason": "LLM fallback"}
         )
 
+    # 聚合层信号覆盖：优先让“多新闻融合”的趋势主导最终方向，减少单条文本噪声
+    if abs(strategy_bias) >= 0.18:
+        if strategy_bias > 0.0:
+            action = "BUY"
+        elif strategy_bias < 0.0:
+            action = "SELL"
+        confidence = max(float(confidence), min(1.0, strategy_conf))
+        # 冲突高时降杠杆（降低信心实际作用）
+        confidence *= max(0.45, 1.0 - 0.5 * max(0.0, min(1.0, strategy_conflict)))
+        w_trend = min(1.0, max(float(w_trend), 0.45 + 0.4 * abs(strategy_bias)))
+
     now = datetime.now(timezone.utc)
     decision_payload = AiCommonBotDecisionPayload(
         bot_id=bot_id,
@@ -226,13 +262,17 @@ def run_commonbot_for_earnings(
 
     trade_json: EventEnvelopeJson | None = None
     if action in {"BUY", "SELL"}:
-        base_size = 10.0
+        base_size = 12.0
         if "inst" in bot_id:
-            base_size = 1000.0
-        
-        # 随信心指数指数级增长，表现得更具攻击性
-        size = base_size * (2 ** (confidence * 4))
-        size *= random.uniform(0.8, 1.2)
+            base_size = 260.0
+
+        urgency_boost = 1.0 + 1.5 * max(0.0, min(1.0, strategy_urgency))
+        conf_boost = 1.0 + 1.2 * max(0.0, min(1.0, confidence))
+        # 冲突越高，单笔越谨慎
+        conflict_penalty = max(0.35, 1.0 - 0.55 * max(0.0, min(1.0, strategy_conflict)))
+
+        size = base_size * urgency_boost * conf_boost * conflict_penalty
+        size *= random.uniform(0.75, 1.25)
 
         intent_payload = TradeIntentSubmittedPayload(
             intent_id=str(uuid4()),
@@ -264,6 +304,15 @@ def _llm_decide_from_news(
     price_series: List[float],
     is_rumor: bool = False,
 ) -> Dict[str, Any] | None:
+    now = datetime.now(timezone.utc)
+    cache_ttl_seconds = int(os.getenv("IF_COMMONBOT_LLM_CACHE_TTL_SECONDS") or "1800")
+    cache_key = f"{symbol}|{str(news_text or '').strip().lower()[:180]}|{is_rumor}"
+    cached = _LLM_ANALYSIS_CACHE.get(cache_key)
+    if cached is not None:
+        ts, payload = cached
+        if (now - ts).total_seconds() <= max(30, cache_ttl_seconds):
+            return payload
+
     client = OpenRouterClient.from_env()
     if client is None:
         log_ai_action(
@@ -346,4 +395,60 @@ def _llm_decide_from_news(
         )
         return None
 
+    _LLM_ANALYSIS_CACHE[cache_key] = (now, obj)
+    if len(_LLM_ANALYSIS_CACHE) > 512:
+        # 简单削峰：保留后半部分缓存
+        items = list(_LLM_ANALYSIS_CACHE.items())
+        _LLM_ANALYSIS_CACHE.clear()
+        for k, v in items[len(items) // 2 :]:
+            _LLM_ANALYSIS_CACHE[k] = v
+
     return obj
+
+
+def _allow_llm(
+    *,
+    use_llm: bool,
+    news_kind: str,
+    force_level: str,
+    symbol: str,
+    news_text: str,
+    strategy_conflict: float,
+    now: datetime,
+    llm_policy: Dict[str, Any],
+) -> bool:
+    if not use_llm:
+        return False
+
+    nk = str(news_kind or "").upper()
+    fl = str(force_level or "NONE").upper()
+    if fl == "HARD":
+        return True
+
+    # 预置模板类新闻默认不走 LLM（节流），除非冲突明显
+    template_kinds = {"MAJOR_EVENT", "WORLD_EVENT", "EARNINGS", "DISCLOSURE", "OMEN"}
+    if nk in template_kinds and strategy_conflict < 0.5:
+        return False
+
+    # 玩家文本/高冲突优先允许
+    must_use = bool(llm_policy.get("prefer_llm")) or strategy_conflict >= 0.55
+
+    # 全局速率限制
+    calls_per_min = int(os.getenv("IF_COMMONBOT_LLM_MAX_CALLS_PER_MIN") or "8")
+    horizon = 60.0
+    while _LLM_CALL_WINDOW and (now - _LLM_CALL_WINDOW[0]).total_seconds() > horizon:
+        _LLM_CALL_WINDOW.pop(0)
+    if len(_LLM_CALL_WINDOW) >= max(1, calls_per_min):
+        return False
+
+    # 低价值文本不调用
+    if len(str(news_text or "").strip()) < 12 and not must_use:
+        return False
+
+    # 非关键情况下做采样调用
+    if not must_use:
+        if random.random() > 0.3:
+            return False
+
+    _LLM_CALL_WINDOW.append(now)
+    return True
