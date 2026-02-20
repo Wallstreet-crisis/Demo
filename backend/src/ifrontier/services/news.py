@@ -41,6 +41,8 @@ class NewsService:
                 "情报点显示：{symbol} 正在大规模紧急抛售其在火星殖民地的基础能源配额，疑似准备撤离。",
                 "内幕消息：{symbol} 研发的‘数字灵魂’存储器被发现存在无法修复的逻辑死循环，首批受试者已全部脑死亡。",
                 "坊间异动：{symbol} 旗下的义体诊所最近出现了大量由于非法算力超频导致的‘赛博精神病’集群案例。",
+                "街区传闻：{symbol} 即将获得轨道城市基础算力配额，若属实其未来三个结算周期现金流将显著改善。",
+                "灰市消息：{symbol} 与月面交通局的补能协议接近签署，可能缓解其长期的能源成本压力。",
             ],
             "LEAK": [
                 "【绝密数据泄露】{symbol} 核心反应堆的损耗率已达临界点，一旦过载将引发足以抹平整个行政区的能量风暴。",
@@ -51,6 +53,8 @@ class NewsService:
                 "一份审计报告显示：{symbol} 进军深空采矿的巨额资金已被秘密转移至某个名为‘虚无’的黑洞账户。",
                 "泄露的清单：{symbol} 正在秘密组建一支完全由高维 AI 操控的‘幽灵雇佣兵’部队，目标不明。",
                 "绝密档案：{symbol} 在最近的季度报告中隐瞒了其核心逻辑引擎已失去自我进化能力，仅靠循环旧代码维持的事实。",
+                "泄露备忘录显示：{symbol} 的次世代冷核堆稳定性测试连续达标，董事会正在评估提前量产窗口。",
+                "内部工单外流：{symbol} 已修复关键链路中的高危漏洞，原定停机维护窗口或将缩短。",
             ],
             "ANALYST_REPORT": [
                 "【深网分析】维持 {symbol} ‘强力买入’评级，其在‘意识上传’领域的专利垄断将确保其在下个纪元的霸权。",
@@ -60,6 +64,8 @@ class NewsService:
                 "赛博金融周刊：{symbol} 的现金流足以支持其在‘全球战争’期间进行毁灭性的溢价收购，建议紧跟庄家。",
                 "【灰区评估】{symbol} 垄断了 90% 的神经链接修复件供应，是控制未来全人类肉体的‘隐形暴君’。",
                 "高盛深网研报：{symbol} 成功整合了地月之间的量子中继链，将实现跨星系的‘零延迟’财富收割。",
+                "机构联评：{symbol} 的负债久期结构优于同业，若宏观波动收敛其估值修复弹性较高。",
+                "晨星深网覆盖：{symbol} 在非战争场景下的防御性现金流表现稳健，给出‘增持’建议。",
             ],
             "OMEN": [
                 "【异常预兆】外交部对 {symbol} 利益相关地区的信号屏蔽行为保持死一般的沉默，空气中弥漫着硝烟味。",
@@ -69,6 +75,7 @@ class NewsService:
                 "【视觉干扰】坊间流传的照片显示 {symbol} 总部大楼已被某种脉冲频率极高的半透明‘维度力场’完全覆盖。",
                 "【高能反应】某种无法被现有物理框架解析的‘熵减信号’正从 {symbol} 核心机房向周边星域疯狂辐射。",
                 "【底层异动】{symbol} 的股价在没有任何成交的情况下出现了极高频的毫秒级跳动，逻辑防火墙正处于崩溃边缘。",
+                "【前兆回暖】{symbol} 的订单簿中出现持续性高质量买单，风险对冲盘正在回补此前过度悲观头寸。",
             ],
             "MAJOR_EVENT": [
                 "【紧急公告】{symbol} 的核心聚变堆发生‘维度坍缩’，整个工业园区已从物理现实中被彻底抹除。",
@@ -77,6 +84,7 @@ class NewsService:
                 "【主权禁令】全网禁令正式生效，{symbol} 在所有主权国家的海外资产已被当地军政府强制‘物理接管’。",
                 "【公司战争】{symbol} 正式对竞争对手发动‘逻辑清除’打击，双方已在数据海和物理现实中进入全面交战状态。",
                 "【算力奇点】{symbol} 部署的全球算力池发生非主观觉醒，开始自我删除所有不符合其‘进化审美’的财务坏账。",
+                "【战略落地】{symbol} 联合多个主权节点完成跨区域清算协议升级，核心业务延迟和违约率同步下降。",
             ],
             "WORLD_EVENT": [
                 "【全网紧急广播】全球战争爆发，所有跨国资本流动和算力租借已被星际联合议会进行‘军事级接管’。",
@@ -85,8 +93,81 @@ class NewsService:
                 "【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。",
                 "【算力黑洞】由于全球性算力风暴，所有基于加密逻辑的资产正在面临史无前例的‘格式化’归零性修正。",
                 "【黑昼降临】由于地月拉格朗日点的量子干扰塔被‘未知实体’爆破，全球卫星通讯和定位系统已完全中断。",
+                "【联邦共识】星际联合议会通过《轨道重建法案》，关键能源与物流主干网将获得超额财政投放。",
+                "【和平窗口】多边停火协议进入执行期，跨境贸易与算力租赁恢复白名单通道。",
             ],
         }
+
+    def get_preset_news_params(self, *, kind: str, theme: str | None = None) -> Dict[str, Any]:
+        kind_key = str(kind or "UNKNOWN").upper()
+        theme_key = str(theme or "").upper()
+
+        kind_defaults: Dict[str, Dict[str, Any]] = {
+            "RUMOR": {
+                "direction_weights": {"UP": 0.34, "DOWN": 0.34, "STABLE": 0.32},
+                "intensity": 0.45,
+                "ttl_seconds": 20 * 60,
+                "reliability_prior": 0.42,
+                "deception_risk": 0.52,
+                "worldview": "cyberpunk_rumor_network",
+            },
+            "LEAK": {
+                "direction_weights": {"UP": 0.36, "DOWN": 0.34, "STABLE": 0.30},
+                "intensity": 0.52,
+                "ttl_seconds": 35 * 60,
+                "reliability_prior": 0.58,
+                "deception_risk": 0.38,
+                "worldview": "cyberpunk_corporate_whistle",
+            },
+            "ANALYST_REPORT": {
+                "direction_weights": {"UP": 0.40, "DOWN": 0.30, "STABLE": 0.30},
+                "intensity": 0.48,
+                "ttl_seconds": 50 * 60,
+                "reliability_prior": 0.66,
+                "deception_risk": 0.22,
+                "worldview": "cyberpunk_sellside_desk",
+            },
+            "OMEN": {
+                "direction_weights": {"UP": 0.33, "DOWN": 0.33, "STABLE": 0.34},
+                "intensity": 0.55,
+                "ttl_seconds": 30 * 60,
+                "reliability_prior": 0.54,
+                "deception_risk": 0.30,
+                "worldview": "cyberpunk_early_signal",
+            },
+            "MAJOR_EVENT": {
+                "direction_weights": {"UP": 0.38, "DOWN": 0.38, "STABLE": 0.24},
+                "intensity": 0.78,
+                "ttl_seconds": 2 * 3600,
+                "reliability_prior": 0.88,
+                "deception_risk": 0.10,
+                "worldview": "cyberpunk_state_and_mega_corp",
+            },
+            "WORLD_EVENT": {
+                "direction_weights": {"UP": 0.36, "DOWN": 0.36, "STABLE": 0.28},
+                "intensity": 0.82,
+                "ttl_seconds": 4 * 3600,
+                "reliability_prior": 0.90,
+                "deception_risk": 0.08,
+                "worldview": "cyberpunk_global_macro",
+            },
+        }
+
+        theme_overrides: Dict[str, Dict[str, Any]] = {
+            "WAR": {"market_bias": -0.12},
+            "FINANCIAL_CRISIS": {"market_bias": -0.14},
+            "ENERGY_SHORTAGE": {"market_bias": -0.08},
+            "BIO_HAZARD": {"market_bias": -0.06},
+            "TECH_BREAKTHROUGH": {"market_bias": 0.10},
+            "PEACE_DIVIDEND": {"market_bias": 0.12},
+            "TRADE_PACT": {"market_bias": 0.08},
+            "INFRA_RECOVERY": {"market_bias": 0.09},
+        }
+
+        base = dict(kind_defaults.get(kind_key, kind_defaults["RUMOR"]))
+        if theme_key and theme_key in theme_overrides:
+            base.update(theme_overrides[theme_key])
+        return base
 
     def _now_game_utc(self) -> datetime:
         cfg = load_game_time_config_from_env()
@@ -541,25 +622,57 @@ class NewsService:
                 "kind": "EARNINGS",
                 "symbols": ["NEURALINK"],
                 "text": "Neuralink 脑机接口三期临床实验数据远超预期。",
-                "truth_payload": {"impact": 0.15, "direction": "UP"}
+                "truth_payload": {
+                    "impact": 0.15,
+                    "direction": "UP",
+                    "intensity": 0.62,
+                    "ttl_seconds": 5400,
+                    "reliability_prior": 0.85,
+                    "deception_risk": 0.12,
+                    "worldview": "cyberpunk_clinical_breakthrough",
+                },
             },
             {
                 "kind": "MILITARY",
                 "symbols": ["BLUEGOLD"],
                 "text": "BlueGold 获得北方联盟 500 亿信用点防御订单。",
-                "truth_payload": {"impact": 0.2, "direction": "UP"}
+                "truth_payload": {
+                    "impact": 0.2,
+                    "direction": "UP",
+                    "intensity": 0.58,
+                    "ttl_seconds": 4200,
+                    "reliability_prior": 0.74,
+                    "deception_risk": 0.2,
+                    "worldview": "cyberpunk_defense_contract",
+                },
             },
             {
                 "kind": "ENERGY",
                 "symbols": ["MARS_GEN"],
                 "text": "火星二号核聚变电站发生容器泄漏事故。",
-                "truth_payload": {"impact": -0.25, "direction": "DOWN"}
+                "truth_payload": {
+                    "impact": -0.25,
+                    "direction": "DOWN",
+                    "intensity": 0.64,
+                    "ttl_seconds": 3600,
+                    "reliability_prior": 0.77,
+                    "deception_risk": 0.18,
+                    "worldview": "cyberpunk_infrastructure_risk",
+                },
             },
             {
                 "kind": "FINANCE",
                 "symbols": ["CIVILBANK"],
                 "text": "联邦储备局宣布将维持当前基准利率不变。",
-                "truth_payload": {"impact": 0.02, "direction": "STABLE"}
+                "truth_payload": {
+                    "impact": 0.02,
+                    "direction": "STABLE",
+                    "intensity": 0.35,
+                    "ttl_seconds": 4800,
+                    "reliability_prior": 0.82,
+                    "deception_risk": 0.08,
+                    "worldview": "cyberpunk_policy_signal",
+                },
             }
         ]
 

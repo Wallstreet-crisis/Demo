@@ -82,15 +82,28 @@ class NewsIntelligenceEngine:
             for s in symbols:
                 direction_map[str(s).upper()] = base_dir
 
-        # 多层影响：允许 market bias
+        # 多层影响：允许 market bias，且优先使用 truth_payload 的预置参数
         market_bias = 0.0
         if news_kind in {"WORLD_EVENT", "MAJOR_EVENT"}:
             market_bias = 0.2 if sum(direction_map.values()) >= 0 else -0.2
+        market_bias = float(payload.get("market_bias", market_bias) or 0.0)
 
-        reliability_prior = self._source_reliability(source_type=source_type, news_kind=news_kind)
-        deception_risk = self._deception_risk(source_type=source_type, news_kind=news_kind, mutation_depth=mutation_depth)
-        intensity = self._intensity(news_kind=news_kind, force_level=force_level, news_text=news_text)
-        ttl_seconds = self._ttl_by_kind(news_kind)
+        reliability_prior = float(
+            payload.get("reliability_prior", self._source_reliability(source_type=source_type, news_kind=news_kind))
+            or self._source_reliability(source_type=source_type, news_kind=news_kind)
+        )
+        deception_risk = float(
+            payload.get(
+                "deception_risk",
+                self._deception_risk(source_type=source_type, news_kind=news_kind, mutation_depth=mutation_depth),
+            )
+            or self._deception_risk(source_type=source_type, news_kind=news_kind, mutation_depth=mutation_depth)
+        )
+        intensity = float(
+            payload.get("intensity", self._intensity(news_kind=news_kind, force_level=force_level, news_text=news_text))
+            or self._intensity(news_kind=news_kind, force_level=force_level, news_text=news_text)
+        )
+        ttl_seconds = int(payload.get("ttl_seconds", self._ttl_by_kind(news_kind)) or self._ttl_by_kind(news_kind))
 
         cluster_id = self._build_cluster_id(
             variant_id=variant_id,

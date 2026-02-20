@@ -175,6 +175,7 @@ class NewsTickEngine:
             "abort_probability": float(abort_probability),
             "symbols": symbols or [],
         }
+        truth_payload.update(self._news.get_preset_news_params(kind=kind))
         if extra_truth:
             truth_payload.update(extra_truth)
 
@@ -265,21 +266,37 @@ class NewsTickEngine:
         # 1) 小新闻投放 (每 60s 触发)
         if self._last_small_news_at is None or (now - self._last_small_news_at).total_seconds() >= 60:
             self._last_small_news_at = now
-            kind = py_random.choice(["RUMOR", "LEAK", "ANALYST_REPORT"])
+            kind = py_random.choices(["RUMOR", "LEAK", "ANALYST_REPORT"], weights=[0.34, 0.28, 0.38], k=1)[0]
             from ifrontier.infra.sqlite.securities import list_securities
             secs = [s.symbol for s in list_securities(status="TRADABLE")]
             if secs:
                 target_symbol = py_random.choice(secs)
                 text = self._news.get_preset_template(kind=kind, symbols=[target_symbol])
-                
-                # 随机生成一个利好或利空倾向
-                impact_direction = py_random.choice(["UP", "DOWN", "STABLE"])
+                params = self._news.get_preset_news_params(kind=kind)
+
+                # 按预置参数控制方向分布，保持长期更均衡
+                dir_weights = params.get("direction_weights") or {"UP": 0.34, "DOWN": 0.34, "STABLE": 0.32}
+                impact_direction = py_random.choices(
+                    ["UP", "DOWN", "STABLE"],
+                    weights=[
+                        float(dir_weights.get("UP") or 0.34),
+                        float(dir_weights.get("DOWN") or 0.34),
+                        float(dir_weights.get("STABLE") or 0.32),
+                    ],
+                    k=1,
+                )[0]
                 
                 # 增加 kind 信息，方便机器人识别新闻类型
                 truth_payload = {
                     "system_spawn": True, 
                     "direction": impact_direction,
-                    "kind": kind
+                    "kind": kind,
+                    "intensity": float(params.get("intensity") or 0.45),
+                    "ttl_seconds": int(params.get("ttl_seconds") or 1800),
+                    "reliability_prior": float(params.get("reliability_prior") or 0.5),
+                    "deception_risk": float(params.get("deception_risk") or 0.45),
+                    "worldview": str(params.get("worldview") or "cyberpunk_daily_flow"),
+                    "market_bias": float(params.get("market_bias") or 0.0),
                 }
                 
                 card_id, card_ev = self._news.create_card(
@@ -337,7 +354,21 @@ class NewsTickEngine:
                 # 4. ENERGY_SHORTAGE (能源荒) -> ENERGY (UP), LOGISTICS/TECH (DOWN), CONSUMER (DOWN)
                 # 5. BIO_HAZARD (生化危机) -> HEALTHCARE (UP), CONSUMER/LOGISTICS (DOWN), TECH (STABLE)
                 
-                theme = py_random.choice(["WAR", "TECH_BREAKTHROUGH", "FINANCIAL_CRISIS", "ENERGY_SHORTAGE", "BIO_HAZARD"])
+                theme = py_random.choices(
+                    [
+                        "WAR",
+                        "FINANCIAL_CRISIS",
+                        "ENERGY_SHORTAGE",
+                        "BIO_HAZARD",
+                        "TECH_BREAKTHROUGH",
+                        "PEACE_DIVIDEND",
+                        "TRADE_PACT",
+                        "INFRA_RECOVERY",
+                    ],
+                    # 总体上保持多空均衡，避免长期系统性偏空
+                    weights=[0.12, 0.12, 0.11, 0.10, 0.18, 0.13, 0.12, 0.12],
+                    k=1,
+                )[0]
                 target_symbols = []
                 impact_map = {} # symbol -> direction
                 
@@ -350,6 +381,36 @@ class NewsTickEngine:
                                 target_symbols.append(s.symbol)
                             elif prof.sector in ["FINANCE", "CONSUMER", "LOGISTICS"]:
                                 impact_map[s.symbol] = "DOWN"
+                                target_symbols.append(s.symbol)
+                elif theme == "PEACE_DIVIDEND":
+                    for s in all_secs:
+                        prof = get_profile(s.symbol)
+                        if prof:
+                            if prof.sector in ["FINANCE", "CONSUMER", "LOGISTICS"]:
+                                impact_map[s.symbol] = "UP"
+                                target_symbols.append(s.symbol)
+                            elif prof.sector in ["MILITARY", "ENERGY"]:
+                                impact_map[s.symbol] = "DOWN"
+                                target_symbols.append(s.symbol)
+                elif theme == "TRADE_PACT":
+                    for s in all_secs:
+                        prof = get_profile(s.symbol)
+                        if prof:
+                            if prof.sector in ["LOGISTICS", "TECH", "CONSUMER"]:
+                                impact_map[s.symbol] = "UP"
+                                target_symbols.append(s.symbol)
+                            elif prof.sector == "ENERGY":
+                                impact_map[s.symbol] = "DOWN"
+                                target_symbols.append(s.symbol)
+                elif theme == "INFRA_RECOVERY":
+                    for s in all_secs:
+                        prof = get_profile(s.symbol)
+                        if prof:
+                            if prof.sector in ["ENERGY", "LOGISTICS", "FINANCE"]:
+                                impact_map[s.symbol] = "UP"
+                                target_symbols.append(s.symbol)
+                            elif prof.sector == "MILITARY":
+                                impact_map[s.symbol] = "STABLE"
                                 target_symbols.append(s.symbol)
                 elif theme == "TECH_BREAKTHROUGH":
                     for s in all_secs:
@@ -408,7 +469,11 @@ class NewsTickEngine:
                     grant_count=py_random.randint(3, 8),
                     seed=py_random.randint(1, 1000000),
                     symbols=target_symbols,
-                    extra_truth={"theme": theme, "impact_map": final_impact_map}
+                    extra_truth={
+                        "theme": theme,
+                        "impact_map": final_impact_map,
+                        **self._news.get_preset_news_params(kind=kind, theme=theme),
+                    }
                 )
                 spawned_events.append(res["card_created_event"].model_dump(mode="json"))
                 spawned_events.append(res["chain_started_event"].model_dump(mode="json"))
@@ -458,6 +523,7 @@ class NewsTickEngine:
                 "signal_strength": int(rnd.randint(1, 3)),
                 "t_minus_seconds": int((t0_at - now).total_seconds()), # 后台可见，文本不可见
             }
+            omen_truth.update(self._news.get_preset_news_params(kind="OMEN"))
             if chain_impact_map:
                 omen_truth["impact_map"] = chain_impact_map
 
