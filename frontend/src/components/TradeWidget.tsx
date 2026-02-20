@@ -5,14 +5,16 @@ import { useNotification } from '../app/NotificationContext'
 import CyberWidget from './CyberWidget'
 
 export default function TradeWidget({ isFocused }: { isFocused?: boolean }) {
-  void isFocused
-  const { playerId, symbol } = useAppSession()
+  const { playerId, symbol, setSymbol } = useAppSession()
   const { notify } = useNotification()
   const [err, setErr] = useState<string>('')
   const [loading, setLoading] = useState(false)
 
   const [quote, setQuote] = useState<MarketQuoteResponse | null>(null)
   const [val, setVal] = useState<AccountValuationResponse | null>(null)
+  const [symbols, setSymbols] = useState<string[]>([])
+  const [orderBook, setOrderBook] = useState<{ bids: Array<{ order_id: string; price: number; quantity_remaining: number; account_id: string }>; asks: Array<{ order_id: string; price: number; quantity_remaining: number; account_id: string }> }>({ bids: [], asks: [] })
+  const [myOpenOrders, setMyOpenOrders] = useState<Array<{ order_id: string; side: string; price: number; quantity_remaining: number; created_at: string }>>([])
 
   const [side, setSide] = useState<'BUY' | 'SELL'>('BUY')
   const [orderType, setOrderType] = useState<'LIMIT' | 'MARKET'>('LIMIT')
@@ -24,30 +26,43 @@ export default function TradeWidget({ isFocused }: { isFocused?: boolean }) {
   const playerIdOk = useMemo(() => {
     return !!playerId && /^[a-zA-Z0-9_]{3,20}$/.test(playerId)
   }, [playerId])
+  const pollMs = useMemo(() => (isFocused ? 3000 : 5000), [isFocused])
 
   const refreshData = useCallback(async () => {
     if (!playerIdOk) return
     try {
-      const [q, v] = await Promise.all([
+      const [q, v, ob, mine, syms] = await Promise.all([
         Api.marketQuote(symbol),
-        Api.accountValuation(`user:${playerId}`)
+        Api.accountValuation(`user:${playerId}`),
+        Api.orderBook(symbol, isFocused ? 12 : 6),
+        Api.myOpenOrders(playerId, symbol, isFocused ? 12 : 5),
+        Api.marketSymbols(),
       ])
       setQuote(q)
       setVal(v)
+      setSymbols(syms || [])
+      setOrderBook({ bids: ob.bids || [], asks: ob.asks || [] })
+      setMyOpenOrders((mine.items || []).map((o) => ({
+        order_id: o.order_id,
+        side: o.side,
+        price: o.price,
+        quantity_remaining: o.quantity_remaining,
+        created_at: o.created_at,
+      })))
       if (orderType === 'LIMIT' && !price && q.last_price) {
         setPrice(String(q.last_price))
       }
     } catch (e) {
       console.error('Failed to fetch trade data', e)
     }
-  }, [playerIdOk, playerId, symbol, orderType, price])
+  }, [playerIdOk, playerId, symbol, orderType, price, isFocused])
 
   useEffect(() => {
     if (!playerIdOk) return
     refreshData()
-    const t = setInterval(refreshData, 3000)
+    const t = setInterval(refreshData, pollMs)
     return () => clearInterval(t)
-  }, [playerIdOk, refreshData])
+  }, [playerIdOk, refreshData, pollMs])
 
   useEffect(() => {
     if (!symbol) return
@@ -131,10 +146,42 @@ export default function TradeWidget({ isFocused }: { isFocused?: boolean }) {
     }
   }
 
+  const quickFillFromBook = (bookSide: 'BUY' | 'SELL', px: number) => {
+    setOrderType('LIMIT')
+    setSide(bookSide === 'SELL' ? 'BUY' : 'SELL')
+    setPrice(String(px))
+  }
+
+  const handleCancelOrder = async (orderId: string) => {
+    if (!playerId) return
+    try {
+      await Api.cancelOrder(orderId, { player_id: playerId })
+      notify('success', 'ORDER_CANCELLED')
+      await refreshData()
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
+      notify('error', msg)
+    }
+  }
+
   return (
     <CyberWidget 
       title={`TRADE_EXECUTION: ${symbol}`} 
       subtitle="QUANTUM_ORDER_ROUTING"
+      titleActions={
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <select
+            className="cyber-input"
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value)}
+            style={{ fontSize: '11px', height: '20px', minWidth: '96px', padding: '0 4px' }}
+          >
+            {symbols.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+      }
     >
       {err && <div style={{ color: 'var(--terminal-error)', fontSize: '12px', marginBottom: '10px', background: 'rgba(239, 68, 68, 0.1)', padding: '8px', borderLeft: '3px solid var(--terminal-error)' }}>[ERR]: {err}</div>}
       
@@ -213,6 +260,69 @@ export default function TradeWidget({ isFocused }: { isFocused?: boolean }) {
             <span style={{ fontWeight: '700', color: (side === 'BUY' ? estimatedValue > availableCash : Number(quantity) > availablePos) ? 'var(--terminal-error)' : 'var(--terminal-success)' }}>
               {side === 'BUY' ? `$${availableCash.toLocaleString()}` : `${availablePos.toLocaleString()} unit`}
             </span>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: isFocused ? '1fr 1fr' : '1fr', gap: '8px' }}>
+          <div style={{ border: '1px solid var(--terminal-border)', borderRadius: '4px', background: 'rgba(15, 23, 42, 0.45)', padding: '8px' }}>
+            <div style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '6px', fontWeight: 600 }}>ORDER_BOOK (click to prefill)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div>
+                <div style={{ fontSize: '9px', color: 'var(--terminal-error)', marginBottom: '4px' }}>ASKS</div>
+                <div style={{ display: 'grid', gap: '4px' }}>
+                  {orderBook.asks.map((o) => (
+                    <button
+                      key={`ask-${o.order_id}`}
+                      className="cyber-button"
+                      onClick={() => quickFillFromBook('SELL', o.price)}
+                      style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', padding: '4px 6px', borderColor: 'rgba(239, 68, 68, 0.25)' }}
+                    >
+                      <span style={{ color: 'var(--terminal-error)' }}>{o.price.toFixed(2)}</span>
+                      <span style={{ color: '#cbd5e1' }}>{o.quantity_remaining.toFixed(2)}</span>
+                    </button>
+                  ))}
+                  {orderBook.asks.length === 0 && <div style={{ fontSize: '10px', color: '#64748b' }}>NO_ASKS</div>}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '9px', color: 'var(--terminal-success)', marginBottom: '4px' }}>BIDS</div>
+                <div style={{ display: 'grid', gap: '4px' }}>
+                  {orderBook.bids.map((o) => (
+                    <button
+                      key={`bid-${o.order_id}`}
+                      className="cyber-button"
+                      onClick={() => quickFillFromBook('BUY', o.price)}
+                      style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', padding: '4px 6px', borderColor: 'rgba(16, 185, 129, 0.25)' }}
+                    >
+                      <span style={{ color: 'var(--terminal-success)' }}>{o.price.toFixed(2)}</span>
+                      <span style={{ color: '#cbd5e1' }}>{o.quantity_remaining.toFixed(2)}</span>
+                    </button>
+                  ))}
+                  {orderBook.bids.length === 0 && <div style={{ fontSize: '10px', color: '#64748b' }}>NO_BIDS</div>}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ border: '1px solid var(--terminal-border)', borderRadius: '4px', background: 'rgba(15, 23, 42, 0.45)', padding: '8px' }}>
+            <div style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '6px', fontWeight: 600 }}>MY_OPEN_ORDERS</div>
+            <div style={{ display: 'grid', gap: '5px' }}>
+              {myOpenOrders.map((o) => (
+                <div key={o.order_id} style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr auto', gap: '6px', alignItems: 'center', fontSize: '10px', border: '1px solid rgba(100, 116, 139, 0.25)', borderRadius: '4px', padding: '4px 6px' }}>
+                  <span style={{ color: o.side === 'BUY' ? 'var(--terminal-success)' : 'var(--terminal-error)', fontWeight: 700 }}>{o.side}</span>
+                  <span style={{ color: '#e2e8f0' }}>{o.price.toFixed(2)}</span>
+                  <span style={{ color: '#94a3b8' }}>qty {o.quantity_remaining.toFixed(2)}</span>
+                  <button
+                    className="cyber-button"
+                    onClick={() => handleCancelOrder(o.order_id)}
+                    style={{ fontSize: '10px', padding: '2px 6px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.45)' }}
+                  >
+                    CANCEL
+                  </button>
+                </div>
+              ))}
+              {myOpenOrders.length === 0 && <div style={{ fontSize: '10px', color: '#64748b' }}>NO_OPEN_ORDERS</div>}
+            </div>
           </div>
         </div>
 

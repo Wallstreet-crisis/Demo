@@ -132,6 +132,37 @@ export type PlayerMarketOrderRequest = {
   quantity: number
 }
 
+export type OrderBookEntryResponse = {
+  order_id: string
+  account_id: string
+  price: number
+  quantity_remaining: number
+  created_at: string
+}
+
+export type OrderBookResponse = {
+  symbol: string
+  bids: OrderBookEntryResponse[]
+  asks: OrderBookEntryResponse[]
+}
+
+export type MyOpenOrderResponse = {
+  order_id: string
+  symbol: string
+  side: string
+  price: number
+  quantity_remaining: number
+  created_at: string
+}
+
+export type MyOpenOrdersListResponse = {
+  items: MyOpenOrderResponse[]
+}
+
+export type PlayerCancelOrderRequest = {
+  player_id: string
+}
+
 export type ChatIntroFeeQuoteRequest = {
   rich_user_id: string
   fee_cash?: number

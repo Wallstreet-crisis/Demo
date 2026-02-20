@@ -173,3 +173,85 @@ def fetch_best_opposite_orders(symbol: str, side: str) -> List[Order]:
         )
         for r in rows
     ]
+
+
+def list_open_orders(symbol: str, side: str, limit: int = 20) -> List[Order]:
+    conn = get_connection()
+    side_u = str(side or "").upper()
+    if side_u not in {"BUY", "SELL"}:
+        raise ValueError("side must be BUY or SELL")
+
+    lim = max(1, min(int(limit or 20), 200))
+    if side_u == "BUY":
+        order_sql = "ORDER BY price DESC, created_at ASC"
+    else:
+        order_sql = "ORDER BY price ASC, created_at ASC"
+
+    rows = conn.execute(
+        (
+            "SELECT * FROM orders "
+            "WHERE symbol = ? AND side = ? AND order_type = 'LIMIT' AND status IN ('OPEN','PARTIAL_FILLED') "
+            f"{order_sql} LIMIT ?"
+        ),
+        (symbol, side_u, lim),
+    ).fetchall()
+
+    return [
+        Order(
+            order_id=r["order_id"],
+            account_id=r["account_id"],
+            symbol=r["symbol"],
+            side=r["side"],
+            order_type=r["order_type"],
+            price=float(r["price"]),
+            quantity_remaining=float(r["quantity_remaining"]),
+            status=r["status"],
+            created_at=r["created_at"],
+        )
+        for r in rows
+    ]
+
+
+def list_open_orders_by_account(account_id: str, symbol: Optional[str] = None, limit: int = 50) -> List[Order]:
+    conn = get_connection()
+    account_norm = str(account_id).lower()
+    lim = max(1, min(int(limit or 50), 200))
+
+    sql = (
+        "SELECT * FROM orders "
+        "WHERE account_id = ? AND order_type = 'LIMIT' AND status IN ('OPEN','PARTIAL_FILLED')"
+    )
+    params: list = [account_norm]
+    if symbol:
+        sql += " AND symbol = ?"
+        params.append(symbol)
+    sql += " ORDER BY created_at DESC LIMIT ?"
+    params.append(lim)
+
+    rows = conn.execute(sql, params).fetchall()
+    return [
+        Order(
+            order_id=r["order_id"],
+            account_id=r["account_id"],
+            symbol=r["symbol"],
+            side=r["side"],
+            order_type=r["order_type"],
+            price=float(r["price"]),
+            quantity_remaining=float(r["quantity_remaining"]),
+            status=r["status"],
+            created_at=r["created_at"],
+        )
+        for r in rows
+    ]
+
+
+def cancel_order(order_id: str, account_id: str) -> bool:
+    conn = get_connection()
+    account_norm = str(account_id).lower()
+    with conn:
+        res = conn.execute(
+            "UPDATE orders SET status = 'CANCELLED', quantity_remaining = 0 "
+            "WHERE order_id = ? AND account_id = ? AND status IN ('OPEN','PARTIAL_FILLED')",
+            (order_id, account_norm),
+        )
+    return (res.rowcount or 0) > 0

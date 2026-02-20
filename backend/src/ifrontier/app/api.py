@@ -20,6 +20,7 @@ from ifrontier.services.commonbot import run_commonbot_for_earnings
 from ifrontier.services.commonbot_emergency import CommonBotEmergencyRunner
 from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account, get_snapshot, list_ledger_entries, spend_cash
 from ifrontier.infra.sqlite.market import get_candles, get_last_price, get_price_series, record_trade
+from ifrontier.infra.sqlite.orders import cancel_order, list_open_orders, list_open_orders_by_account
 from ifrontier.services.matching import submit_limit_order, submit_market_order
 from ifrontier.services.market_analytics import get_market_trends, get_quote
 from ifrontier.services.valuation import value_account
@@ -1000,6 +1001,33 @@ class PlayerOrderResponse(BaseModel):
     order_id: str
 
 
+class OrderBookEntryResponse(BaseModel):
+    order_id: str
+    account_id: str
+    price: float
+    quantity_remaining: float
+    created_at: str
+
+
+class OrderBookResponse(BaseModel):
+    symbol: str
+    bids: List[OrderBookEntryResponse]
+    asks: List[OrderBookEntryResponse]
+
+
+class MyOpenOrderResponse(BaseModel):
+    order_id: str
+    symbol: str
+    side: str
+    price: float
+    quantity_remaining: float
+    created_at: str
+
+
+class MyOpenOrdersListResponse(BaseModel):
+    items: List[MyOpenOrderResponse]
+
+
 @router.post("/orders/limit")
 async def submit_player_limit_order(req: PlayerLimitOrderRequest) -> PlayerOrderResponse:
     account_id = f"user:{str(req.player_id).lower()}"
@@ -1023,6 +1051,77 @@ async def submit_player_limit_order(req: PlayerLimitOrderRequest) -> PlayerOrder
     except Exception as exc:
         print(f"[API:Order] Failed to submit limit order: {exc}")
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/orders/book/{symbol}")
+async def get_order_book(symbol: str, limit: int = 20) -> OrderBookResponse:
+    try:
+        bids = list_open_orders(symbol=symbol, side="BUY", limit=limit)
+        asks = list_open_orders(symbol=symbol, side="SELL", limit=limit)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return OrderBookResponse(
+        symbol=symbol,
+        bids=[
+            OrderBookEntryResponse(
+                order_id=o.order_id,
+                account_id=o.account_id,
+                price=o.price,
+                quantity_remaining=o.quantity_remaining,
+                created_at=o.created_at,
+            )
+            for o in bids
+        ],
+        asks=[
+            OrderBookEntryResponse(
+                order_id=o.order_id,
+                account_id=o.account_id,
+                price=o.price,
+                quantity_remaining=o.quantity_remaining,
+                created_at=o.created_at,
+            )
+            for o in asks
+        ],
+    )
+
+
+@router.get("/orders/open/{player_id}")
+async def get_my_open_orders(player_id: str, symbol: str | None = None, limit: int = 50) -> MyOpenOrdersListResponse:
+    account_id = f"user:{str(player_id).lower()}"
+    try:
+        rows = list_open_orders_by_account(account_id=account_id, symbol=symbol, limit=limit)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return MyOpenOrdersListResponse(
+        items=[
+            MyOpenOrderResponse(
+                order_id=o.order_id,
+                symbol=o.symbol,
+                side=o.side,
+                price=o.price,
+                quantity_remaining=o.quantity_remaining,
+                created_at=o.created_at,
+            )
+            for o in rows
+        ]
+    )
+
+
+class PlayerCancelOrderRequest(BaseModel):
+    player_id: str
+
+
+@router.post("/orders/{order_id}/cancel")
+async def cancel_player_order(order_id: str, req: PlayerCancelOrderRequest) -> None:
+    account_id = f"user:{str(req.player_id).lower()}"
+    try:
+        ok = cancel_order(order_id=order_id, account_id=account_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not ok:
+        raise HTTPException(status_code=404, detail="open order not found")
 
 
 class PlayerMarketOrderRequest(BaseModel):

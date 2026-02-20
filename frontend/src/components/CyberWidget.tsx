@@ -4,6 +4,7 @@ interface CyberWidgetProps {
   title: string;
   children: React.ReactNode;
   subtitle?: string;
+  titleActions?: React.ReactNode;
   actions?: React.ReactNode;
   height?: string | number;
   className?: string;
@@ -14,6 +15,7 @@ export default function CyberWidget({
   title, 
   children, 
   subtitle, 
+  titleActions,
   actions, 
   height, 
   className = '', 
@@ -41,7 +43,7 @@ export default function CyberWidget({
         paddingBottom: '6px',
         height: '24px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ 
             fontSize: '13px', 
             fontWeight: '700', 
@@ -58,6 +60,7 @@ export default function CyberWidget({
           }}>
             {subtitle}
           </div>
+          {titleActions}
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
           {actions}

@@ -37,6 +37,9 @@ import type {
   HostingEnableResponse,
   HostingStatusResponse,
   MarketCandlesResponse,
+  MyOpenOrdersListResponse,
+  OrderBookResponse,
+  PlayerCancelOrderRequest,
   MarketQuoteResponse,
   MarketSeriesResponse,
   MarketSummaryResponse,
@@ -110,6 +113,12 @@ export const Api = {
   submitMarketOrder: async (req: PlayerMarketOrderRequest) => {
     await api.post<unknown>('/orders/market', req)
   },
+  orderBook: (symbol: string, limit = 20) =>
+    api.get<OrderBookResponse>(`/orders/book/${encodeURIComponent(symbol)}`, { limit }),
+  myOpenOrders: (player_id: string, symbol?: string, limit = 50) =>
+    api.get<MyOpenOrdersListResponse>(`/orders/open/${encodeURIComponent(player_id)}`, { symbol, limit }),
+  cancelOrder: (order_id: string, req: PlayerCancelOrderRequest) =>
+    api.post<void>(`/orders/${encodeURIComponent(order_id)}/cancel`, req),
 
   playersBootstrap: (req: PlayerBootstrapRequest) => api.post<PlayerBootstrapResponse>('/players/bootstrap', req),
 
