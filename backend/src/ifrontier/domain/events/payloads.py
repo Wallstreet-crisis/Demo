@@ -309,3 +309,17 @@ class ContractRuleExecutedPayload(BaseModel):
     reason: str | None = None
     settlement_event_id: str | None = None
     executed_at: datetime
+
+
+class ContractInvitedPayload(BaseModel):
+    contract_id: str
+    invitee: str
+    invited_by: str
+    invited_at: datetime
+
+
+class ContractTerminatedPayload(BaseModel):
+    contract_id: str
+    terminated_by: str
+    reason: str
+    terminated_at: datetime

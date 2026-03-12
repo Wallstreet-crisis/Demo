@@ -10,7 +10,7 @@ from pydantic import RootModel
 
 from ifrontier.domain.events.envelope import EventActor, EventEnvelope, EventEnvelopeJson
 from ifrontier.domain.events.types import EventType
-from ifrontier.infra.neo4j.event_store import Neo4jEventStore
+from ifrontier.infra.sqlite.event_store import SqliteEventStore
 from ifrontier.infra.sqlite.chat import (
     ChatMessage,
     ChatThread,
@@ -44,7 +44,7 @@ class OpenPmResult:
 
 
 class ChatService:
-    def __init__(self, *, event_store: Neo4jEventStore) -> None:
+    def __init__(self, *, event_store: SqliteEventStore) -> None:
         self._event_store = event_store
 
     @staticmethod

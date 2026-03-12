@@ -6,8 +6,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from neo4j import Driver
-
 from ifrontier.domain.events.envelope import EventActor, EventEnvelope, EventEnvelopeJson
 from ifrontier.domain.events.payloads import (
     NewsBroadcastedPayload,
@@ -19,13 +17,13 @@ from ifrontier.domain.events.payloads import (
     NewsVariantMutatedPayload,
 )
 from ifrontier.domain.events.types import EventType
-from ifrontier.infra.neo4j.event_store import Neo4jEventStore
+from ifrontier.infra.sqlite.event_store import SqliteEventStore
+from ifrontier.infra.sqlite import news as news_db
 from ifrontier.services.game_time import game_time_now, load_game_time_config_from_env
 
 
 class NewsService:
-    def __init__(self, driver: Driver, event_store: Neo4jEventStore) -> None:
-        self._driver = driver
+    def __init__(self, event_store: SqliteEventStore) -> None:
         self._event_store = event_store
 
     def _preset_templates(self) -> Dict[str, List[str]]:
@@ -174,16 +172,10 @@ class NewsService:
         return game_time_now(cfg=cfg, real_now_utc=None).real_now_utc
 
     def follow(self, *, follower_id: str, followee_id: str) -> None:
-        with self._driver.session() as session:
-            session.execute_write(
-                self._follow_tx,
-                {"follower_id": follower_id, "followee_id": followee_id},
-            )
+        news_db.follow(follower_id=follower_id, followee_id=followee_id)
 
     def list_users(self, *, limit: int = 5000) -> List[str]:
-        with self._driver.session() as session:
-            users = session.execute_read(self._list_users_tx, {"limit": int(limit)})
-        return [str(r["user_id"]) for r in users]
+        return news_db.list_all_users(limit=int(limit))
 
     def create_card(
         self,
@@ -200,20 +192,16 @@ class NewsService:
         now = self._now_game_utc()
         card_id = str(uuid4())
 
-        with self._driver.session() as session:
-            session.execute_write(
-                self._create_card_tx,
-                {
-                    "card_id": card_id,
-                    "kind": kind,
-                    "image_anchor_id": image_anchor_id,
-                    "image_uri": image_uri,
-                    "truth_payload_json": json.dumps(truth_payload or {}, ensure_ascii=False),
-                    "symbols": symbols or [],
-                    "tags": tags or [],
-                    "created_at": now.isoformat(),
-                },
-            )
+        news_db.save_news(
+            card_id=card_id,
+            kind=kind,
+            publisher_id=actor_id,
+            image_anchor_id=image_anchor_id,
+            image_uri=image_uri,
+            truth_payload=truth_payload,
+            symbols=symbols or [],
+            tags=tags or [],
+        )
 
         payload = NewsCardCreatedPayload(
             card_id=card_id,
@@ -249,21 +237,22 @@ class NewsService:
         now = self._now_game_utc()
         variant_id = str(uuid4())
 
-        with self._driver.session() as session:
-            session.execute_write(
-                self._emit_variant_tx,
-                {
-                    "card_id": card_id,
-                    "variant_id": variant_id,
-                    "parent_variant_id": parent_variant_id,
-                    "author_id": author_id,
-                    "text": text,
-                    "mutation_depth": 0,
-                    "influence_cost": float(influence_cost),
-                    "risk_roll_json": json.dumps(risk_roll or {}, ensure_ascii=False),
-                    "created_at": now.isoformat(),
-                },
-            )
+        card = news_db.get_news(card_id=card_id, variant_id=None)
+        if card is None:
+            raise ValueError("card not found")
+
+        news_db.save_news(
+            card_id=card_id,
+            variant_id=variant_id,
+            kind=card.kind,
+            text=text,
+            author_id=author_id,
+            parent_variant_id=parent_variant_id,
+            mutation_depth=0,
+            influence_cost=float(influence_cost),
+            risk_roll=risk_roll,
+            published_at=now.isoformat(),
+        )
 
         payload = NewsVariantEmittedPayload(
             card_id=card_id,
@@ -298,24 +287,29 @@ class NewsService:
         now = self._now_game_utc()
         new_variant_id = str(uuid4())
 
-        with self._driver.session() as session:
-            record = session.execute_write(
-                self._mutate_variant_tx,
-                {
-                    "parent_variant_id": parent_variant_id,
-                    "new_variant_id": new_variant_id,
-                    "editor_id": editor_id,
-                    "new_text": new_text,
-                    "influence_cost": float(influence_cost),
-                    "risk_roll_json": json.dumps(risk_roll or {}, ensure_ascii=False),
-                    "mutated_at": now.isoformat(),
-                },
-            )
-
-        if record is None or record.get("card_id") is None:
+        parent = news_db.get_variant(parent_variant_id)
+        if parent is None or not parent.get("card_id"):
             raise ValueError("parent variant not found")
 
-        card_id = str(record["card_id"])
+        card_id = str(parent["card_id"])
+        card = news_db.get_news(card_id=card_id, variant_id=None)
+        if card is None:
+            raise ValueError("card not found")
+        # Depth increases by 1
+        new_depth = int(parent.get("mutation_depth", 0)) + 1
+
+        news_db.save_news(
+            card_id=card_id,
+            variant_id=new_variant_id,
+            kind=card.kind,
+            text=new_text,
+            author_id=editor_id,
+            parent_variant_id=parent_variant_id,
+            mutation_depth=new_depth,
+            influence_cost=float(influence_cost),
+            risk_roll=risk_roll,
+            published_at=now.isoformat(),
+        )
         payload = NewsVariantMutatedPayload(
             card_id=card_id,
             new_variant_id=new_variant_id,
@@ -349,24 +343,20 @@ class NewsService:
         now = self._now_game_utc()
         delivery_id = str(uuid4())
 
-        with self._driver.session() as session:
-            record = session.execute_write(
-                self._deliver_variant_tx,
-                {
-                    "delivery_id": delivery_id,
-                    "variant_id": variant_id,
-                    "to_player_id": to_player_id,
-                    "from_actor_id": from_actor_id,
-                    "visibility_level": visibility_level,
-                    "delivery_reason": delivery_reason,
-                    "delivered_at": now.isoformat(),
-                },
-            )
-
-        if record is None or record.get("card_id") is None:
+        variant = news_db.get_variant(variant_id)
+        if variant is None or not variant.get("card_id"):
             raise ValueError("variant not found")
 
-        card_id = str(record["card_id"])
+        card_id = str(variant["card_id"])
+
+        news_db.deliver_variant(
+            delivery_id=delivery_id,
+            variant_id=variant_id,
+            to_player_id=to_player_id,
+            from_actor_id=from_actor_id,
+            visibility_level=visibility_level,
+            delivery_reason=delivery_reason,
+        )
         payload = NewsDeliveredPayload(
             delivery_id=delivery_id,
             card_id=card_id,
@@ -398,15 +388,10 @@ class NewsService:
         correlation_id: UUID | None = None,
     ) -> List[EventEnvelopeJson]:
         # v0：只做一跳传播，从 from_actor_id 投递给其 followers
-        with self._driver.session() as session:
-            followers = session.execute_read(
-                self._list_followers_tx,
-                {"followee_id": from_actor_id, "limit": int(limit)},
-            )
+        followers = news_db.list_followers(followee_id=from_actor_id, limit=int(limit))
 
         delivered_events: List[EventEnvelopeJson] = []
-        for f in followers:
-            to_player_id = str(f["user_id"])
+        for to_player_id in followers:
             _delivery_id, event_json = self.deliver_variant(
                 variant_id=variant_id,
                 to_player_id=to_player_id,
@@ -431,13 +416,10 @@ class NewsService:
     ) -> tuple[int, EventEnvelopeJson]:
         broadcast_id = str(uuid4())
         corr = correlation_id or uuid4()
-
-        with self._driver.session() as session:
-            users = session.execute_read(self._list_users_tx, {"limit": int(limit_users)})
+        users = news_db.list_all_users(limit=int(limit_users))
 
         count = 0
-        for u in users:
-            to_player_id = str(u["user_id"])
+        for to_player_id in users:
             _delivery_id, _delivery_event = self.deliver_variant(
                 variant_id=variant_id,
                 to_player_id=to_player_id,
@@ -448,10 +430,8 @@ class NewsService:
             )
             count += 1
 
-        # 记录 broadcast 事件（并不需要与每个 delivery 事务一致）
-        with self._driver.session() as session:
-            rec = session.execute_read(self._get_card_id_by_variant_tx, {"variant_id": variant_id})
-        card_id = str((rec or {}).get("card_id") or "")
+        variant = news_db.get_variant(variant_id)
+        card_id = str((variant or {}).get("card_id") or "")
 
         payload = NewsBroadcastedPayload(
             broadcast_id=broadcast_id,
@@ -472,41 +452,29 @@ class NewsService:
         return count, event_json
 
     def list_inbox(self, *, player_id: str, limit: int = 50) -> List[Dict[str, Any]]:
-        with self._driver.session() as session:
-            records = session.execute_read(
-                self._list_inbox_tx,
-                {"player_id": player_id, "limit": int(limit)},
-            )
-
-        out = []
-        for r in records:
-            d = dict(r)
-            if d.get("truth_payload_json"):
-                try:
-                    d["truth_payload"] = json.loads(d["truth_payload_json"])
-                except Exception:
-                    d["truth_payload"] = {}
-            else:
-                d["truth_payload"] = None
-            out.append(d)
-        return out
+        return news_db.list_inbox(user_id=player_id, limit=int(limit))
 
     def get_variant_context(self, *, variant_id: str) -> Dict[str, Any] | None:
-        with self._driver.session() as session:
-            rec = session.execute_read(
-                self._get_variant_context_tx,
-                {"variant_id": variant_id},
-            )
-        if rec is None:
+        v = news_db.get_variant(variant_id)
+        if v is None:
             return None
-        
-        out = dict(rec)
-        if out.get("truth_payload_json"):
-            try:
-                out["truth_payload"] = json.loads(out["truth_payload_json"])
-            except Exception:
-                out["truth_payload"] = {}
-        return out
+        card_id = str(v.get("card_id") or "")
+        if not card_id:
+            return None
+
+        card = news_db.get_news(card_id=card_id, variant_id=None)
+        if card is None:
+            return None
+
+        truth_payload_json = json.dumps(card.truth_payload or {}, ensure_ascii=False)
+        return {
+            "text": v.get("text") or "",
+            "author_id": v.get("author_id") or "",
+            "mutation_depth": int(v.get("mutation_depth") or 0),
+            "symbols": card.symbols or [],
+            "truth_payload_json": truth_payload_json,
+            "kind": card.kind,
+        }
 
     def grant_ownership(
         self,
@@ -517,13 +485,7 @@ class NewsService:
         correlation_id: UUID | None = None,
     ) -> EventEnvelopeJson:
         now = self._now_game_utc()
-        with self._driver.session() as session:
-            ok = session.execute_write(
-                self._grant_ownership_tx,
-                {"card_id": card_id, "to_user_id": to_user_id},
-            )
-        if not ok:
-            raise ValueError("card not found")
+        news_db.grant_ownership(card_id=card_id, user_id=to_user_id, granter_id=granter_id)
 
         payload = NewsOwnershipGrantedPayload(
             card_id=card_id,
@@ -554,17 +516,9 @@ class NewsService:
             raise ValueError("from_user_id and to_user_id must be different")
 
         now = self._now_game_utc()
-        with self._driver.session() as session:
-            ok = session.execute_write(
-                self._transfer_ownership_tx,
-                {
-                    "card_id": card_id,
-                    "from_user_id": from_user_id,
-                    "to_user_id": to_user_id,
-                },
-            )
-        if not ok:
-            raise ValueError("ownership not found")
+        news_db.transfer_ownership(
+            card_id=card_id, from_user_id=from_user_id, to_user_id=to_user_id, transferred_by=transferred_by
+        )
 
         payload = NewsOwnershipTransferredPayload(
             card_id=card_id,
@@ -584,38 +538,18 @@ class NewsService:
         return event_json
 
     def list_owned_cards(self, *, user_id: str, limit: int = 200) -> List[str]:
-        with self._driver.session() as session:
-            rows = session.execute_read(
-                self._list_owned_cards_tx,
-                {"user_id": user_id, "limit": int(limit)},
-            )
-        return [str(r["card_id"]) for r in rows]
+        rows = news_db.list_owned_cards(user_id=user_id, limit=int(limit))
+        return [str(r.get("card_id")) for r in rows if r.get("card_id")]
 
     def ensure_bot_users(self, bot_ids: List[str]) -> None:
-        """确保内置机器人在 Neo4j 中拥有 User 节点"""
-        with self._driver.session() as session:
-            session.execute_write(
-                self._ensure_users_tx,
-                {"user_ids": bot_ids}
-            )
-
-    @staticmethod
-    def _ensure_users_tx(tx, params: Dict[str, Any]) -> None:
-        tx.run(
-            """
-            UNWIND $user_ids AS uid
-            MERGE (u:User {user_id: uid})
-            """,
-            **params
-        )
+        """确保内置机器人在数据库中拥有 User 节点"""
+        for bot_id in bot_ids:
+            news_db.create_user(bot_id)
 
     def init_news_seed_data(self) -> None:
         """初始化预设的新闻卡牌组"""
-        with self._driver.session() as session:
-            # 检查是否已有卡牌，避免重复创建
-            count = session.execute_read(lambda tx: tx.run("MATCH (c:NewsCard) RETURN count(c) as c").single()["c"])
-            if count > 0:
-                return
+        if news_db.count_cards() > 0:
+            return
 
         seeds = [
             {
@@ -709,7 +643,6 @@ class NewsService:
         pool = templates.get(kind_key, templates["RUMOR"])
         symbol_str = ", ".join(symbols) if symbols else "某知名企业"
         return [str(t).format(symbol=symbol_str) for t in pool]
-
     @staticmethod
     def _follow_tx(tx, params: Dict[str, Any]) -> None:
         tx.run(
@@ -921,3 +854,4 @@ class NewsService:
             **params,
         )
         return [dict(r) for r in result]
+

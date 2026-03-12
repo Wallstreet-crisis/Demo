@@ -8,8 +8,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from neo4j import Driver
-
 from ifrontier.domain.events.envelope import EventActor, EventEnvelope, EventEnvelopeJson
 from ifrontier.domain.events.payloads import (
     NewsChainAbortedPayload,
@@ -19,7 +17,8 @@ from ifrontier.domain.events.payloads import (
     NewsVariantEmittedPayload,
 )
 from ifrontier.domain.events.types import EventType
-from ifrontier.infra.neo4j.event_store import Neo4jEventStore
+from ifrontier.infra.sqlite.event_store import SqliteEventStore
+from ifrontier.infra.sqlite import news_chain as news_chain_db
 from ifrontier.services.commonbot_emergency import CommonBotEmergencyRunner
 from ifrontier.services.news import NewsService
 from ifrontier.services.game_time import game_time_now, load_game_time_config_from_env
@@ -38,16 +37,14 @@ class ChainConfig:
 class NewsTickEngine:
     def __init__(
         self,
-        driver: Driver,
-        event_store: Neo4jEventStore,
+        event_store: SqliteEventStore,
         news_service: NewsService,
     ) -> None:
         from ifrontier.services.market_analytics import get_market_trends
-        self._driver = driver
         self._event_store = event_store
         self._news = news_service
         self._commonbot_emergency_runner = CommonBotEmergencyRunner(
-            news=self._news, 
+            news=self._news,
             event_store=self._event_store,
             market_data_provider=get_market_trends
         )
@@ -55,29 +52,6 @@ class NewsTickEngine:
         past = datetime.now(timezone.utc) - timedelta(hours=1)
         self._last_small_news_at: datetime | None = past
         self._last_chain_at: datetime | None = past
-
-        self._ensure_news_chain_extra_truth_schema()
-
-    def _ensure_news_chain_extra_truth_schema(self) -> None:
-        with self._driver.session() as session:
-            session.execute_write(self._ensure_news_chain_extra_truth_schema_tx, {})
-
-    @staticmethod
-    def _ensure_news_chain_extra_truth_schema_tx(tx, params: Dict[str, Any]) -> None:
-        tx.run(
-            """
-            CREATE (t:__SchemaWarmup {extra_truth_json: '{}'})
-            WITH t
-            DELETE t
-            """
-        )
-        tx.run(
-            """
-            MATCH (ch:NewsChain)
-            WHERE ch.extra_truth_json IS NULL
-            SET ch.extra_truth_json = '{}'
-            """
-        )
 
     def suppress_propagation(
         self,
@@ -96,15 +70,7 @@ class NewsTickEngine:
         suppression_id = str(uuid4())
         sc = str(signal_class or "ANY")
 
-        with self._driver.session() as session:
-            ok = session.execute_write(
-                self._add_suppression_tx,
-                {
-                    "chain_id": str(chain_id),
-                    "spend": float(spend_influence),
-                    "signal_class": sc,
-                },
-            )
+        ok = news_chain_db.add_suppression_budget(chain_id=str(chain_id), spend=float(spend_influence))
         if not ok:
             raise ValueError("chain not found")
 
@@ -169,7 +135,7 @@ class NewsTickEngine:
         truth_payload = {
             "chain_id": chain_id,
             "kind": kind,
-            "system_spawn": True, # 标识为系统生成的权威事件
+            "system_spawn": True,  # 标识为系统生成的权威事件
             "phase": "INCUBATING",
             "t0_at": t0_at.isoformat(),
             "abort_probability": float(abort_probability),
@@ -190,24 +156,18 @@ class NewsTickEngine:
             correlation_id=correlation_id,
         )
 
-        with self._driver.session() as session:
-            session.execute_write(
-                self._create_chain_tx,
-                {
-                    "chain_id": chain_id,
-                    "major_card_id": major_card_id,
-                    "kind": kind,
-                    "phase": "INCUBATING",
-                    "created_at": now.isoformat(),
-                    "t0_at": t0_at.isoformat(),
-                    "next_omen_at": next_omen_at.isoformat(),
-                    "omen_interval_seconds": int(omen_interval_seconds),
-                    "abort_probability": float(abort_probability),
-                    "grant_count": int(grant_count),
-                    "seed": int(seed),
-                    "symbols": symbols or [],
-                },
-            )
+        news_chain_db.create_news_chain(
+            chain_id=chain_id,
+            root_card_id=major_card_id,
+            kind=kind,
+            seed=seed,
+            t0_at=t0_at.isoformat(),
+            omen_interval_seconds=omen_interval_seconds,
+            abort_probability=abort_probability,
+            grant_count=grant_count,
+            symbols=symbols,
+            extra_truth=extra_truth,
+        )
 
         corr = correlation_id or uuid4()
         chain_payload = NewsChainStartedPayload(
@@ -569,11 +529,7 @@ class NewsTickEngine:
                     await self._commonbot_emergency_runner.react_to_delivery(delivery_event=deliv_ev)
 
             next_omen_at2 = now + timedelta(seconds=omen_interval_seconds)
-            with self._driver.session() as session:
-                session.execute_write(
-                    self._update_next_omen_tx,
-                    {"chain_id": chain_id, "next_omen_at": next_omen_at2.isoformat()},
-                )
+            news_chain_db.update_next_omen(chain_id=chain_id, next_omen_at=next_omen_at2.isoformat())
 
             out["actions"].append(
                 {
@@ -611,15 +567,7 @@ class NewsTickEngine:
             )
 
             # 更新链状态
-            with self._driver.session() as session:
-                session.execute_write(
-                    self._resolve_chain_tx,
-                    {
-                        "chain_id": chain_id,
-                        "phase": outcome,
-                        "resolved_at": now.isoformat(),
-                    },
-                )
+            news_chain_db.resolve_chain(chain_id=chain_id, phase=outcome)
 
             # 记录 truth_revealed 与 chain_aborted 事件
             final_truth = {
@@ -710,14 +658,7 @@ class NewsTickEngine:
             now = now.replace(tzinfo=timezone.utc)
         now = now.astimezone(timezone.utc)
 
-        with self._driver.session() as session:
-            return session.execute_read(
-                self._list_due_chains_tx,
-                {
-                    "now": now.isoformat(),
-                    "limit": int(limit),
-                },
-            )
+        return news_chain_db.list_due_chains(now=now.isoformat(), limit=limit)
 
     @staticmethod
     def _create_chain_tx(tx, params: Dict[str, Any]) -> None:
@@ -747,109 +688,14 @@ class NewsTickEngine:
         if requested <= 0:
             return 0, 0.0
 
-        with self._driver.session() as session:
-            rec = session.execute_write(
-                self._consume_suppression_tx,
-                {
-                    "chain_id": chain_id,
-                    "signal_class": signal_class,
-                    "requested": int(requested),
-                },
-            )
-
-        if rec is None:
-            return 0, 0.0
-        return int(rec.get("suppressed") or 0), float(rec.get("suppression_left") or 0.0)
-
-    @staticmethod
-    def _add_suppression_tx(tx, params: Dict[str, Any]) -> bool:
-        rec = tx.run(
-            """
-            MATCH (ch:NewsChain {chain_id: $chain_id})
-            WITH ch,
-                 CASE WHEN ch.suppression_budget_grants IS NULL THEN 0 ELSE toInteger(ch.suppression_budget_grants) END AS grants,
-                 CASE WHEN ch.suppression_budget_total IS NULL THEN 0.0 ELSE toFloat(ch.suppression_budget_total) END AS total,
-                 toInteger(toFloat($spend)) AS spend_grants
-            SET ch.suppression_budget_grants = grants + spend_grants,
-                ch.suppression_budget_total = total + toFloat($spend)
-            RETURN true AS ok
-            """,
-            **params,
-        ).single()
-        return bool(rec and rec.get("ok"))
-
-    @staticmethod
-    def _consume_suppression_tx(tx, params: Dict[str, Any]) -> Dict[str, Any] | None:
-        # v0：只消费 suppression_budget_grants（不区分 signal_class），避免引入 APOC 依赖。
-        rec = tx.run(
-            """
-            MATCH (ch:NewsChain {chain_id: $chain_id})
-            WITH ch,
-                 CASE WHEN ch.suppression_budget_grants IS NULL THEN 0 ELSE toInteger(ch.suppression_budget_grants) END AS grants,
-                 toInteger($requested) AS requested
-            WITH ch, grants,
-                 CASE WHEN grants <= 0 THEN 0 ELSE
-                   CASE WHEN grants >= requested THEN requested ELSE grants END
-                 END AS suppressed
-            SET ch.suppression_budget_grants = grants - suppressed
-            RETURN suppressed AS suppressed, toFloat(ch.suppression_budget_grants) AS suppression_left
-            """,
-            **params,
-        ).single()
-        return dict(rec) if rec is not None else None
-
-    @staticmethod
-    def _list_due_chains_tx(tx, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-        result = tx.run(
-            """
-            MATCH (ch:NewsChain {phase: 'INCUBATING'})
-            WHERE ch.next_omen_at <= $now OR ch.t0_at <= $now
-            RETURN ch.chain_id AS chain_id,
-                   ch.major_card_id AS major_card_id,
-                   ch.kind AS kind,
-                   ch.phase AS phase,
-                   ch.t0_at AS t0_at,
-                   ch.next_omen_at AS next_omen_at,
-                   ch.omen_interval_seconds AS omen_interval_seconds,
-                   ch.abort_probability AS abort_probability,
-                   ch.grant_count AS grant_count,
-                   ch.seed AS seed,
-                   ch.symbols AS symbols,
-                   coalesce(ch.extra_truth_json, '{}') AS extra_truth_json
-            ORDER BY ch.t0_at ASC
-            LIMIT $limit
-            """,
-            **params,
-        )
-        out = []
-        for r in result:
-            d = dict(r)
-            if d.get("extra_truth_json") and d["extra_truth_json"] != '{}':
-                try:
-                    extra = json.loads(d["extra_truth_json"])
-                    d.update(extra)
-                except Exception:
-                    pass
-            out.append(d)
-        return out
+        return news_chain_db.consume_suppression_budget(chain_id=chain_id, requested=int(requested))
 
     @staticmethod
     def _update_next_omen_tx(tx, params: Dict[str, Any]) -> None:
-        tx.run(
-            """
-            MATCH (ch:NewsChain {chain_id: $chain_id})
-            SET ch.next_omen_at = $next_omen_at
-            """,
-            **params,
-        )
+        # This is now handled by news_chain_db.update_next_omen
+        pass
 
     @staticmethod
     def _resolve_chain_tx(tx, params: Dict[str, Any]) -> None:
-        tx.run(
-            """
-            MATCH (ch:NewsChain {chain_id: $chain_id})
-            SET ch.phase = $phase,
-                ch.resolved_at = $resolved_at
-            """,
-            **params,
-        )
+        # This is now handled by news_chain_db.resolve_chain
+        pass

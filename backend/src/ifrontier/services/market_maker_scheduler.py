@@ -11,13 +11,11 @@ class MarketMakerScheduler:
     def __init__(
         self,
         *,
-        driver: Any = None,
         tick_interval_seconds: float = 2.0,
         broadcaster: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
         channel_for_online_stats: Optional[str] = None,
         get_channel_size: Optional[Callable[[str], Awaitable[int]]] = None,
     ) -> None:
-        self._driver = driver
         self._tick_interval_seconds = float(tick_interval_seconds)
         self._broadcaster = broadcaster
 
@@ -25,7 +23,7 @@ class MarketMakerScheduler:
         self._get_channel_size = get_channel_size
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task[None]] = None
-        
+
         cfg = MarketMakerConfig(
             account_id=str(os.getenv("IF_MARKET_MAKER_ACCOUNT_ID") or "mm:1"),
             spread_pct=float(os.getenv("IF_MARKET_MAKER_SPREAD_PCT") or "0.02"),
@@ -67,17 +65,15 @@ class MarketMakerScheduler:
                 # 检查市场是否开市
                 gt_cfg = load_game_time_config_from_env()
                 session = get_market_session(cfg=gt_cfg)
-                
+
                 if session.phase == MarketPhase.TRADING:
-                    active_chains_count = 0
-                    if self._driver:
-                        with self._driver.session() as neo_session:
-                            res = neo_session.run("MATCH (ch:NewsChain {phase: 'INCUBATING'}) RETURN count(ch) as c").single()
-                            active_chains_count = int(res["c"]) if res else 0
+                    # 使用 SQLite 统计 INCUBATING 状态的新闻链数量
+                    from ifrontier.infra.sqlite.news_chain import count_chains_by_status
+                    active_chains_count = count_chains_by_status("INCUBATING")
 
                     # 在线程池中运行同步的 tick_once
                     matches = await asyncio.to_thread(self._mm.tick_once, active_chains_count=active_chains_count)
-                    
+
                     # 广播成交事件
                     if self._broadcaster and matches:
                         for m in matches:

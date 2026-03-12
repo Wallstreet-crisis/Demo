@@ -138,15 +138,8 @@ class UserHostingAgent:
             recent_news = []
             try:
                 # 获取收件箱新闻作为市场新闻来源
-                inbox = self.facade.chat_service._event_store.driver.session().execute_read(
-                    lambda tx: tx.run(
-                        "MATCH (u:User {user_id: $uid})-[:INBOX_ITEM]->(d:NewsDelivery)-[:DELIVERS_VARIANT]->(v:NewsVariant) "
-                        "RETURN v.text as text, d.delivered_at as delivered_at "
-                        "ORDER BY d.delivered_at DESC LIMIT 5",
-                        {"uid": self.user_id}
-                    ).data()
-                )
-                recent_news = inbox
+                from ifrontier.infra.sqlite import news as news_db
+                recent_news = news_db.list_user_inbox_news(self.user_id, limit=5)
             except Exception:
                 recent_news = []
 

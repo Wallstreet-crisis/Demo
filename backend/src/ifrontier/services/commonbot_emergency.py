@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 from ifrontier.domain.events.envelope import EventEnvelopeJson
 from ifrontier.domain.events.types import EventType
-from ifrontier.infra.neo4j.event_store import Neo4jEventStore
+from ifrontier.infra.sqlite.event_store import SqliteEventStore
 from ifrontier.services.commonbot import run_commonbot_for_earnings
 from ifrontier.services.commonbot_context import (
     CommonBotMarketTrends,
@@ -52,7 +52,7 @@ class CommonBotEmergencyRunner:
         self,
         *,
         news: NewsService,
-        event_store: Neo4jEventStore,
+        event_store: SqliteEventStore,
         cohorts: List[CommonBotCohortConfig] | None = None,
         market_data_provider: Callable[[List[str]], CommonBotMarketTrends] | None = None,
     ) -> None:

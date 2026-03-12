@@ -46,6 +46,7 @@ class EventType(str, Enum):
     CONTRACT_ACTIVATED = "contract.activated"
 
     CONTRACT_JOINED = "contract.joined"
+    CONTRACT_INVITED = "contract.invited"
     CONTRACT_PROPOSAL_CREATED = "contract.proposal_created"
     CONTRACT_PROPOSAL_APPROVED = "contract.proposal_approved"
     CONTRACT_SUSPENDED = "contract.suspended"

@@ -5,8 +5,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 from uuid import uuid4
 
-from neo4j import Driver
-
 from ifrontier.domain.contracts.models import ContractStatus, ParticipationMode
 from ifrontier.domain.events.envelope import EventActor, EventEnvelope, EventEnvelopeJson
 from ifrontier.domain.events.payloads import (
@@ -18,10 +16,27 @@ from ifrontier.domain.events.payloads import (
     ContractDefaultedPayload,
     ContractSettledPayload,
     ContractSignedPayload,
-    ContractRuleExecutedPayload
+    ContractRuleExecutedPayload,
+    ContractInvitedPayload,
+    ContractTerminatedPayload
 )
 from ifrontier.domain.events.types import EventType
-from ifrontier.infra.neo4j.event_store import Neo4jEventStore
+from ifrontier.infra.sqlite.contracts import (
+    ContractRecord,
+    create_contract as sqlite_create_contract,
+    get_contract as sqlite_get_contract,
+    list_contracts_for_player as sqlite_list_contracts_for_player,
+    update_contract_status as sqlite_update_contract_status,
+    set_contract_has_rules as sqlite_set_contract_has_rules,
+    save_contract_rule_state as sqlite_save_contract_rule_state,
+    save_contract_terms as sqlite_save_contract_terms,
+    join_contract as sqlite_join_contract,
+    sign_contract as sqlite_sign_contract,
+    create_proposal as sqlite_create_proposal,
+    get_proposal as sqlite_get_proposal,
+    add_proposal_approval as sqlite_add_proposal_approval,
+)
+from ifrontier.infra.sqlite.event_store import SqliteEventStore
 from ifrontier.infra.sqlite.ledger import ContractTransfer, apply_contract_transfers, get_snapshot
 from ifrontier.services.contract_rules import eval_condition, parse_transfers, should_run
 
@@ -166,53 +181,36 @@ class ContractService:
 
         return scaled, float(global_ratio), shortfall_by_from
 
-    def __init__(self, driver: Driver, event_store: Neo4jEventStore) -> None:
-        self._driver = driver
+    def __init__(self, event_store: SqliteEventStore) -> None:
         self._event_store = event_store
 
     def list_contracts(self, *, player_id: str, limit: int = 50) -> List[Dict[str, Any]]:
         """列出与特定玩家相关的合约：参与的、受邀的、作为签署者的。"""
         pid = str(player_id).lower()
-        with self._driver.session() as session:
-            records = session.execute_read(self._list_contracts_tx, {"player_id": pid, "limit": int(limit)})
-        
+        records = sqlite_list_contracts_for_player(pid, limit=int(limit))
+
         out = []
         for r in records:
-            d = dict(r)
+            d = {
+                "contract_id": r.contract_id,
+                "kind": r.kind,
+                "title": r.title,
+                "terms_json": r.terms_json,
+                "status": r.status,
+                "parties": r.parties,
+                "required_signers": r.required_signers,
+                "signatures": [],
+                "participation_mode": "ALL_SIGNERS",
+                "invited_parties": r.invited_parties,
+                "created_at": r.created_at,
+                "updated_at": r.created_at,
+            }
             try:
                 d["terms"] = json.loads(d.get("terms_json") or "{}")
             except Exception:
                 d["terms"] = {}
             out.append(d)
         return out
-
-    @staticmethod
-    def _list_contracts_tx(tx, params: Dict[str, Any]):
-        # 查询：对 player_id 做不区分大小写的匹配（或者假设已经归一化）
-        res = tx.run(
-            """
-            MATCH (c:Contract)
-            WHERE $player_id IN c.parties 
-               OR $player_id IN c.required_signers 
-               OR $player_id IN c.invited_parties
-            RETURN c.contract_id AS contract_id,
-                   c.kind AS kind,
-                   c.title AS title,
-                   c.terms_json AS terms_json,
-                   c.status AS status,
-                   c.parties AS parties,
-                   c.required_signers AS required_signers,
-                   c.signatures AS signatures,
-                   c.participation_mode AS participation_mode,
-                   c.invited_parties AS invited_parties,
-                   c.created_at AS created_at,
-                   c.updated_at AS updated_at
-            ORDER BY c.updated_at DESC
-            LIMIT $limit
-            """,
-            **params
-        )
-        return [dict(r) for r in res]
 
     def create_contract(
         self,
@@ -231,34 +229,24 @@ class ContractService:
 
         rules_raw = terms.get("rules") if isinstance(terms, dict) else None
         has_rules = isinstance(rules_raw, list) and any(isinstance(x, dict) for x in rules_raw)
-        
+
         mode = (participation_mode or ParticipationMode.ALL_SIGNERS.value).upper()
-        
+
         # ID 归一化
         parties = [str(p).lower() for p in (parties or [])]
         required_signers = [str(s).lower() for s in (required_signers or [])]
         invited = [str(i).lower() for i in (invited_parties or [])]
         aid = str(actor_id).lower()
 
-        with self._driver.session() as session:
-            session.execute_write(
-                self._create_contract_tx,
-                {
-                    "contract_id": contract_id,
-                    "kind": kind,
-                    "title": title,
-                    "terms_json": json.dumps(terms, ensure_ascii=False),
-                    "status": ContractStatus.DRAFT.value,
-                    "has_rules": bool(has_rules),
-                    "parties": parties,
-                    "required_signers": required_signers,
-                    "signatures": [], # 改为列表存储签名
-                    "participation_mode": mode,
-                    "invited_parties": invited,
-                    "created_at": now.isoformat(),
-                    "updated_at": now.isoformat(),
-                },
-            )
+        sqlite_create_contract(
+            contract_id=contract_id,
+            kind=kind,
+            title=title,
+            terms=terms,
+            parties=parties,
+            required_signers=required_signers,
+            invited_parties=invited,
+        )
 
         payload = ContractCreatedPayload(
             contract_id=contract_id,
@@ -319,10 +307,15 @@ class ContractService:
                 }
             )
 
-        with self._driver.session() as session:
-            session.execute_write(
-                self._create_contracts_batch_tx,
-                {"contracts": specs},
+        for spec in specs:
+            sqlite_create_contract(
+                contract_id=spec["contract_id"],
+                kind=spec["kind"],
+                title=spec["title"],
+                terms=spec["terms"],
+                parties=spec["parties"],
+                required_signers=spec["required_signers"],
+                invited_parties=spec["invited_parties"],
             )
 
         for spec in specs:
@@ -348,11 +341,7 @@ class ContractService:
     def join_contract(self, *, contract_id: str, joiner: str) -> None:
         now = datetime.now(timezone.utc)
 
-        with self._driver.session() as session:
-            ok = session.execute_write(
-                self._join_contract_tx,
-                {"contract_id": contract_id, "joiner": joiner, "joined_at": now.isoformat()},
-            )
+        ok = sqlite_join_contract(contract_id, str(joiner).lower())
         if not ok:
             raise ValueError("contract not found or not joinable")
 
@@ -376,20 +365,17 @@ class ContractService:
         now = datetime.now(timezone.utc)
         proposal_id = str(uuid4())
 
-        with self._driver.session() as session:
-            ok = session.execute_write(
-                self._create_proposal_tx,
-                {
-                    "contract_id": contract_id,
-                    "proposal_id": proposal_id,
-                    "proposal_type": proposal_type.upper(),
-                    "proposer": proposer,
-                    "details_json": json.dumps(details, ensure_ascii=False),
-                    "created_at": now.isoformat(),
-                },
-            )
-        if not ok:
+        contract = sqlite_get_contract(contract_id)
+        if contract is None:
             raise ValueError("contract not found")
+
+        sqlite_create_proposal(
+            proposal_id=proposal_id,
+            contract_id=contract_id,
+            proposal_type=proposal_type.upper(),
+            proposer=str(proposer).lower(),
+            details=details,
+        )
 
         payload = ContractProposalCreatedPayload(
             contract_id=contract_id,
@@ -417,19 +403,41 @@ class ContractService:
     ) -> Dict[str, Any]:
         now = datetime.now(timezone.utc)
 
-        with self._driver.session() as session:
-            record = session.execute_write(
-                self._approve_proposal_tx,
-                {
-                    "contract_id": contract_id,
-                    "proposal_id": proposal_id,
-                    "approver": approver,
-                    "approved_at": now.isoformat(),
-                },
-            )
-
-        if record is None:
+        proposal = sqlite_get_proposal(proposal_id)
+        if proposal is None or proposal.contract_id != contract_id:
             raise ValueError("proposal not found")
+
+        contract = sqlite_get_contract(contract_id)
+        if contract is None:
+            raise ValueError("contract not found")
+
+        updated_proposal = sqlite_add_proposal_approval(proposal_id, str(approver).lower())
+        if updated_proposal is None:
+            raise ValueError("proposal not found")
+
+        all_approved = set(contract.parties).issubset(set(updated_proposal.approvals))
+
+        new_status = contract.status
+        if all_approved:
+            proposal_type = proposal.proposal_type.upper()
+            if proposal_type == "SUSPEND":
+                new_status = "SUSPENDED"
+            elif proposal_type == "TERMINATE":
+                new_status = "TERMINATED"
+            elif proposal_type == "FAIL":
+                new_status = "FAILED"
+            elif proposal_type == "AMEND":
+                try:
+                    details = json.loads(proposal.details_json)
+                    new_terms = details.get("terms", {})
+                    new_status = contract.status
+                    if new_terms:
+                        sqlite_save_contract_terms(contract_id, new_terms)
+                except Exception:
+                    pass
+
+            if new_status != contract.status:
+                sqlite_update_contract_status(contract_id, new_status)
 
         payload = ContractProposalApprovedPayload(
             contract_id=contract_id,
@@ -445,7 +453,7 @@ class ContractService:
         )
         self._event_store.append(EventEnvelopeJson.from_envelope(env))
 
-        return dict(record)
+        return {"applied": all_approved, "contract_status": new_status, "proposal_type": proposal.proposal_type}
 
     def sign_contract(self, *, contract_id: str, signer: str) -> ContractStatus:
         now = datetime.now(timezone.utc)
@@ -453,16 +461,25 @@ class ContractService:
         contract_id = str(contract_id).strip()
         signer = str(signer).lower()
 
-        with self._driver.session() as session:
-            record = session.execute_write(
-                self._sign_contract_tx,
-                {"contract_id": contract_id, "signer": signer, "signed_at": now.isoformat()},
-            )
-
-        if record is None:
+        contract = sqlite_get_contract(contract_id)
+        if contract is None:
             raise ValueError("contract not found or not signable")
 
-        status = record["status"]
+        if contract.status not in ("DRAFT", "SIGNED"):
+            raise ValueError("contract not in signable state")
+
+        parties = list(contract.parties)
+        if signer not in parties:
+            parties.append(signer)
+
+        required = set(contract.required_signers)
+        all_signed = required.issubset(set(parties))
+
+        if all_signed:
+            sqlite_update_contract_status(contract_id, "ACTIVE")
+
+        contract = sqlite_get_contract(contract_id)
+        status = contract.status if contract else "DRAFT"
 
         payload = ContractSignedPayload(contract_id=contract_id, signer=signer, signed_at=now)
         env = EventEnvelope[ContractSignedPayload](
@@ -485,12 +502,11 @@ class ContractService:
 
             has_exec_rules = False
             try:
-                with self._driver.session() as session:
-                    rec2 = session.execute_read(self._load_contract_for_rules_tx, {"contract_id": contract_id})
-                terms_json2 = str((rec2 or {}).get("terms_json") or "{}")
-                terms2 = json.loads(terms_json2)
-                rules_raw2 = terms2.get("rules")
-                has_exec_rules = isinstance(rules_raw2, list) and any(isinstance(x, dict) for x in rules_raw2)
+                contract = sqlite_get_contract(contract_id)
+                if contract:
+                    terms = json.loads(contract.terms_json)
+                    rules_raw = terms.get("rules")
+                    has_exec_rules = isinstance(rules_raw, list) and any(isinstance(x, dict) for x in rules_raw)
             except Exception:
                 has_exec_rules = False
 
@@ -509,13 +525,11 @@ class ContractService:
     def activate_contract(self, *, contract_id: str, actor_id: str) -> None:
         now = datetime.now(timezone.utc)
 
-        with self._driver.session() as session:
-            ok = session.execute_write(
-                self._activate_contract_tx,
-                {"contract_id": contract_id, "activated_at": now.isoformat()},
-            )
-        if not ok:
+        contract = sqlite_get_contract(contract_id)
+        if contract is None or contract.status != "SIGNED":
             raise ValueError("contract not found or not signed")
+
+        sqlite_update_contract_status(contract_id, "ACTIVE")
 
         payload = ContractActivatedPayload(contract_id=contract_id, activated_at=now)
         env = EventEnvelope[ContractActivatedPayload](
@@ -528,12 +542,11 @@ class ContractService:
 
         has_exec_rules = False
         try:
-            with self._driver.session() as session:
-                rec2 = session.execute_read(self._load_contract_for_rules_tx, {"contract_id": contract_id})
-            terms_json2 = str((rec2 or {}).get("terms_json") or "{}")
-            terms2 = json.loads(terms_json2)
-            rules_raw2 = terms2.get("rules")
-            has_exec_rules = isinstance(rules_raw2, list) and any(isinstance(x, dict) for x in rules_raw2)
+            contract = sqlite_get_contract(contract_id)
+            if contract:
+                terms = json.loads(contract.terms_json)
+                rules_raw = terms.get("rules")
+                has_exec_rules = isinstance(rules_raw, list) and any(isinstance(x, dict) for x in rules_raw)
         except Exception:
             has_exec_rules = False
 
@@ -551,16 +564,11 @@ class ContractService:
     def settle_contract(self, *, contract_id: str, actor_id: str) -> None:
         now = datetime.now(timezone.utc)
 
-        with self._driver.session() as session:
-            record = session.execute_read(
-                self._load_contract_for_settle_tx,
-                {"contract_id": contract_id},
-            )
-
-        if record is None:
+        contract = sqlite_get_contract(contract_id)
+        if contract is None:
             raise ValueError("contract not found")
 
-        status = str(record.get("status") or "")
+        status = contract.status
         if status == ContractStatus.SETTLED.value:
             return
         if status == ContractStatus.DEFAULTED.value:
@@ -568,7 +576,7 @@ class ContractService:
         if status != ContractStatus.ACTIVE.value:
             raise ValueError("contract not active")
 
-        terms_json = str(record.get("terms_json") or "{}")
+        terms_json = contract.terms_json
         try:
             terms = json.loads(terms_json)
         except json.JSONDecodeError as exc:
@@ -591,11 +599,7 @@ class ContractService:
             apply_contract_transfers(transfers=scaled, event_id=settlement_event_id)
 
         new_status = ContractStatus.SETTLED.value if fill_ratio >= 1.0 - 1e-9 else ContractStatus.DEFAULTED.value
-        with self._driver.session() as session:
-            session.execute_write(
-                self._set_contract_status_tx,
-                {"contract_id": contract_id, "status": new_status, "updated_at": now.isoformat()},
-            )
+        sqlite_update_contract_status(contract_id, new_status)
 
         if new_status == ContractStatus.DEFAULTED.value:
             payload = ContractDefaultedPayload(
@@ -625,16 +629,11 @@ class ContractService:
     def run_rules(self, *, contract_id: str, actor_id: str) -> None:
         now = datetime.now(timezone.utc)
 
-        with self._driver.session() as session:
-            record = session.execute_read(
-                self._load_contract_for_rules_tx,
-                {"contract_id": contract_id},
-            )
-
-        if record is None:
+        contract = sqlite_get_contract(contract_id)
+        if contract is None:
             raise ValueError("contract not found")
 
-        status = str(record.get("status") or "")
+        status = contract.status
         if status == ContractStatus.SETTLED.value:
             return
         if status == ContractStatus.DEFAULTED.value:
@@ -642,7 +641,7 @@ class ContractService:
         if status != ContractStatus.ACTIVE.value:
             raise ValueError("contract not active")
 
-        terms_json = str(record.get("terms_json") or "{}")
+        terms_json = contract.terms_json
         try:
             terms = json.loads(terms_json)
         except json.JSONDecodeError as exc:
@@ -656,14 +655,10 @@ class ContractService:
 
         has_exec_rules = any(isinstance(x, dict) for x in rules_raw)
         if not has_exec_rules:
-            with self._driver.session() as session:
-                session.execute_write(
-                    self._set_contract_has_rules_tx,
-                    {"contract_id": contract_id, "has_rules": False, "updated_at": now.isoformat()},
-                )
+            sqlite_set_contract_has_rules(contract_id, False)
             return
 
-        rule_state_json = str(record.get("rule_state_json") or "{}")
+        rule_state_json = contract.rule_state_json
         try:
             rule_state = json.loads(rule_state_json) if rule_state_json else {}
         except json.JSONDecodeError as exc:
@@ -789,22 +784,10 @@ class ContractService:
                 break
 
         if state_changed:
-            with self._driver.session() as session:
-                session.execute_write(
-                    self._save_contract_rule_state_tx,
-                    {
-                        "contract_id": contract_id,
-                        "rule_state_json": json.dumps(rule_state, ensure_ascii=False),
-                        "updated_at": now.isoformat(),
-                    },
-                )
+            sqlite_save_contract_rule_state(contract_id, rule_state)
 
         if defaulted:
-            with self._driver.session() as session:
-                session.execute_write(
-                    self._set_contract_status_tx,
-                    {"contract_id": contract_id, "status": ContractStatus.DEFAULTED.value, "updated_at": now.isoformat()},
-                )
+            sqlite_update_contract_status(contract_id, ContractStatus.DEFAULTED.value)
             return
 
         all_exhausted = True
@@ -845,224 +828,141 @@ class ContractService:
                 break
 
         if all_exhausted:
-            with self._driver.session() as session:
-                session.execute_write(
-                    self._set_contract_status_tx,
-                    {"contract_id": contract_id, "status": ContractStatus.SETTLED.value, "updated_at": now.isoformat()},
-                )
+            sqlite_update_contract_status(contract_id, ContractStatus.SETTLED.value)
 
-    @staticmethod
-    def _set_contract_status_tx(tx, params: Dict[str, Any]) -> None:
-        tx.run(
-            """
-            MATCH (c:Contract {contract_id: $contract_id})
-            SET c.status = $status,
-                c.updated_at = $updated_at
-            """,
-            **params,
+    def get_contract(self, *, contract_id: str) -> Dict[str, Any]:
+        """获取单个合约的详细信息"""
+        contract = sqlite_get_contract(contract_id)
+        if contract is None:
+            raise ValueError("contract not found")
+
+        return {
+            "contract_id": contract.contract_id,
+            "kind": contract.kind,
+            "title": contract.title,
+            "terms": json.loads(contract.terms_json) if contract.terms_json else {},
+            "status": contract.status,
+            "parties": contract.parties,
+            "required_signers": contract.required_signers,
+            "invited_parties": contract.invited_parties,
+            "has_rules": contract.has_rules,
+            "rule_state": json.loads(contract.rule_state_json) if contract.rule_state_json else {},
+            "created_at": contract.created_at,
+            "activated_at": contract.activated_at,
+            "settled_at": contract.settled_at,
+        }
+
+    def update_contract_terms(self, *, contract_id: str, terms: Dict[str, Any], actor_id: str) -> None:
+        """更新合约条款"""
+        contract = sqlite_get_contract(contract_id)
+        if contract is None:
+            raise ValueError("contract not found")
+
+        if contract.status not in (ContractStatus.DRAFT.value, ContractStatus.SIGNED.value):
+            raise ValueError("contract cannot be modified in current status")
+
+        sqlite_save_contract_terms(contract_id, terms)
+
+    def invite_to_contract(self, *, contract_id: str, invitee: str, actor_id: str) -> None:
+        """邀请玩家加入合约"""
+        from ifrontier.domain.events.payloads import ContractInvitedPayload
+
+        contract = sqlite_get_contract(contract_id)
+        if contract is None:
+            raise ValueError("contract not found")
+
+        from ifrontier.infra.sqlite.contracts import invite_to_contract as sqlite_invite_to_contract
+        ok = sqlite_invite_to_contract(contract_id, str(invitee).lower())
+        if not ok:
+            raise ValueError("failed to invite to contract")
+
+        now = datetime.now(timezone.utc)
+        payload = ContractInvitedPayload(
+            contract_id=contract_id,
+            invitee=invitee,
+            invited_by=actor_id,
+            invited_at=now,
         )
-
-    @staticmethod
-    def _set_contract_has_rules_tx(tx, params: Dict[str, Any]) -> None:
-        tx.run(
-            """
-            MATCH (c:Contract {contract_id: $contract_id})
-            SET c.has_rules = $has_rules,
-                c.updated_at = $updated_at
-            """,
-            **params,
+        env = EventEnvelope[ContractInvitedPayload](
+            event_type=EventType.CONTRACT_INVITED,
+            correlation_id=uuid4(),
+            actor=EventActor(user_id=actor_id),
+            payload=payload,
         )
+        self._event_store.append(EventEnvelopeJson.from_envelope(env))
 
-    @staticmethod
-    def _create_contract_tx(tx, params: Dict[str, Any]) -> None:
-        tx.run(
-            """
-            MERGE (c:Contract {contract_id: $contract_id})
-            SET c.kind = $kind,
-                c.title = $title,
-                c.terms_json = $terms_json,
-                c.status = $status,
-                c.has_rules = $has_rules,
-                c.parties = $parties,
-                c.required_signers = $required_signers,
-                c.signatures = $signatures,
-                c.participation_mode = $participation_mode,
-                c.invited_parties = $invited_parties,
-                c.created_at = $created_at,
-                c.updated_at = $updated_at
-            """,
-            **params,
+    def list_pending_contracts(self, *, limit: int = 50) -> List[Dict[str, Any]]:
+        """列出所有待处理的合约（DRAFT, SIGNED, ACTIVE 状态）"""
+        from ifrontier.infra.sqlite.contracts import list_pending_contracts as sqlite_list_pending_contracts
+
+        records = sqlite_list_pending_contracts(limit=int(limit))
+        out = []
+        for r in records:
+            out.append({
+                "contract_id": r.contract_id,
+                "kind": r.kind,
+                "title": r.title,
+                "terms": json.loads(r.terms_json) if r.terms_json else {},
+                "status": r.status,
+                "parties": r.parties,
+                "required_signers": r.required_signers,
+                "invited_parties": r.invited_parties,
+                "has_rules": r.has_rules,
+                "created_at": r.created_at,
+                "activated_at": r.activated_at,
+                "settled_at": r.settled_at,
+            })
+        return out
+
+    def terminate_contract(self, *, contract_id: str, actor_id: str, reason: str = "") -> None:
+        """强制终止合约"""
+        from ifrontier.domain.events.payloads import ContractTerminatedPayload
+
+        contract = sqlite_get_contract(contract_id)
+        if contract is None:
+            raise ValueError("contract not found")
+
+        if contract.status not in (ContractStatus.ACTIVE.value, ContractStatus.SIGNED.value, ContractStatus.DRAFT.value):
+            raise ValueError("contract cannot be terminated in current status")
+
+        new_status = ContractStatus.TERMINATED.value
+        sqlite_update_contract_status(contract_id, new_status)
+
+        now = datetime.now(timezone.utc)
+        payload = ContractTerminatedPayload(
+            contract_id=contract_id,
+            terminated_by=actor_id,
+            reason=reason,
+            terminated_at=now,
         )
-
-    @staticmethod
-    def _create_contracts_batch_tx(tx, params: Dict[str, Any]) -> None:
-        tx.run(
-            """
-            UNWIND $contracts AS c
-            MERGE (ct:Contract {contract_id: c.contract_id})
-            SET ct.kind = c.kind,
-                ct.title = c.title,
-                ct.terms_json = c.terms_json,
-                ct.status = c.status,
-                ct.has_rules = c.has_rules,
-                ct.parties = c.parties,
-                ct.required_signers = c.required_signers,
-                ct.signatures = c.signatures,
-                ct.participation_mode = c.participation_mode,
-                ct.invited_parties = c.invited_parties,
-                ct.created_at = c.created_at,
-                ct.updated_at = c.updated_at
-            """,
-            **params,
+        env = EventEnvelope[ContractTerminatedPayload](
+            event_type=EventType.CONTRACT_TERMINATED,
+            correlation_id=uuid4(),
+            actor=EventActor(user_id=actor_id),
+            payload=payload,
         )
+        self._event_store.append(EventEnvelopeJson.from_envelope(env))
 
-    @staticmethod
-    def _join_contract_tx(tx, params: Dict[str, Any]) -> bool:
-        record = tx.run(
-            """
-            MATCH (c:Contract {contract_id: $contract_id})
-            WHERE c.participation_mode = 'OPT_IN'
-            WITH c,
-                 CASE WHEN c.invited_parties IS NULL THEN [] ELSE c.invited_parties END AS invited,
-                 CASE WHEN c.parties IS NULL THEN [] ELSE c.parties END AS parties
-            WHERE $joiner IN invited
-            WITH c, parties,
-                 CASE WHEN $joiner IN parties THEN parties ELSE parties + $joiner END AS new_parties
-            SET c.parties = new_parties,
-                c.updated_at = $joined_at
-            RETURN c.contract_id AS contract_id
-            """,
-            **params,
-        ).single()
-        return record is not None
+    def get_contract_rule_state(self, *, contract_id: str) -> Dict[str, Any]:
+        """获取合约规则执行状态"""
+        contract = sqlite_get_contract(contract_id)
+        if contract is None:
+            raise ValueError("contract not found")
 
-    @staticmethod
-    def _create_proposal_tx(tx, params: Dict[str, Any]) -> bool:
-        record = tx.run(
-            """
-            MATCH (c:Contract {contract_id: $contract_id})
-            CREATE (p:ContractProposal {proposal_id: $proposal_id})
-            SET p.contract_id = $contract_id,
-                p.proposal_type = $proposal_type,
-                p.proposer = $proposer,
-                p.details_json = $details_json,
-                p.approvals = [],
-                p.created_at = $created_at
-            MERGE (c)-[:HAS_PROPOSAL]->(p)
-            RETURN p.proposal_id AS proposal_id
-            """,
-            **params,
-        ).single()
-        return record is not None
+        try:
+            rule_state = json.loads(contract.rule_state_json) if contract.rule_state_json else {}
+        except json.JSONDecodeError:
+            rule_state = {}
 
-    @staticmethod
-    def _approve_proposal_tx(tx, params: Dict[str, Any]):
-        record = tx.run(
-            """
-            MATCH (c:Contract {contract_id: $contract_id})-[:HAS_PROPOSAL]->(p:ContractProposal {proposal_id: $proposal_id})
-            WITH c, p,
-                 CASE WHEN p.approvals IS NULL THEN [] ELSE p.approvals END AS approvals,
-                 CASE WHEN c.parties IS NULL THEN [] ELSE c.parties END AS parties
-            WITH c, p, parties,
-                 CASE WHEN $approver IN approvals THEN approvals ELSE approvals + $approver END AS new_approvals
-            WITH c, p, parties, new_approvals,
-                 ALL(x IN parties WHERE x IN new_approvals) AS all_approved
-            SET p.approvals = new_approvals
+        return rule_state
 
-            SET c.status = CASE
-                WHEN all_approved AND p.proposal_type = 'SUSPEND' THEN 'SUSPENDED'
-                WHEN all_approved AND p.proposal_type = 'TERMINATE' THEN 'TERMINATED'
-                WHEN all_approved AND p.proposal_type = 'FAIL' THEN 'FAILED'
-                ELSE c.status
-            END,
-            c.terms_json = CASE
-                WHEN all_approved AND p.proposal_type = 'AMEND' THEN p.details_json
-                ELSE c.terms_json
-            END,
-            c.updated_at = CASE WHEN all_approved THEN $approved_at ELSE c.updated_at END
+    def reset_contract_rule_state(self, *, contract_id: str, actor_id: str) -> None:
+        """重置合约规则执行状态"""
+        contract = sqlite_get_contract(contract_id)
+        if contract is None:
+            raise ValueError("contract not found")
 
-            RETURN all_approved AS applied, c.status AS contract_status, p.proposal_type AS proposal_type
-            """,
-            **params,
-        ).single()
-        return record
+        if contract.status != ContractStatus.DRAFT.value:
+            raise ValueError("can only reset rule state in DRAFT status")
 
-    @staticmethod
-    def _sign_contract_tx(tx, params: Dict[str, Any]):
-        result = tx.run(
-            """
-            MATCH (c:Contract {contract_id: $contract_id})
-            WITH c,
-                 CASE WHEN c.signatures IS NULL THEN [] ELSE c.signatures END AS sigs,
-                 CASE WHEN c.required_signers IS NULL THEN [] ELSE c.required_signers END AS reqs
-            WHERE toUpper(trim(coalesce(c.status, ''))) IN ['DRAFT','SIGNED']
-            WITH c, sigs, reqs,
-                 [x IN sigs | toLower(toString(x))] AS sigs_lc,
-                 [x IN reqs | toLower(toString(x))] AS reqs_lc,
-                 toLower(toString($signer)) AS signer_lc
-            WITH c, sigs, reqs_lc, sigs_lc, signer_lc,
-                 CASE WHEN signer_lc IN sigs_lc THEN sigs ELSE sigs + $signer END AS new_sigs
-            WITH c, new_sigs, reqs_lc,
-                 [x IN new_sigs | toLower(toString(x))] AS new_sigs_lc
-            WITH c, new_sigs, reqs_lc,
-                 ALL(x IN reqs_lc WHERE x IN new_sigs_lc) AS all_signed
-            SET c.signatures = new_sigs,
-                c.status = CASE WHEN all_signed THEN 'ACTIVE' ELSE c.status END,
-                c.activated_at = CASE WHEN all_signed THEN $signed_at ELSE c.activated_at END,
-                c.updated_at = $signed_at
-            RETURN c.status AS status
-            """,
-            **params,
-        )
-        return result.single()
-
-    @staticmethod
-    def _activate_contract_tx(tx, params: Dict[str, Any]) -> bool:
-        record = tx.run(
-            """
-            MATCH (c:Contract {contract_id: $contract_id})
-            WHERE c.status = 'SIGNED'
-            SET c.status = 'ACTIVE',
-                c.updated_at = $activated_at,
-                c.activated_at = $activated_at
-            RETURN c.contract_id AS contract_id
-            """,
-            **params,
-        ).single()
-        return record is not None
-
-    @staticmethod
-    def _load_contract_for_rules_tx(tx, params):
-        rec = tx.run(
-            """
-            MATCH (c:Contract {contract_id: $contract_id})
-            RETURN c.status AS status,
-                   c.terms_json AS terms_json,
-                   c.rule_state_json AS rule_state_json
-            """,
-            **params,
-        ).single()
-        return dict(rec) if rec else None
-
-    @staticmethod
-    def _load_contract_for_settle_tx(tx, params: Dict[str, Any]):
-        result = tx.run(
-            """
-            MATCH (c:Contract {contract_id: $contract_id})
-            RETURN c.status AS status, c.terms_json AS terms_json
-            """,
-            **params,
-        )
-        rec = result.single()
-        return dict(rec) if rec is not None else None
-
-    @staticmethod
-    def _save_contract_rule_state_tx(tx, params) -> None:
-        tx.run(
-            """
-            MATCH (c:Contract {contract_id: $contract_id})
-            SET c.rule_state_json = $rule_state_json,
-                c.updated_at = $updated_at
-            """,
-            **params,
-        )
+        sqlite_save_contract_rule_state(contract_id, {})

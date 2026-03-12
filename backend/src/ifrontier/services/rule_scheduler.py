@@ -3,8 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Awaitable, Callable, List, Optional
 
-from neo4j import Driver
-
+from ifrontier.infra.sqlite.contracts import list_contracts_with_rules
 from ifrontier.services.contracts import ContractService
 
 
@@ -12,7 +11,6 @@ class ContractRuleScheduler:
     def __init__(
         self,
         *,
-        driver: Driver,
         contract_service: ContractService,
         tick_interval_seconds: float = 1.0,
         batch_size: int = 50,
@@ -20,7 +18,6 @@ class ContractRuleScheduler:
         channel_for_online_stats: Optional[str] = None,
         get_channel_size: Optional[Callable[[str], Awaitable[int]]] = None,
     ) -> None:
-        self._driver = driver
         self._contract_service = contract_service
         self._tick_interval_seconds = float(tick_interval_seconds)
         self._batch_size = int(batch_size)
@@ -91,21 +88,5 @@ class ContractRuleScheduler:
                 return
 
     def _fetch_active_contracts_with_rules(self, *, limit: int) -> List[str]:
-        with self._driver.session() as session:
-            return session.execute_read(
-                self._fetch_active_contracts_with_rules_tx,
-                {"limit": int(limit)},
-            )
-
-    @staticmethod
-    def _fetch_active_contracts_with_rules_tx(tx, params):
-        result = tx.run(
-            """
-            MATCH (c:Contract)
-            WHERE c.status = 'ACTIVE' AND c.has_rules = true
-            RETURN c.contract_id AS contract_id
-            LIMIT $limit
-            """,
-            **params,
-        )
-        return [r["contract_id"] for r in result]
+        contracts = list_contracts_with_rules(limit=int(limit))
+        return [c.contract_id for c in contracts]

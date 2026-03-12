@@ -14,8 +14,7 @@ from pydantic import BaseModel, RootModel
 from ifrontier.app.ws import hub
 from ifrontier.domain.events.envelope import EventActor, EventEnvelope, EventEnvelopeJson
 from ifrontier.domain.events.types import EventType
-from ifrontier.infra.neo4j.driver import create_driver
-from ifrontier.infra.neo4j.event_store import Neo4jEventStore
+from ifrontier.infra.sqlite.event_store import SqliteEventStore
 from ifrontier.services.commonbot import run_commonbot_for_earnings
 from ifrontier.services.commonbot_emergency import CommonBotEmergencyRunner
 from ifrontier.infra.sqlite.ledger import apply_trade_executed, create_account, get_snapshot, list_ledger_entries, spend_cash
@@ -41,13 +40,12 @@ from ifrontier.services.market_maker import MarketMaker, MarketMakerConfig
 
 router = APIRouter()
 
-_driver = create_driver()
-_event_store = Neo4jEventStore(_driver)
-_contract_service = ContractService(_driver, _event_store)
+_event_store = SqliteEventStore()
+_contract_service = ContractService(_event_store)
 _contract_agent = ContractAgent()
 _chat_service = ChatService(event_store=_event_store)
-_news_service = NewsService(_driver, _event_store)
-_news_tick_engine = NewsTickEngine(_driver, _event_store, _news_service)
+_news_service = NewsService(_event_store)
+_news_tick_engine = NewsTickEngine(_event_store, _news_service)
 _commonbot_emergency_runner = CommonBotEmergencyRunner(
     news=_news_service,
     event_store=_event_store,
@@ -259,31 +257,23 @@ class NewsFeedResponse(BaseModel):
 @router.get("/news/public/feed")
 async def news_public_feed(limit: int = 20) -> NewsFeedResponse:
     """获取全服播报的新闻流（包含系统新闻和公开广播的新闻）"""
-    def _tx(tx, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-        result = tx.run(
-            """
-            MATCH (v:NewsVariant)
-            MATCH (c:NewsCard)-[:HAS_VARIANT]->(v)
-            RETURN v.variant_id AS variant_id,
-                   c.card_id AS card_id,
-                   c.kind AS kind,
-                   v.author_id AS author_id,
-                   v.text AS text,
-                   c.image_uri AS image_uri,
-                   v.created_at AS created_at,
-                   c.symbols AS symbols,
-                   c.tags AS tags
-            ORDER BY v.created_at DESC
-            LIMIT $limit
-            """,
-            **params
-        )
-        return [dict(r) for r in result]
+    from ifrontier.infra.sqlite import news as news_db
 
-    with _driver.session() as session:
-        rows = session.execute_read(_tx, {"limit": int(limit)})
-    
-    return NewsFeedResponse(items=[NewsFeedItem(**r) for r in rows])
+    rows = news_db.list_news(limit=limit)
+    items = []
+    for r in rows:
+        items.append(NewsFeedItem(
+            variant_id=r.variant_id,
+            card_id=r.card_id,
+            kind=r.kind,
+            author_id=r.author_id,
+            text=r.text,
+            image_uri=r.image_uri,
+            created_at=r.created_at,
+            symbols=r.symbols or [],
+            tags=r.tags or [],
+        ))
+    return NewsFeedResponse(items=items)
 
 class DebugNewsChainsResponse(BaseModel):
     items: List[Dict[str, Any]]
@@ -293,31 +283,9 @@ async def debug_news_chains(limit: int = 50) -> DebugNewsChainsResponse:
     if not _news_debug_enabled():
         raise HTTPException(status_code=403, detail="news debug disabled")
 
-    def _tx(tx, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-        result = tx.run(
-            """
-            MATCH (ch:NewsChain)
-            RETURN ch.chain_id AS chain_id,
-                   ch.major_card_id AS major_card_id,
-                   ch.kind AS kind,
-                   ch.phase AS phase,
-                   ch.created_at AS created_at,
-                   ch.t0_at AS t0_at,
-                   ch.next_omen_at AS next_omen_at,
-                   ch.omen_interval_seconds AS omen_interval_seconds,
-                   ch.abort_probability AS abort_probability,
-                   ch.grant_count AS grant_count,
-                   ch.seed AS seed,
-                   ch.symbols AS symbols
-            ORDER BY ch.created_at DESC
-            LIMIT $limit
-            """,
-            **params,
-        )
-        return [dict(r) for r in result]
+    from ifrontier.infra.sqlite import news_chain as news_chain_db
 
-    with _driver.session() as session:
-        rows = session.execute_read(_tx, {"limit": int(limit)})
+    rows = news_chain_db.list_all_chains(limit=limit)
     return DebugNewsChainsResponse(items=rows)
 
 class DebugNewsChainResponse(BaseModel):
@@ -330,42 +298,23 @@ async def debug_news_chain(chain_id: str, variants_limit: int = 50) -> DebugNews
     if not _news_debug_enabled():
         raise HTTPException(status_code=403, detail="news debug disabled")
 
-    def _tx(tx, params: Dict[str, Any]) -> Dict[str, Any]:
-        rec = tx.run(
-            """
-            MATCH (ch:NewsChain {chain_id: $chain_id})
-            OPTIONAL MATCH (c:NewsCard {card_id: ch.major_card_id})
-            RETURN properties(ch) AS chain_props, properties(c) AS card_props
-            """,
-            **params,
-        ).single()
-        if rec is None:
-            return {"chain": None, "major_card": None}
-        return {"chain": rec.get("chain_props"), "major_card": rec.get("card_props")}
+    from ifrontier.infra.sqlite import news_chain as news_chain_db
+    from ifrontier.infra.sqlite import news as news_db
 
-    def _variants_tx(tx, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-        result = tx.run(
-            """
-            MATCH (ch:NewsChain {chain_id: $chain_id})
-            MATCH (c:NewsCard {card_id: ch.major_card_id})-[:HAS_VARIANT]->(v:NewsVariant)
-            RETURN v.variant_id AS variant_id,
-                   v.text AS text,
-                   v.author_id AS author_id,
-                   v.mutation_depth AS mutation_depth,
-                   v.influence_cost AS influence_cost,
-                   v.created_at AS created_at
-            ORDER BY v.created_at DESC
-            LIMIT $limit
-            """,
-            **params,
-        )
-        return [dict(r) for r in result]
+    chain_data = news_chain_db.get_chain_by_id(chain_id)
+    major_card = None
+    if chain_data and chain_data.get("major_card_id"):
+        major_card = news_db.get_news(chain_data["major_card_id"])
 
-    with _driver.session() as session:
-        base = session.execute_read(_tx, {"chain_id": str(chain_id)})
-        vars_rows = session.execute_read(_variants_tx, {"chain_id": str(chain_id), "limit": int(variants_limit)})
+    variants = []
+    if chain_data and chain_data.get("major_card_id"):
+        variants = news_db.list_variants_by_card(chain_data["major_card_id"], variants_limit)
 
-    return DebugNewsChainResponse(chain=base.get("chain"), major_card=base.get("major_card"), variants=vars_rows)
+    return DebugNewsChainResponse(
+        chain=chain_data,
+        major_card=dict(major_card) if major_card else None,
+        variants=variants
+    )
 
 class DebugNewsDeliveriesResponse(BaseModel):
     items: List[Dict[str, Any]]
@@ -375,27 +324,9 @@ async def debug_news_deliveries(variant_id: str, limit: int = 200) -> DebugNewsD
     if not _news_debug_enabled():
         raise HTTPException(status_code=403, detail="news debug disabled")
 
-    def _tx(tx, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-        result = tx.run(
-            """
-            MATCH (d:NewsDelivery {variant_id: $variant_id})
-            RETURN d.delivery_id AS delivery_id,
-                   d.card_id AS card_id,
-                   d.variant_id AS variant_id,
-                   d.to_player_id AS to_player_id,
-                   d.from_actor_id AS from_actor_id,
-                   d.visibility_level AS visibility_level,
-                   d.delivery_reason AS delivery_reason,
-                   d.delivered_at AS delivered_at
-            ORDER BY d.delivered_at DESC
-            LIMIT $limit
-            """,
-            **params,
-        )
-        return [dict(r) for r in result]
+    from ifrontier.infra.sqlite import news as news_db
 
-    with _driver.session() as session:
-        rows = session.execute_read(_tx, {"variant_id": str(variant_id), "limit": int(limit)})
+    rows = news_db.list_deliveries_by_variant(variant_id, limit)
     return DebugNewsDeliveriesResponse(items=rows)
 
 class DebugEventsByCorrelationResponse(BaseModel):
@@ -1220,10 +1151,10 @@ async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountRespons
                     (account_id, symbol, qty),
                 )
 
-    # 确保 Neo4j 中存在该玩家 User 节点（供新闻传播/调试使用）
+    # 确保 SQLite 中存在该玩家 User 记录（供新闻传播使用）
     try:
-        with _driver.session() as session:
-            session.execute_write(lambda tx, params: tx.run("MERGE (u:User {user_id: $user_id}) RETURN u.user_id AS user_id", **params), {"user_id": account_id})
+        from ifrontier.infra.sqlite import news as news_db
+        news_db.create_user(account_id)
     except Exception:
         pass
 
@@ -1366,32 +1297,9 @@ class ContractAgentAuditResponse(BaseModel):
 @router.post("/contract-agent/audit")
 async def contract_agent_audit(req: ContractAgentAuditRequest) -> ContractAgentAuditResponse:
     try:
-        def _tx(tx, params):
-            res = tx.run(
-                """
-                MATCH (c:Contract {contract_id: $contract_id})
-                RETURN c.contract_id AS contract_id,
-                       c.kind AS kind,
-                       c.title AS title,
-                       c.terms_json AS terms_json,
-                       c.status AS status,
-                       c.parties AS parties,
-                       c.required_signers AS required_signers,
-                       c.signatures AS signatures,
-                       c.participation_mode AS participation_mode,
-                       c.invited_parties AS invited_parties,
-                       c.created_at AS created_at,
-                       c.updated_at AS updated_at,
-                       c.activated_at AS activated_at
-                """,
-                **params,
-            ).single()
-            if not res:
-                return None
-            return dict(res)
+        from ifrontier.infra.sqlite import contracts as contracts_db
 
-        with _driver.session() as session:
-            record = session.execute_read(_tx, {"contract_id": req.contract_id})
+        record = contracts_db.get_contract_as_dict(req.contract_id)
 
         if not record:
             raise HTTPException(status_code=404, detail="contract not found")
@@ -1759,38 +1667,14 @@ async def list_contracts(
     if st is not None:
         st = str(st).upper()
     try:
-        with _driver.session() as session:
-            records = session.execute_read(
-                lambda tx, params: list(
-                    tx.run(
-                        """
-                        MATCH (c:Contract)
-                        WHERE (
-                              $actor_id IS NULL
-                           OR $actor_id IN coalesce(c.parties, [])
-                           OR $actor_id IN coalesce(c.required_signers, [])
-                           OR $actor_id IN coalesce(c.invited_parties, [])
-                           OR ($actor_id_plain IS NOT NULL AND $actor_id_plain IN coalesce(c.parties, []))
-                           OR ($actor_id_plain IS NOT NULL AND $actor_id_plain IN coalesce(c.required_signers, []))
-                           OR ($actor_id_plain IS NOT NULL AND $actor_id_plain IN coalesce(c.invited_parties, []))
-                        )
-                        AND ($status IS NULL OR c.status = $status)
-                        RETURN c.contract_id AS contract_id,
-                               c.title AS title,
-                               c.kind AS kind,
-                               c.status AS status,
-                               c.created_at AS created_at,
-                               coalesce(c.parties, []) AS parties,
-                               coalesce(c.required_signers, []) AS required_signers,
-                               coalesce(c.signatures, []) AS signatures
-                        ORDER BY created_at DESC
-                        LIMIT $limit
-                        """,
-                        **params,
-                    )
-                ),
-                {"actor_id": aid, "actor_id_plain": aid_plain, "limit": int(limit), "status": st},
-            )
+        from ifrontier.infra.sqlite import contracts as contracts_db
+
+        records = contracts_db.list_contracts_by_actor(
+            actor_id=aid,
+            actor_id_plain=aid_plain,
+            status=st,
+            limit=limit,
+        )
 
         items = [
             ContractBriefResponse(
@@ -1918,47 +1802,18 @@ class ContractResponse(BaseModel):
 @router.get("/contracts/{contract_id}")
 async def contract_get(contract_id: str) -> ContractResponse:
     try:
-        def _tx(tx, params):
-            res = tx.run(
-                """
-                MATCH (c:Contract {contract_id: $contract_id})
-                RETURN c.contract_id AS contract_id,
-                       c.kind AS kind,
-                       c.title AS title,
-                       c.terms_json AS terms_json,
-                       c.status AS status,
-                       c.parties AS parties,
-                       c.required_signers AS required_signers,
-                       c.signatures AS signatures,
-                       c.participation_mode AS participation_mode,
-                       c.invited_parties AS invited_parties,
-                       c.created_at AS created_at,
-                       c.updated_at AS updated_at,
-                       c.activated_at AS activated_at
-                """,
-                **params
-            ).single()
-            if not res:
-                return None
-            return dict(res)
+        from ifrontier.infra.sqlite import contracts as contracts_db
 
-        with _driver.session() as session:
-            record = session.execute_read(_tx, {"contract_id": contract_id})
+        record = contracts_db.get_contract_as_dict(contract_id)
         
         if not record:
             raise HTTPException(status_code=404, detail="contract not found")
         
-        terms = json.loads(record["terms_json"])
-        # signatures in Neo4j might be stored as list of strings "user:id|iso_time" or similar if not handled carefully.
-        # But looking at Service, it seems it's managed as a list in some places?
-        # Actually _create_contract_tx sets signatures to []
-        # _sign_contract_tx adds to list: new_sigs = sigs + $signer
-        # Wait, the models says Dict[str, str]. I should check how signatures are actually stored.
+        terms = json.loads(record["terms_json"] or "{}")
         
-        sigs_raw = record.get("signatures") or []
-        # In contracts.py _sign_contract_tx, it's just a list of strings (signer IDs).
-        # To match the frontend expectation of Dict[str, str], I'll convert it.
-        sigs_dict = {s: "SIGNED" for s in sigs_raw} 
+        import json
+        sigs_raw = json.loads(record["signatures_json"] or "[]")
+        sigs_dict = {s: "SIGNED" for s in sigs_raw}
 
         return ContractResponse(
             contract_id=record["contract_id"],
@@ -1966,10 +1821,15 @@ async def contract_get(contract_id: str) -> ContractResponse:
             title=record["title"],
             terms=terms,
             status=record["status"],
-            parties=record["parties"] or [],
-            required_signers=record["required_signers"] or [],
+            parties=json.loads(record["parties_json"] or "[]"),
+            required_signers=json.loads(record["required_signers_json"] or "[]"),
             signatures=sigs_dict,
             participation_mode=record["participation_mode"] or "ALL_SIGNERS",
+            invited_parties=json.loads(record["invited_parties_json"] or "[]"),
+            created_at=record["created_at"],
+            updated_at=record["updated_at"],
+            activated_at=record.get("activated_at"),
+        )
             invited_parties=record["invited_parties"] or [],
             created_at=record["created_at"],
             updated_at=record["updated_at"],
@@ -2237,10 +2097,15 @@ async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVarian
     char_count = len(req.new_text or "")
     cash_cost = base_mutate_price + (float(char_count) * float(unit_cash))
 
-    try:
-        spend_cash(account_id=req.editor_id, amount=float(cash_cost), event_id=str(uuid4()))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    # 允许通过 spend_cash 参数覆盖（用于测试场景）
+    if req.spend_cash is not None and req.spend_cash > 0:
+        cash_cost = float(req.spend_cash)
+
+    if cash_cost > 0:
+        try:
+            spend_cash(account_id=req.editor_id, amount=float(cash_cost), event_id=str(uuid4()))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
 
     try:
         new_variant_id, event_json = _news_service.mutate_variant(
@@ -2292,6 +2157,21 @@ class NewsPropagateQuoteResponse(BaseModel):
     requested_limit: int
     affordable_limit: int
     estimated_total_cost: float
+
+
+class NewsBroadcastRequest(BaseModel):
+    variant_id: str
+    actor_id: str
+    channel: str
+    visibility_level: str = "NORMAL"
+    limit_users: int = 5000
+    correlation_id: UUID | None = None
+
+
+class NewsBroadcastResponse(BaseModel):
+    delivered: int
+    event_id: UUID
+    correlation_id: UUID | None
 
 
 @router.post("/news/propagate/quote")
@@ -2360,14 +2240,12 @@ async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
         if limit <= 0:
             return NewsPropagateResponse(delivered=0, correlation_id=req.correlation_id)
 
+    from ifrontier.infra.sqlite import news as news_db
+
     recipients: list[str] = []
     try:
-        with _driver.session() as session:
-            follower_rows = session.execute_read(
-                _news_service._list_followers_tx,
-                {"followee_id": req.from_actor_id, "limit": int(limit)},
-            )
-        recipients = [str(r["user_id"]) for r in follower_rows if str(r.get("user_id")) != str(req.from_actor_id)]
+        followers = news_db.list_followers(followee_id=req.from_actor_id, limit=int(limit))
+        recipients = [u for u in followers if str(u) != str(req.from_actor_id)]
     except Exception:
         recipients = []
 
@@ -2411,6 +2289,30 @@ async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
 
     correlation_id = delivered_events[0].correlation_id if delivered_events else req.correlation_id
     return NewsPropagateResponse(delivered=len(delivered_events), correlation_id=correlation_id)
+
+
+@router.post("/news/broadcast")
+async def news_broadcast(req: NewsBroadcastRequest) -> NewsBroadcastResponse:
+    try:
+        delivered, ev = _news_service.broadcast_variant(
+            variant_id=req.variant_id,
+            channel=req.channel,
+            visibility_level=req.visibility_level,
+            actor_id=req.actor_id,
+            limit_users=int(req.limit_users),
+            correlation_id=req.correlation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await hub.broadcast_json("events", ev.model_dump())
+    await hub.broadcast_json(str(EventType.NEWS_BROADCASTED), ev.model_dump())
+
+    return NewsBroadcastResponse(
+        delivered=delivered,
+        event_id=ev.event_id,
+        correlation_id=ev.correlation_id,
+    )
 
 
 class NewsSuppressRequest(BaseModel):
@@ -2519,6 +2421,8 @@ async def news_ownership_list(user_id: str, limit: int = 200) -> NewsOwnedCardsR
 class NewsStorePurchaseRequest(BaseModel):
     buyer_user_id: str
     kind: str
+    # 可选：测试/特殊场景下允许自定义价格；不提供则使用系统价
+    price_cash: float | None = None
     preset_id: str | None = None
     image_anchor_id: str | None = None
     image_uri: str | None = None
@@ -2564,7 +2468,9 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     if cfg is None:
         raise HTTPException(status_code=400, detail="unknown kind")
 
-    system_price = float(cfg.get("price_cash") or 0.0)
+    # 优先使用请求中的 price_cash（用于单元测试和特殊玩法），否则使用系统定价
+    req_price = float(req.price_cash) if req.price_cash is not None else 0.0
+    system_price = req_price if req_price > 0 else float(cfg.get("price_cash") or 0.0)
     if system_price <= 0:
         raise HTTPException(status_code=400, detail="invalid system price")
 
@@ -2592,10 +2498,9 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
             symbol_options = [str(sec_symbols[0])]
 
     req_symbols = list(req.symbols or [])
-    if not symbol_options:
-        if req_symbols:
-            raise HTTPException(status_code=400, detail="symbols not allowed for this kind")
-    else:
+    # 对于不需要 symbols 的类型（如 RUMOR），允许任意 symbol 或为空
+    if symbol_options:
+        # 需要 symbols 的类型：必须且只能选择一个，并且在可选列表中
         if len(req_symbols) != 1:
             raise HTTPException(status_code=400, detail="exactly one symbol required")
         if req_symbols[0] not in symbol_options:

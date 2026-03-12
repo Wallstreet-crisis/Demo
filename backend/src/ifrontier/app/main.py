@@ -34,7 +34,6 @@ def create_app() -> FastAPI:
         api_module._news_service.init_news_seed_data()
 
         scheduler = ContractRuleScheduler(
-            driver=api_module._driver,
             contract_service=api_module._contract_service,
             tick_interval_seconds=1.0,
             batch_size=50,
@@ -61,7 +60,6 @@ def create_app() -> FastAPI:
         )
 
         market_maker_scheduler = MarketMakerScheduler(
-            driver=api_module._driver,
             tick_interval_seconds=1.0,
             broadcaster=_make_news_broadcaster(hub),
             channel_for_online_stats="presence",
