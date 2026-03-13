@@ -218,7 +218,6 @@ def get_contract_as_dict(contract_id: str) -> Optional[Dict[str, Any]]:
     if row is None:
         return None
     return dict(row)
-    )
 
 
 def list_contracts_for_player(player_id: str, limit: int = 50) -> List[ContractRecord]:

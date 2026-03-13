@@ -327,7 +327,7 @@ def count_chains_by_status(status: str) -> int:
     """统计指定状态的新闻链数量"""
     conn = get_connection()
     row = conn.execute(
-        "SELECT count(*) as c FROM news_chains WHERE status = ?",
+        "SELECT count(*) as c FROM news_chains WHERE phase = ?",
         (status,),
     ).fetchone()
     return int(row["c"]) if row else 0

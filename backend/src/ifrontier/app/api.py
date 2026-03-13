@@ -1830,11 +1830,6 @@ async def contract_get(contract_id: str) -> ContractResponse:
             updated_at=record["updated_at"],
             activated_at=record.get("activated_at"),
         )
-            invited_parties=record["invited_parties"] or [],
-            created_at=record["created_at"],
-            updated_at=record["updated_at"],
-            activated_at=record.get("activated_at")
-        )
     except Exception as exc:
         if isinstance(exc, HTTPException):
             raise exc
