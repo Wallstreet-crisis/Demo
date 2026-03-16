@@ -70,7 +70,7 @@ class CommonBotEmergencyRunner:
         self._pending_market_open: _PendingMarketOpenReaction | None = None
         self._intel = NewsIntelligenceEngine()
 
-    async def maybe_react(
+    def maybe_react(
         self,
         *,
         broadcast_event: EventEnvelopeJson,
@@ -192,7 +192,7 @@ class CommonBotEmergencyRunner:
                 if trade_json is not None:
                     self._event_store.append(trade_json)
                     emitted.append(trade_json)
-                    await self._submit_trade_from_intent(
+                    self._submit_trade_from_intent(
                         account_id=cohort.account_id,
                         symbol=symbol,
                         trade_payload=trade_json.payload,
@@ -203,7 +203,7 @@ class CommonBotEmergencyRunner:
 
         return emitted
 
-    async def maybe_react_on_market_open(self) -> List[EventEnvelopeJson]:
+    def maybe_react_on_market_open(self) -> List[EventEnvelopeJson]:
         cfg = load_game_time_config_from_env()
         session = get_market_session(cfg=cfg)
         if session.phase != MarketPhase.TRADING:
@@ -291,7 +291,7 @@ class CommonBotEmergencyRunner:
                 if trade_json is not None:
                     self._event_store.append(trade_json)
                     emitted.append(trade_json)
-                    await self._submit_trade_from_intent(
+                    self._submit_trade_from_intent(
                         account_id=cohort.account_id,
                         symbol=symbol,
                         trade_payload=trade_json.payload,
@@ -453,7 +453,7 @@ class CommonBotEmergencyRunner:
             if session.phase == MarketPhase.TRADING and trade_json is not None:
                 self._event_store.append(trade_json)
                 emitted.append(trade_json)
-                await self._submit_trade_from_intent(
+                self._submit_trade_from_intent(
                     account_id=target_cohort.account_id,
                     symbol=symbol,
                     trade_payload=trade_json.payload,
@@ -472,7 +472,7 @@ class CommonBotEmergencyRunner:
             EventType.NEWS_BROADCASTED.value,
         }
 
-    async def _submit_trade_from_intent(
+    def _submit_trade_from_intent(
         self,
         *,
         account_id: str,
@@ -537,9 +537,18 @@ class CommonBotEmergencyRunner:
 
             for m in matches:
                 ev = m.executed_event.model_dump()
-                await hub.broadcast_json("events", ev)
+                self._broadcast_event_sync("events", ev)
                 ev_type = ev.get("event_type")
                 if ev_type:
-                    await hub.broadcast_json(str(ev_type), ev)
+                    self._broadcast_event_sync(str(ev_type), ev)
         except Exception as exc:
             print(f"[CommonBotEmergency:{log_prefix}] Order failed for {account_id}: {exc}")
+
+    @staticmethod
+    def _broadcast_event_sync(channel: str, payload: Dict[str, Any]) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(hub.broadcast_json(channel, payload))
+            return
+        loop.create_task(hub.broadcast_json(channel, payload))
