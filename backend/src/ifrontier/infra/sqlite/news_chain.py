@@ -262,7 +262,7 @@ def update_next_omen(chain_id: str, next_omen_at: str) -> None:
     conn = get_connection()
     with conn:
         conn.execute(
-            "UPDATE news_chains SET next_omen_at = ? WHERE chain_id = ?",
+            "UPDATE news_chains SET next_publish_at = ? WHERE chain_id = ?",
             (next_omen_at, chain_id),
         )
 

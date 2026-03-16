@@ -442,14 +442,14 @@ class NewsTickEngine:
 
     async def _tick_one_chain(self, *, now: datetime, chain: Dict[str, Any]) -> Dict[str, Any]:
         chain_id = str(chain["chain_id"])
-        major_card_id = str(chain["major_card_id"])
+        major_card_id = str(chain.get("major_card_id") or chain.get("root_card_id"))
         kind = str(chain["kind"])
         phase = str(chain["phase"])
         t0_at = datetime.fromisoformat(str(chain["t0_at"]))
-        next_omen_at = datetime.fromisoformat(str(chain["next_omen_at"]))
+        next_omen_at = datetime.fromisoformat(str(chain.get("next_omen_at") or chain.get("next_publish_at")))
         omen_interval_seconds = int(chain["omen_interval_seconds"])
         abort_probability = float(chain["abort_probability"])
-        grant_count = int(chain["grant_count"])
+        grant_count = int(chain.get("grant_count") or chain.get("suppression_budget_grants") or 0)
         seed = int(chain["seed"])
         symbols = chain.get("symbols") or []
 
@@ -630,7 +630,7 @@ class NewsTickEngine:
                     correlation_id=None,
                 )
                 if broadcast_event is not None:
-                    emergency_events = await self._commonbot_emergency_runner.maybe_react(
+                    emergency_events = self._commonbot_emergency_runner.maybe_react(
                         broadcast_event=broadcast_event,
                         force=True,
                     )

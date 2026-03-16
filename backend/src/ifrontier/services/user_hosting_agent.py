@@ -365,32 +365,12 @@ class UserHostingAgent:
                         except Exception:
                             last_ts = None
 
-                    recent_public_msgs = observation.get("recent_public_messages") or []
-                    seen_similar = False
-                    if norm:
-                        for m in recent_public_msgs:
-                            m_norm = _norm_text(str((m or {}).get("content") or ""))
-                            if not m_norm:
-                                continue
-                            if norm in m_norm or m_norm in norm:
-                                seen_similar = True
-                                break
-
-                    if (last_hash and last_hash == content_hash) or seen_similar:
+                    if last_hash and last_hash == content_hash:
                         results.append({"ok": True, "skipped": True, "reason": "duplicate_public_message"})
                         log_ai_action(
                             agent_id=f"hosting:{self.user_id}",
                             action_type="SKIP_SPAM_PUBLIC_MESSAGE",
-                            detail=f"type={msg_type} duplicate_or_similar=True",
-                        )
-                        continue
-
-                    if last_ts is not None and (now_ts - last_ts) < float(cooldown_seconds):
-                        results.append({"ok": True, "skipped": True, "reason": "cooldown_public_message"})
-                        log_ai_action(
-                            agent_id=f"hosting:{self.user_id}",
-                            action_type="SKIP_COOLDOWN_PUBLIC_MESSAGE",
-                            detail=f"type={msg_type} cooldown={cooldown_seconds}s",
+                            detail=f"type={msg_type} duplicate=True",
                         )
                         continue
 

@@ -1,53 +1,87 @@
-# 信息边境：AI / Agent 架构（部署级参考）
+﻿# AI Architecture
 
-## 1. 总体定位
-- AI 不是装饰 NPC，而是底层“流动性 / 契约生成 / 信息过滤 / 世界熵增调节”的模型库
-- 后端落地原则：所有 AI 行为以 `EventEnvelope` 形式进入事件流，可审计、可回放、可推送
+## 1. 目标
 
-## 2. 四层 AI 分工
-### 2.1 Common Bots（流动性源）
-- **目标**：提供市场基础流动性，主观能动性低，响应“市场表象”
-- **输入**：
-  - 新闻卡 `visual_truth`（系统预置）与可选 `Truth_Tags`
-  - 新闻变体的 `text_overlay`（FastText/关键词）
-  - 价格动量 `W_trend`
-- **输出**：
-  - 交易意向/成交：`trade.intent_submitted` / `trade.executed`
-  - 可观测解释：`ai.commonbot.decision`
+AI 系统负责：
 
-### 2.2 Contract Agent（语义化逻辑翻译官）
-- **目标**：把自然语言映射为受限 Python DSL（仅预置 Financial_Lib）
-- **输出**：
-  - `ai.contract.drafted`（含 python_preview + risk_rating）
-  - 玩家确认后再进入 `contract.created/signed/activated`
+- 让 CommonBot 根据新闻与市场数据产生交易行为
+- 让 ContractAgent 参与合约生成与解析
+- 让 HostingAgent 代替离线玩家执行有限动作
+- 让世界事件与新闻系统形成联动
 
-### 2.3 Whisperer AI（信息过滤与虚假真相分析）
-- **目标**：阶级特权 AI：溯源、冲突热力图、离线简报
-- **输出**：
-  - `ai.whisperer.assessment`（conflict_score + summary）
-  - 简报可以后续扩展为 `ai.whisperer.briefing_generated`（暂不强制）
+## 2. 总体原则
 
-### 2.4 World Engine（熵增平衡器）
-- **目标**：维护市场波动与暗示链（T-Minus 队列）
-- **输出**：
-  - `ai.world_event.omen_emitted`（暗示碎屑）
-  - `ai.world_event.purchased`（富豪购买背景大卡）
-  - `ai.world_event.resolved`（物理坍缩落地）
+- AI 不是独立持久化系统。
+- AI 的结果统一写回现有事件系统。
+- AI 读取的数据来自 SQLite 权威存储。
+- AI 只能通过服务层或 facade 访问能力，不能绕开权限边界。
 
-## 3. 玩家代理（Player Agent）
-- **定位**：陪玩/托管，能力与玩家一致，但可调用后端接口进行自动化
-- **事件链**：
-  - `ai.player_agent.task_submitted` -> 过程触发 `trade.* / news.* / contract.*` -> `ai.player_agent.task_completed`
+## 3. 关键组件
 
-## 4. Neo4j 建议图模型（最小）
-- `AiAgent {agent_id, kind}`
-- `AiModel {model_id, name, provider}`
-- `(AiAgent)-[:USES_MODEL]->(AiModel)`
-- `(AiAgent)-[:EMITTED_EVENT]->(Any)`：用于审计投影（与现有 `EMITTED_EVENT` 兼容）
+### 3.1 `CommonBotEmergencyRunner`
 
-## 5. 与 WebSocket 的对接
-- 建议按 Channel 分流：
-  - `market.*`：行情与撮合
-  - `news.*`：新闻变体与传播
-  - `ai.*`：AI 决策解释/评估/暗示链
-- 推送统一使用 `EventEnvelopeJson`
+负责让 Bot 在新闻广播、市场开盘等场景下快速反应。
+
+输入：
+
+- 新闻上下文
+- 市场数据
+- Bot 账户状态
+
+输出：
+
+- `ai.commonbot.decision`
+- 可能触发 `trade.*`
+
+### 3.2 `HostingAgent`
+
+面向托管用户：
+
+- 通过 `UserCapabilityFacade` 获取受限观测
+- 使用 LLM 或降级策略生成动作
+- 将行为落到已有交易 / 合约 / 新闻接口
+
+### 3.3 `ContractAgent`
+
+负责：
+
+- 合约草拟
+- 合约上下文理解
+- 规则辅助生成
+
+### 3.4 `NewsTickEngine`
+
+负责：
+
+- 前兆生成
+- 事件链推进
+- 广播时机控制
+
+## 4. 当前数据来源
+
+AI 读取的数据主要来自：
+
+- `events`
+- `news`
+- `news_deliveries`
+- `accounts`
+- `positions`
+- `orders`
+- 市场相关表
+- 合约相关表
+
+## 5. 审计
+
+AI 相关动作应当可追踪：
+
+- 输入上下文来自哪里
+- 输出做了什么
+- 是否触发下游交易 / 新闻 / 合约行为
+
+最终仍统一落到事件与业务存储，而不是独立图模型。
+
+## 6. 当前迁移结论
+
+- 旧 Neo4j 图模型已不再作为 AI 的运行基础
+- AI 层当前依赖 SQLite 读模型与服务层
+- 后续新增 AI 能力应继续沿用 SQLite + Event Store 的架构

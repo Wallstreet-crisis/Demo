@@ -18,7 +18,7 @@ client = TestClient(app)
 
 
 def test_news_card_variant_mutate_propagate_and_inbox() -> None:
-    # Use unique ids to avoid cross-test pollution in shared Neo4j
+    # Use unique ids to avoid cross-test pollution in the shared SQLite database
     u_author = f"user:author:{uuid4()}"
     u_follower = f"user:follower:{uuid4()}"
 
@@ -90,7 +90,7 @@ def test_news_broadcast_delivers_to_all_known_users() -> None:
     u1 = f"user:broadcast:u1:{uuid4()}"
     u2 = f"user:broadcast:u2:{uuid4()}"
 
-    # Create two users in graph via follow (ensures :User nodes exist)
+    # Create two users via follow so they are present in the news user table
     resp = client.post(
         "/social/follow",
         json={"follower_id": u2, "followee_id": u1},

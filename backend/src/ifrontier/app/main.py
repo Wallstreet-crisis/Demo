@@ -26,7 +26,7 @@ def create_app() -> FastAPI:
         # 初始化机器人及做市商账户资金
         init_bot_accounts()
 
-        # 同步内置机器人及系统账号到 Neo4j 用户池，确保新闻传播有目标
+        # 同步内置机器人及系统账号到新闻用户表，确保新闻传播有目标
         bots = default_bot_profiles()
         bot_ids = [b.account_id for b in bots] + ["system"]
         api_module._news_service.ensure_bot_users(bot_ids)

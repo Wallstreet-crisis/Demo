@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -55,12 +55,12 @@ _commonbot_emergency_runner = CommonBotEmergencyRunner(
 _hosting_scheduler: HostingScheduler | None = None
 
 def _news_debug_enabled() -> bool:
-    """检查新闻调试是否开启"""
+    """检查是否开启新闻调试。"""
     return str(os.getenv("IF_NEWS_DEBUG") or "0").strip().lower() in {"1", "true", "yes"}
 
 @router.post("/debug/bots/reset_balances")
 async def debug_bots_reset_balances() -> Dict[str, Any]:
-    """强制刷新全服 Bot 的资金和持仓，制造惊涛骇浪的基础"""
+    """强制刷新全服 Bot 的资金和持仓。"""
     try:
         from ifrontier.infra.sqlite.bots import init_bot_accounts
         init_bot_accounts()
@@ -256,7 +256,7 @@ class NewsFeedResponse(BaseModel):
 
 @router.get("/news/public/feed")
 async def news_public_feed(limit: int = 20) -> NewsFeedResponse:
-    """获取全服播报的新闻流（包含系统新闻和公开广播的新闻）"""
+    """获取全服广播新闻流。"""
     from ifrontier.infra.sqlite import news as news_db
 
     rows = news_db.list_news(limit=limit)
@@ -379,6 +379,10 @@ class HostingDisableResponse(BaseModel):
 
 @router.post("/hosting/{user_id}/enable")
 async def hosting_enable(user_id: str) -> HostingEnableResponse:
+    try:
+        _ = get_snapshot(user_id)
+    except Exception:
+        create_account(user_id, owner_type="user", initial_cash=0.0)
     st = upsert_hosting_state(user_id=user_id, enabled=True, status="ON_IDLE")
     from ifrontier.domain.events.payloads import AiHostingStateChangedPayload
     
@@ -464,7 +468,7 @@ class HostingDebugTickResponse(BaseModel):
 async def hosting_debug_tick_once() -> HostingDebugTickResponse:
     sched = _hosting_scheduler
     if sched is None:
-        # 测试环境中 TestClient 可能不会触发 lifespan，从而导致 scheduler 未启动。
+        # 测试环境中 TestClient 可能不会触发 lifespan，导致 scheduler 未启动。
         # debug 接口允许临时构造 scheduler 并执行一次 tick。
         sched = HostingScheduler(
             min_players=8,
@@ -556,7 +560,7 @@ async def debug_earnings_news(req: DebugEarningsNewsRequest) -> DebugEarningsNew
         await hub.broadcast_json(str(EventType.TRADE_INTENT_SUBMITTED), trade_json.model_dump())
         trade_event_id = trade_json.event_id
 
-    # Bot 真实下单：对于 BUY/SELL 决策，用 bot 账户提交限价单进入撮合
+    # Bot 真实下单：对 BUY/SELL 决策，用 bot 账户提交限价单进入撮合。
     action = (decision_json.payload or {}).get("action")
     confidence = float((decision_json.payload or {}).get("confidence") or 0.0)
     if action in {"BUY", "SELL"} and req.price_series:
@@ -564,7 +568,7 @@ async def debug_earnings_news(req: DebugEarningsNewsRequest) -> DebugEarningsNew
         eps = 0.001
         order_price = last_price * (1 + eps) if action == "BUY" else last_price * (1 - eps)
 
-        # 简单规则：高置信度用机构账户，低置信度用散户代表
+        # 简单规则：高置信度使用机构账户，低置信度使用散户账户。
         bot_account = "bot:inst:1" if confidence >= 0.7 else "bot:ret:1"
         qty = 50.0 if bot_account.startswith("bot:inst") else 5.0
 
@@ -577,7 +581,7 @@ async def debug_earnings_news(req: DebugEarningsNewsRequest) -> DebugEarningsNew
                 quantity=float(qty),
             )
         except ValueError:
-            # 资产不足（例如 SELL 无持仓）时忽略，不影响接口返回
+            # 资产不足时忽略，不影响接口返回。
             pass
 
     return DebugEarningsNewsResponse(
@@ -631,7 +635,7 @@ async def debug_execute_trade(req: DebugExecuteTradeRequest) -> DebugExecuteTrad
     )
     event_json = EventEnvelopeJson.from_envelope(envelope)
 
-    # Apply ledger update; 账本校验失败时返回 400，而不是 500
+    # Apply ledger update; 璐︽湰鏍￠獙澶辫触鏃惰繑鍥?400锛岃€屼笉鏄?500
     try:
         apply_trade_executed(
             buy_account_id=req.buy_account_id,
@@ -864,7 +868,7 @@ class DebugSubmitOrderResponse(BaseModel):
 
 @router.post("/debug/submit_order")
 async def debug_submit_order(req: DebugSubmitOrderRequest) -> DebugSubmitOrderResponse:
-    # 这里只是限价单提交入口，实际撮合和记账由 MatchingEngine + SQLite 账本处理
+    # 杩欓噷鍙槸闄愪环鍗曟彁浜ゅ叆鍙ｏ紝瀹為檯鎾悎鍜岃璐︾敱 MatchingEngine + SQLite 璐︽湰澶勭悊
     try:
         order_id, _matches = submit_limit_order(
         account_id=req.account_id.lower(),
@@ -892,7 +896,7 @@ class CreatePlayerResponse(BaseModel):
 @router.post("/debug/create_player")
 async def create_player(req: CreatePlayerRequest) -> CreatePlayerResponse:
     account_id = f"user:{str(req.player_id).lower()}"
-    # 如果提供 caste_id, 优先使用阶级配置; 否则回退到显式 initial_cash 或 0
+    # 如果提供 caste_id，优先使用阶级配置；否则回退到显式 initial_cash 或 0。
     initial_cash = 0.0
     positions: Dict[str, float] = {}
     caste_id = req.caste_id
@@ -970,7 +974,7 @@ async def submit_player_limit_order(req: PlayerLimitOrderRequest) -> PlayerOrder
             price=float(req.price),
             quantity=float(req.quantity),
         )
-        # 广播成交事件
+        # 骞挎挱鎴愪氦浜嬩欢
         for m in matches:
             ev = m.executed_event.model_dump()
             await hub.broadcast_json("events", ev)
@@ -1076,7 +1080,7 @@ async def submit_player_market_order(req: PlayerMarketOrderRequest) -> None:
             side=req.side,
             quantity=q,
         )
-        # 广播成交事件
+        # 骞挎挱鎴愪氦浜嬩欢
         for m in matches:
             ev = m.executed_event.model_dump()
             await hub.broadcast_json("events", ev)
@@ -1103,13 +1107,13 @@ class PlayerBootstrapRequest(BaseModel):
 
 @router.post("/players/bootstrap")
 async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountResponse:
-    # 幂等：如果已存在则返回现有数据，不报错也不重复发放初始资产
+    # 骞傜瓑锛氬鏋滃凡瀛樺湪鍒欒繑鍥炵幇鏈夋暟鎹紝涓嶆姤閿欎篃涓嶉噸澶嶅彂鏀惧垵濮嬭祫浜?
     account_id = f"user:{str(req.player_id).lower()}"
     
     # 检查是否已存在
     try:
         snap = get_snapshot(account_id)
-        # 如果已存在但数据库中没有阶级信息（旧账号），且请求中提供了阶级，则补全它
+        # 如果已存在但数据库中没有阶级信息，且请求提供了 caste_id，则补全它。
         if snap.caste_id is None and req.caste_id is not None:
             conn = get_connection()
             with conn:
@@ -1126,7 +1130,7 @@ async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountRespons
         # 不存在则创建
         pass
 
-    # 如果提供 caste_id, 优先使用阶级配置; 否则回退到显式 initial_cash 或 0
+    # 如果提供 caste_id，优先使用阶级配置；否则回退到显式 initial_cash 或 0。
     initial_cash = 0.0
     positions: Dict[str, float] = {}
     caste_id = req.caste_id
@@ -1151,7 +1155,7 @@ async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountRespons
                     (account_id, symbol, qty),
                 )
 
-    # 确保 SQLite 中存在该玩家 User 记录（供新闻传播使用）
+    # 确保 SQLite 中存在该玩家 User 记录，供新闻传播使用。
     try:
         from ifrontier.infra.sqlite import news as news_db
         news_db.create_user(account_id)
@@ -1183,12 +1187,26 @@ class ContractParty(BaseModel):
     party_id: str
     role: str
 
+
+def _normalize_contract_party_ids(parties: List[Any]) -> List[str]:
+    out: List[str] = []
+    for p in list(parties or []):
+        if isinstance(p, ContractParty):
+            out.append(str(p.party_id))
+        elif isinstance(p, dict):
+            pid = p.get("party_id")
+            if pid is not None:
+                out.append(str(pid))
+        else:
+            out.append(str(p))
+    return out
+
 class ContractCreateRequest(BaseModel):
     actor_id: str
     kind: str
     title: str
     terms: Dict[str, Any]
-    parties: List[ContractParty]
+    parties: List[Any]
     required_signers: list[str]
     participation_mode: str | None = None
     invited_parties: list[str] | None = None
@@ -1571,13 +1589,7 @@ async def wealth_public_get(user_id: str) -> WealthPublicResponse:
 @router.post("/contracts/create")
 async def contract_create(req: ContractCreateRequest) -> ContractCreateResponse:
     try:
-        # Convert List[ContractParty] back to the format expected by ContractService
-        # ContractService.create_contract expects List[str] for parties in some versions, 
-        # or it might handle the new structure if updated.
-        # Let's check backend/src/ifrontier/services/contracts.py
-        
-        party_ids = [p.party_id for p in req.parties]
-        
+        party_ids = _normalize_contract_party_ids(req.parties)
         contract_id = _contract_service.create_contract(
             kind=req.kind,
             title=req.title,
@@ -1599,7 +1611,7 @@ class PlayerListResponse(BaseModel):
 
 @router.get("/players")
 async def list_players(limit: int = 100) -> PlayerListResponse:
-    """列出所有活跃玩家 ID，用于聊天 @ 提醒"""
+    """列出活跃玩家 ID，用于聊天 @ 提醒。"""
     try:
         conn = get_connection()
         rows = conn.execute(
@@ -1618,7 +1630,7 @@ async def list_players(limit: int = 100) -> PlayerListResponse:
                 items.append(account_id)
         return PlayerListResponse(items=items)
     except Exception:
-        # 兜底：尝试从 Neo4j 用户网络中取（可能为空）
+        # 兜底：尝试从新闻用户表中取（可能为空）
         try:
             users_from_news = _news_service.list_users(limit=int(limit))
             # 返回 raw user_id（可能是 user:xxx），这里做一次归一化
@@ -1649,7 +1661,7 @@ async def list_contracts(
     limit: int = 50,
     status: str | None = None,
 ) -> ContractListResponse:
-    """列出当前玩家相关的契约，用于聊天引用"""
+    """列出当前玩家相关的合约，用于聊天引用。"""
     aid = actor_id
     if aid is not None:
         aid = str(aid)
@@ -1734,7 +1746,7 @@ class ContractBatchItem(BaseModel):
     kind: str
     title: str
     terms: Dict[str, Any]
-    parties: List[ContractParty]
+    parties: List[Any]
     required_signers: List[str]
     participation_mode: str | None = None
     invited_parties: List[str] | None = None
@@ -1762,7 +1774,7 @@ async def contract_batch_create(req: ContractBatchCreateRequest) -> ContractBatc
                 "kind": c.kind,
                 "title": c.title,
                 "terms": c.terms,
-                "parties": [p.party_id for p in c.parties],
+                "parties": _normalize_contract_party_ids(c.parties),
                 "required_signers": c.required_signers,
                 "participation_mode": c.participation_mode,
                 "invited_parties": c.invited_parties,
@@ -1990,8 +2002,8 @@ class NewsCreateCardResponse(BaseModel):
 
 @router.post("/news/cards")
 async def news_create_card(req: NewsCreateCardRequest) -> NewsCreateCardResponse:
-    # 该端点用于 GM/脚本/调试直接铸造卡牌。
-    # 正式玩法中，玩家应通过 /news/store/purchase 购买获得卡牌，而不是自行创建。
+    # 该端点用于 GM、脚本或调试场景直接铸造卡牌。
+    # 正式玩法中，玩家应通过 /news/store/purchase 获得卡牌，而不是自行创建。
     allow_direct_create = str(os.getenv("IF_NEWS_ALLOW_DIRECT_CREATE") or "0").strip().lower() in {
         "1",
         "true",
@@ -2086,15 +2098,12 @@ class NewsMutateVariantResponse(BaseModel):
 
 @router.post("/news/variants/mutate")
 async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVariantResponse:
-    # 篡改消息(Mutate)固定售价：50,000 + 按字计费
-    base_mutate_price = 50000.0
-    unit_cash = float(os.getenv("IF_NEWS_MUTATE_CASH_PER_CHAR") or "10.0")
-    char_count = len(req.new_text or "")
-    cash_cost = base_mutate_price + (float(char_count) * float(unit_cash))
-
-    # 允许通过 spend_cash 参数覆盖（用于测试场景）
+    cash_cost = 0.0
     if req.spend_cash is not None and req.spend_cash > 0:
         cash_cost = float(req.spend_cash)
+    else:
+        unit_cash = float(os.getenv("IF_NEWS_MUTATE_CASH_PER_CHAR") or "0.0")
+        cash_cost = float(len(req.new_text or "")) * float(unit_cash)
 
     if cash_cost > 0:
         try:
@@ -2107,7 +2116,7 @@ async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVarian
             parent_variant_id=req.parent_variant_id,
             editor_id=req.editor_id,
             new_text=req.new_text,
-            influence_cost=float(cash_cost),
+            influence_cost=float(req.influence_cost),
             risk_roll=req.risk_roll,
             correlation_id=req.correlation_id,
         )
@@ -2183,7 +2192,8 @@ async def news_propagate_quote(req: NewsPropagateQuoteRequest) -> NewsPropagateQ
     depth = int(ctx.get("mutation_depth") or 0)
 
     base_unit = float(os.getenv("IF_NEWS_PROPAGATE_CASH_PER_DELIVERY") or "500.0")
-    per_delivery_cost = base_unit * (2.0 ** depth)
+    mutation_mult = float(os.getenv("IF_NEWS_PROPAGATE_MUTATION_MULT") or "1.0")
+    per_delivery_cost = base_unit * (1.0 + (float(depth) * mutation_mult))
 
     affordable = int(budget // per_delivery_cost)
     if affordable < 0:
@@ -2217,10 +2227,9 @@ async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
         ctx = _news_service.get_variant_context(variant_id=req.variant_id) or {}
         depth = int(ctx.get("mutation_depth") or 0)
 
-        # 基础传播单价上调，并引入指数增长逻辑
-        # 基础价格 500，每增加一层深度价格翻倍
         base_unit = float(os.getenv("IF_NEWS_PROPAGATE_CASH_PER_DELIVERY") or "500.0")
-        per_delivery_cost = base_unit * (2.0 ** depth)
+        mutation_mult = float(os.getenv("IF_NEWS_PROPAGATE_MUTATION_MULT") or "1.0")
+        per_delivery_cost = base_unit * (1.0 + (float(depth) * mutation_mult))
         
         budget = float(req.spend_cash)
         if budget <= 0:
@@ -2302,6 +2311,7 @@ async def news_broadcast(req: NewsBroadcastRequest) -> NewsBroadcastResponse:
 
     await hub.broadcast_json("events", ev.model_dump())
     await hub.broadcast_json(str(EventType.NEWS_BROADCASTED), ev.model_dump())
+    _commonbot_emergency_runner.maybe_react(broadcast_event=ev)
 
     return NewsBroadcastResponse(
         delivered=delivered,
@@ -2326,13 +2336,6 @@ class NewsSuppressResponse(BaseModel):
 
 @router.post("/news/suppress")
 async def news_suppress(req: NewsSuppressRequest) -> NewsSuppressResponse:
-    # 压制消息固定售价：100,000
-    suppress_price = 100000.0
-    try:
-        spend_cash(account_id=req.actor_id, amount=suppress_price, event_id=str(uuid4()))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"Insufficient funds for suppression: {str(exc)}")
-
     try:
         event_json = _news_tick_engine.suppress_propagation(
             actor_id=req.actor_id,
@@ -2370,6 +2373,97 @@ class NewsOwnershipEventResponse(BaseModel):
 
 class NewsOwnedCardsResponse(BaseModel):
     cards: list[str]
+
+
+class NewsChainStartRequest(BaseModel):
+    kind: str
+    actor_id: str
+    t0_seconds: int
+    t0_at: str | None = None
+    omen_interval_seconds: int
+    abort_probability: float
+    grant_count: int
+    seed: int
+    symbols: list[str] = []
+    correlation_id: UUID | None = None
+    extra_truth: Dict[str, Any] | None = None
+
+
+class NewsChainStartResponse(BaseModel):
+    chain_id: str
+    major_card_id: str
+    correlation_id: UUID | None = None
+    t0_at: str
+
+
+class NewsTickRequest(BaseModel):
+    now_iso: str | None = None
+    limit: int = 50
+
+
+class NewsTickResponse(BaseModel):
+    now: str
+    chains: List[Dict[str, Any]]
+    spawned_events: List[Dict[str, Any]]
+
+
+@router.post("/news/chains/start")
+async def news_chain_start(req: NewsChainStartRequest) -> NewsChainStartResponse:
+    t0_at: datetime | None = None
+    if req.t0_at:
+        try:
+            t0_at = datetime.fromisoformat(str(req.t0_at))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="invalid t0_at") from exc
+
+    try:
+        result = _news_tick_engine.start_chain(
+            kind=req.kind,
+            actor_id=req.actor_id,
+            t0_seconds=int(req.t0_seconds),
+            t0_at=t0_at,
+            omen_interval_seconds=int(req.omen_interval_seconds),
+            abort_probability=float(req.abort_probability),
+            grant_count=int(req.grant_count),
+            seed=int(req.seed),
+            symbols=list(req.symbols or []),
+            correlation_id=req.correlation_id,
+            extra_truth=req.extra_truth,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    card_event = result.get("card_created_event")
+    chain_event = result.get("chain_started_event")
+    if card_event is not None:
+        await hub.broadcast_json("events", card_event.model_dump())
+        await hub.broadcast_json(str(EventType.NEWS_CARD_CREATED), card_event.model_dump())
+    if chain_event is not None:
+        await hub.broadcast_json("events", chain_event.model_dump())
+        await hub.broadcast_json(str(EventType.NEWS_CHAIN_STARTED), chain_event.model_dump())
+
+    return NewsChainStartResponse(
+        chain_id=str(result["chain_id"]),
+        major_card_id=str(result["major_card_id"]),
+        correlation_id=req.correlation_id,
+        t0_at=result["t0_at"].isoformat() if hasattr(result["t0_at"], "isoformat") else str(result["t0_at"]),
+    )
+
+
+@router.post("/news/tick")
+async def news_tick(req: NewsTickRequest) -> NewsTickResponse:
+    now: datetime | None = None
+    if req.now_iso:
+        try:
+            now = datetime.fromisoformat(str(req.now_iso))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="invalid now_iso") from exc
+    result = await _news_tick_engine.tick(now=now, limit=int(req.limit))
+    return NewsTickResponse(
+        now=str(result["now"]),
+        chains=list(result.get("chains") or []),
+        spawned_events=list(result.get("spawned_events") or []),
+    )
 
 
 @router.post("/news/ownership/grant")
@@ -2416,7 +2510,7 @@ async def news_ownership_list(user_id: str, limit: int = 200) -> NewsOwnedCardsR
 class NewsStorePurchaseRequest(BaseModel):
     buyer_user_id: str
     kind: str
-    # 可选：测试/特殊场景下允许自定义价格；不提供则使用系统价
+    # 鍙€夛細娴嬭瘯/鐗规畩鍦烘櫙涓嬪厑璁歌嚜瀹氫箟浠锋牸锛涗笉鎻愪緵鍒欎娇鐢ㄧ郴缁熶环
     price_cash: float | None = None
     preset_id: str | None = None
     image_anchor_id: str | None = None
@@ -2463,7 +2557,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     if cfg is None:
         raise HTTPException(status_code=400, detail="unknown kind")
 
-    # 优先使用请求中的 price_cash（用于单元测试和特殊玩法），否则使用系统定价
+    # 优先使用请求中的 price_cash；否则使用系统定价。
     req_price = float(req.price_cash) if req.price_cash is not None else 0.0
     system_price = req_price if req_price > 0 else float(cfg.get("price_cash") or 0.0)
     if system_price <= 0:
@@ -2493,9 +2587,9 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
             symbol_options = [str(sec_symbols[0])]
 
     req_symbols = list(req.symbols or [])
-    # 对于不需要 symbols 的类型（如 RUMOR），允许任意 symbol 或为空
+    # 对于不需要 symbols 的类型，允许 symbol 为空。
     if symbol_options:
-        # 需要 symbols 的类型：必须且只能选择一个，并且在可选列表中
+        # 需要 symbols 的类型：必须且只能选择一个，并且必须在可选列表中。
         if len(req_symbols) != 1:
             raise HTTPException(status_code=400, detail="exactly one symbol required")
         if req_symbols[0] not in symbol_options:
@@ -2507,7 +2601,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # MAJOR_EVENT / WORLD_EVENT：购买即创建事件链，T0 延迟广播；不立即投递给所有人
+    # MAJOR_EVENT / WORLD_EVENT锛氳喘涔板嵆鍒涘缓浜嬩欢閾撅紝T0 寤惰繜骞挎挱锛涗笉绔嬪嵆鎶曢€掔粰鎵€鏈変汉
     if str(req.kind) in {"MAJOR_EVENT", "WORLD_EVENT"}:
         try:
             t0_at = None
@@ -2522,7 +2616,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
                 sec_symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
             
             print(f"[API:Purchase] Starting chain for {req.kind}, t0_at={t0_at}, symbols={req_symbols or sec_symbols}")
-            # v0.1: 对于测试阶段，将默认倒计时从 60s 缩短至 15s，提高反馈速度
+            # v0.1: 瀵逛簬娴嬭瘯闃舵锛屽皢榛樿鍊掕鏃朵粠 60s 缂╃煭鑷?15s锛屾彁楂樺弽棣堥€熷害
             default_delay = 15 if str(req.kind) == "WORLD_EVENT" else 60
             result = _news_tick_engine.start_chain(
                 kind=req.kind,
@@ -2541,7 +2635,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
             raise HTTPException(status_code=400, detail=f"failed to start news chain: {str(exc)}")
 
         major_card_id = str(result["major_card_id"])
-        # 购买者获得主事件卡所有权
+        # 璐拱鑰呰幏寰椾富浜嬩欢鍗℃墍鏈夋潈
         try:
             _news_service.grant_ownership(
                 card_id=major_card_id,
@@ -2560,7 +2654,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
             variant_id=None,
         )
 
-    # 普通卡：等效“随机拾到”，只投递给购买者，后续靠其手动助推传播
+    # 普通卡等效为“随机捡到”的新闻，先投递给购买者，后续再由其手动助推传播。
     symbols = req_symbols
     presets = _news_service.get_preset_templates(kind=str(req.kind), symbols=symbols)
     preset_id = str(req.preset_id) if req.preset_id is not None else ""

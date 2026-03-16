@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from dataclasses import dataclass
@@ -129,16 +129,8 @@ def save_news(
     conn = get_connection()
     now = datetime.now(timezone.utc).isoformat()
     
-    # Determine published_at
     pub_at = published_at
     if pub_at is None and variant_id is not None:
-        # If emitting a variant, usually it's "published" immediately or later
-        # But if we are creating a card, it might not be published yet.
-        # We can default to now if not provided, or let caller decide.
-        # For safety, let's allow None (draft) but if we are calling "save_news" for a variant, we probably want to set it.
-        # Let's check the signature of emit_variant: it has no published_at param in the neo4j version I saw.
-        # However, the prompt asks for "published_at" field.
-        # I will allow None for draft cards.
         pass
 
     with conn:
@@ -242,20 +234,31 @@ def list_news_by_tag(tag: str, limit: int = 50) -> List[NewsRecord]:
 
 
 def list_user_inbox(user_id: str, limit: int = 50) -> List[NewsRecord]:
-    # This is different from "list_news". 
-    # In the Neo4j version, "inbox" is a relationship `(:User)-[:INBOX_ITEM]->(:Delivery)`.
-    # We don't have a delivery table here yet. 
-    # The prompt didn't explicitly ask for "inbox" implementation in the new file, but "list_news" etc.
-    # However, `NewsService.list_inbox` exists.
-    # Let's assume for now we just implement the "news" storage.
-    # If I need to implement inbox, I'd need a "deliveries" table.
-    # The user asked for "functions like ... list_news, list_news_by_symbol, ...".
-    # I will skip inbox for now unless I see it's strictly required.
-    return []
+    rows = list_inbox(user_id=user_id, limit=limit)
+    items: List[NewsRecord] = []
+    for row in rows:
+        items.append(
+            NewsRecord(
+                card_id=str(row["card_id"]),
+                variant_id=str(row["variant_id"]),
+                kind=str(row["kind"]),
+                text=str(row["text"]),
+                symbols=list(row.get("symbols") or []),
+                tags=list(row.get("tags") or []),
+                publisher_id=None,
+                published_at=str(row["created_at"]),
+                is_suppressed=False,
+                suppression_reason=None,
+                truth_payload=dict(row.get("truth_payload") or {}),
+                image_uri=None,
+                preset_id=None,
+            )
+        )
+    return items
 
 
 def get_card_owner(card_id: str) -> Optional[str]:
-    # In Neo4j: MATCH (u:User)-[:OWNS_NEWS]->(c:NewsCard {card_id: ...}) RETURN u.user_id
+    # 通过 news_ownership 表查找卡牌当前所有者
     conn = get_connection()
     row = conn.execute(
         "SELECT user_id FROM news_ownership WHERE card_id = ?", (card_id,)
@@ -362,15 +365,16 @@ def grant_ownership(card_id: str, user_id: str, granter_id: str) -> None:
 
 
 def transfer_ownership(card_id: str, from_user_id: str, to_user_id: str, transferred_by: str) -> None:
-    # In Neo4j: MATCH (u:User {user_id: from})-[:OWNS_NEWS]->(c:NewsCard {card_id: card_id}) DETACH DELETE r ...
-    # But here we just update.
+    # SQLite 版本通过更新 news_ownership 记录完成转移。
     conn = get_connection()
     now = datetime.now(timezone.utc).isoformat()
     with conn:
-        conn.execute(
+        cursor = conn.execute(
             "UPDATE news_ownership SET user_id = ?, granted_at = ?, granter_id = ? WHERE card_id = ? AND user_id = ?",
             (to_user_id, now, transferred_by, card_id, from_user_id),
         )
+    if int(getattr(cursor, "rowcount", 0) or 0) <= 0:
+        raise ValueError("current owner not found")
 
 
 def list_owned_cards(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
@@ -379,7 +383,7 @@ def list_owned_cards(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
     rows = conn.execute(
         """
         SELECT n.*, no.granted_at, no.granter_id FROM news_ownership no
-        JOIN news n ON n.card_id = no.card_id
+        JOIN news n ON n.card_id = no.card_id AND n.variant_id IS NULL
         WHERE no.user_id = ?
         ORDER BY no.granted_at DESC
         LIMIT ?
@@ -437,9 +441,11 @@ def list_inbox(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
             n.text,
             n.symbols_json,
             n.tags_json,
-            n.truth_payload_json
+            n.truth_payload_json,
+            CASE WHEN no.card_id IS NOT NULL THEN 1 ELSE 0 END AS owns_card
         FROM news_deliveries d
         JOIN news n ON n.variant_id = d.variant_id
+        LEFT JOIN news_ownership no ON no.card_id = n.card_id AND no.user_id = d.to_player_id
         WHERE d.to_player_id = ?
         ORDER BY d.delivered_at DESC
         LIMIT ?
@@ -482,7 +488,7 @@ def list_inbox(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
                 "symbols": symbols,
                 "tags": tags,
                 "truth_payload": truth_payload,
-                "owns_card": False,
+                "owns_card": bool(r["owns_card"]),
             }
         )
     return items
@@ -503,7 +509,7 @@ def count_cards() -> int:
 
 
 def list_user_inbox_news(user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
-    """获取用户的 inbox 新闻，用于 AI 代理的市场情报"""
+    """获取用户收件箱中的最近新闻，用于 AI 代理的市场情报。"""
     conn = get_connection()
     rows = conn.execute(
         """
@@ -520,12 +526,12 @@ def list_user_inbox_news(user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
 
 
 def list_all_cards(limit: int = 50) -> List[Dict[str, Any]]:
-    """获取所有新闻卡片，用于调试端点"""
+    """获取所有新闻卡片，用于调试端点。"""
     conn = get_connection()
     rows = conn.execute(
         """
-        SELECT card_id, kind, from_actor_id, visibility_level,
-               delivery_reason, created_at, published_at, text,
+        SELECT card_id, kind, publisher_id, created_at, published_at, text,
+               image_uri, image_anchor_id, preset_id,
                symbols_json, tags_json, truth_payload_json
         FROM news
         WHERE variant_id IS NULL
@@ -546,7 +552,7 @@ def list_all_cards(limit: int = 50) -> List[Dict[str, Any]]:
 
 
 def list_variants_by_card(card_id: str, limit: int = 50) -> List[Dict[str, Any]]:
-    """获取指定卡片的所有变体，用于调试端点"""
+    """获取指定卡片的所有变体，用于调试端点。"""
     conn = get_connection()
     rows = conn.execute(
         """
@@ -563,7 +569,7 @@ def list_variants_by_card(card_id: str, limit: int = 50) -> List[Dict[str, Any]]
 
 
 def list_deliveries_by_variant(variant_id: str, limit: int = 200) -> List[Dict[str, Any]]:
-    """获取指定变体的所有投递记录，用于调试端点"""
+    """获取指定变体的所有投递记录，用于调试端点。"""
     conn = get_connection()
     rows = conn.execute(
         """
@@ -580,7 +586,7 @@ def list_deliveries_by_variant(variant_id: str, limit: int = 200) -> List[Dict[s
 
 
 def list_deliveries_by_user(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
-    """获取指定用户的所有投递记录，用于调试端点"""
+    """获取指定用户的所有投递记录，用于调试端点。"""
     conn = get_connection()
     rows = conn.execute(
         """
@@ -601,4 +607,5 @@ def list_deliveries_by_user(user_id: str, limit: int = 50) -> List[Dict[str, Any
         d["text"] = r["text"] if r["text"] else ""
         result.append(d)
     return result
+
 

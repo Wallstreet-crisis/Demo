@@ -11,18 +11,16 @@
 
 ### SQLite
 - 本项目使用 SQLite 落盘到 `backend/data/ledger.db`（首次启动会自动创建表）。
+- 当前后端主运行链路（账户、账本、订单、事件、新闻、社交关系、托管等）均以 SQLite 为权威存储。
 
 ### 前端
 - frontend\vite.config.ts   去看这个配置
 
-### Neo4j（必需）
-- 默认连接参数在 `src/ifrontier/core/settings.py`。
-- 通过环境变量配置（前缀 `IF_`）：
-  - `IF_NEO4J_URI`（默认 `bolt://localhost:7687`）
-  - `IF_NEO4J_USER`（默认 `neo4j`）
-  - `IF_NEO4J_PASSWORD`（默认 `password`）
-- 初始化 Cypher：`backend/scripts/neo4j/init.cypher`   这个文件需要粘贴到前端的neo4j数据库中 有个对应入口，AI知道
-docker start neo4j   
+### Neo4j
+- 项目正在从 Neo4j 完全迁移到 SQLite。
+- 当前后端主流程已不再依赖 Neo4j 才能启动或运行。
+- 仓库中仍可能保留少量历史文档表述，需按 SQLite 现状理解。
+
 ### 大模型（可选，但托管AI/ContractAgent会用到）
 - 通过 OpenRouter 调用（代码在 `src/ifrontier/infra/llm/openrouter.py`）。
 - 环境变量：

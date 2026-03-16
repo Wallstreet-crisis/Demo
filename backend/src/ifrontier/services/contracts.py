@@ -468,15 +468,16 @@ class ContractService:
         if contract.status not in ("DRAFT", "SIGNED"):
             raise ValueError("contract not in signable state")
 
-        parties = list(contract.parties)
-        if signer not in parties:
-            parties.append(signer)
+        ok = sqlite_sign_contract(contract_id, signer)
+        if not ok:
+            raise ValueError("contract not found or not signable")
 
         required = set(contract.required_signers)
-        all_signed = required.issubset(set(parties))
+        signed_parties = set((sqlite_get_contract(contract_id) or contract).signed_parties)
+        all_signed = required.issubset(signed_parties)
 
         if all_signed:
-            sqlite_update_contract_status(contract_id, "ACTIVE")
+            sqlite_update_contract_status(contract_id, ContractStatus.SIGNED.value)
 
         contract = sqlite_get_contract(contract_id)
         status = contract.status if contract else "DRAFT"
@@ -489,37 +490,6 @@ class ContractService:
             payload=payload,
         )
         self._event_store.append(EventEnvelopeJson.from_envelope(env))
-
-        if str(status) == ContractStatus.ACTIVE.value:
-            payload2 = ContractActivatedPayload(contract_id=contract_id, activated_at=now)
-            env2 = EventEnvelope[ContractActivatedPayload](
-                event_type=EventType.CONTRACT_ACTIVATED,
-                correlation_id=uuid4(),
-                actor=EventActor(user_id=signer),
-                payload=payload2,
-            )
-            self._event_store.append(EventEnvelopeJson.from_envelope(env2))
-
-            has_exec_rules = False
-            try:
-                contract = sqlite_get_contract(contract_id)
-                if contract:
-                    terms = json.loads(contract.terms_json)
-                    rules_raw = terms.get("rules")
-                    has_exec_rules = isinstance(rules_raw, list) and any(isinstance(x, dict) for x in rules_raw)
-            except Exception:
-                has_exec_rules = False
-
-            try:
-                self.run_rules(contract_id=contract_id, actor_id=signer)
-            except Exception as exc:
-                print(f"[ContractService] auto run_rules skipped/failed: {contract_id}: {exc}")
-
-            if not has_exec_rules:
-                try:
-                    self.settle_contract(contract_id=contract_id, actor_id=signer)
-                except Exception as exc:
-                    print(f"[ContractService] auto settle skipped/failed: {contract_id}: {exc}")
         return ContractStatus(status)
 
     def activate_contract(self, *, contract_id: str, actor_id: str) -> None:
@@ -539,27 +509,6 @@ class ContractService:
             payload=payload,
         )
         self._event_store.append(EventEnvelopeJson.from_envelope(env))
-
-        has_exec_rules = False
-        try:
-            contract = sqlite_get_contract(contract_id)
-            if contract:
-                terms = json.loads(contract.terms_json)
-                rules_raw = terms.get("rules")
-                has_exec_rules = isinstance(rules_raw, list) and any(isinstance(x, dict) for x in rules_raw)
-        except Exception:
-            has_exec_rules = False
-
-        try:
-            self.run_rules(contract_id=contract_id, actor_id=actor_id)
-        except Exception as exc:
-            print(f"[ContractService] auto run_rules skipped/failed: {contract_id}: {exc}")
-
-        if not has_exec_rules:
-            try:
-                self.settle_contract(contract_id=contract_id, actor_id=actor_id)
-            except Exception as exc:
-                print(f"[ContractService] auto settle skipped/failed: {contract_id}: {exc}")
 
     def settle_contract(self, *, contract_id: str, actor_id: str) -> None:
         now = datetime.now(timezone.utc)

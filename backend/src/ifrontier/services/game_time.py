@@ -33,10 +33,19 @@ def _parse_bool(value: str | None, default: bool = False) -> bool:
 
 
 def load_game_time_config_from_env() -> GameTimeConfig:
-    enabled = _parse_bool(os.getenv("IF_GAME_TIME_ENABLED"), default=True)
+    enabled = _parse_bool(os.getenv("IF_GAME_TIME_ENABLED"), default=False)
 
     epoch = None
-    if enabled:
+    epoch_raw = os.getenv("IF_GAME_EPOCH_UTC")
+    if epoch_raw:
+        try:
+            epoch = datetime.fromisoformat(epoch_raw)
+            if epoch.tzinfo is None:
+                epoch = epoch.replace(tzinfo=timezone.utc)
+            epoch = epoch.astimezone(timezone.utc)
+        except Exception:
+            epoch = _DEFAULT_EPOCH_UTC
+    elif enabled:
         from ifrontier.infra.sqlite.db import get_connection
         conn = get_connection()
         row = conn.execute("SELECT value FROM game_meta WHERE key = 'epoch_utc'").fetchone()
@@ -49,17 +58,7 @@ def load_game_time_config_from_env() -> GameTimeConfig:
                 epoch = None
 
     if epoch is None:
-        epoch_raw = os.getenv("IF_GAME_EPOCH_UTC")
-        if epoch_raw:
-            try:
-                epoch = datetime.fromisoformat(epoch_raw)
-                if epoch.tzinfo is None:
-                    epoch = epoch.replace(tzinfo=timezone.utc)
-                epoch = epoch.astimezone(timezone.utc)
-            except Exception:
-                epoch = _DEFAULT_EPOCH_UTC
-        else:
-            epoch = _DEFAULT_EPOCH_UTC
+        epoch = _DEFAULT_EPOCH_UTC
         
         # Persist if enabled
         if enabled:
