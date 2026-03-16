@@ -23,6 +23,11 @@ from ifrontier.services.game_time import game_time_now, load_game_time_config_fr
 
 
 class NewsService:
+    _REPEATABLE_DELIVERY_REASONS = {
+        "PURCHASED",
+        "PAID_PROMOTION",
+    }
+
     def __init__(self, event_store: SqliteEventStore) -> None:
         self._event_store = event_store
 
@@ -339,15 +344,27 @@ class NewsService:
         visibility_level: str,
         delivery_reason: str,
         correlation_id: UUID | None = None,
-    ) -> tuple[str, EventEnvelopeJson]:
+    ) -> tuple[str | None, EventEnvelopeJson | None]:
         now = self._now_game_utc()
-        delivery_id = str(uuid4())
 
         variant = news_db.get_variant(variant_id)
         if variant is None or not variant.get("card_id"):
             raise ValueError("variant not found")
 
         card_id = str(variant["card_id"])
+
+        reason_key = str(delivery_reason or "").upper()
+        if reason_key not in self._REPEATABLE_DELIVERY_REASONS:
+            existing = news_db.find_delivery(
+                variant_id=variant_id,
+                to_player_id=to_player_id,
+                from_actor_id=from_actor_id,
+                delivery_reason=delivery_reason,
+            )
+            if existing is not None:
+                return str(existing.get("delivery_id") or ""), None
+
+        delivery_id = str(uuid4())
 
         news_db.deliver_variant(
             delivery_id=delivery_id,
@@ -400,7 +417,8 @@ class NewsService:
                 delivery_reason="SOCIAL_PROPAGATION",
                 correlation_id=correlation_id,
             )
-            delivered_events.append(event_json)
+            if event_json is not None:
+                delivered_events.append(event_json)
 
         return delivered_events
 
@@ -420,7 +438,7 @@ class NewsService:
 
         count = 0
         for to_player_id in users:
-            _delivery_id, _delivery_event = self.deliver_variant(
+            _delivery_id, delivery_event = self.deliver_variant(
                 variant_id=variant_id,
                 to_player_id=to_player_id,
                 from_actor_id=actor_id,
@@ -428,7 +446,8 @@ class NewsService:
                 delivery_reason="BROADCAST",
                 correlation_id=corr,
             )
-            count += 1
+            if delivery_event is not None:
+                count += 1
 
         variant = news_db.get_variant(variant_id)
         card_id = str((variant or {}).get("card_id") or "")

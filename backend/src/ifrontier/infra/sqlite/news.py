@@ -424,6 +424,27 @@ def deliver_variant(
         )
 
 
+def find_delivery(
+    *,
+    variant_id: str,
+    to_player_id: str,
+    from_actor_id: str,
+    delivery_reason: str,
+) -> Dict[str, Any] | None:
+    conn = get_connection()
+    row = conn.execute(
+        """
+        SELECT delivery_id, variant_id, to_player_id, from_actor_id, visibility_level, delivery_reason, delivered_at
+        FROM news_deliveries
+        WHERE variant_id = ? AND to_player_id = ? AND from_actor_id = ? AND delivery_reason = ?
+        ORDER BY delivered_at DESC
+        LIMIT 1
+        """,
+        (variant_id, to_player_id, from_actor_id, delivery_reason),
+    ).fetchone()
+    return dict(row) if row is not None else None
+
+
 def list_inbox(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
     conn = get_connection()
     rows = conn.execute(
