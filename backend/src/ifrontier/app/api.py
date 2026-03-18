@@ -977,6 +977,11 @@ class MarketQuoteResponse(BaseModel):
     ma_5: float | None
     ma_20: float | None
     vol_20: float | None
+    listing_price: float | None = None
+    day_open: float | None = None
+    day_amplitude_pct: float | None = None
+    sector: str = ""
+    status: str = "TRADABLE"
     high_24h: float | None = None
     low_24h: float | None = None
     volume_24h: float | None = None
@@ -1000,6 +1005,11 @@ async def market_quote(symbol: str) -> MarketQuoteResponse:
         ma_5=q.ma_5,
         ma_20=q.ma_20,
         vol_20=q.vol_20,
+        listing_price=q.listing_price,
+        day_open=q.day_open,
+        day_amplitude_pct=q.day_amplitude_pct,
+        sector=q.sector,
+        status=q.status,
         high_24h=q.high_24h,
         low_24h=q.low_24h,
         volume_24h=q.volume_24h,

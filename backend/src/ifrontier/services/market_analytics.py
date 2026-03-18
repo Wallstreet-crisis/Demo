@@ -23,6 +23,11 @@ class MarketQuote:
     ma_5: Optional[float]
     ma_20: Optional[float]
     vol_20: Optional[float]
+    listing_price: Optional[float] = None
+    day_open: Optional[float] = None
+    day_amplitude_pct: Optional[float] = None
+    sector: str = ""
+    status: str = "TRADABLE"
     high_24h: Optional[float] = None
     low_24h: Optional[float] = None
     volume_24h: Optional[float] = None
@@ -58,15 +63,19 @@ def _volatility(prices: List[float], window: int) -> Optional[float]:
 def get_quote(symbol: str, *, series_limit: int = 200) -> MarketQuote:
     prices = get_price_series(symbol=symbol, limit=series_limit)
     last_price = get_last_price(symbol)
+    from ifrontier.infra.sqlite.securities import get_security
+    sec = get_security(symbol)
+    listing_price = float(sec.seed_price) if sec else None
+    sector = str(sec.sector) if sec else ""
+    status = str(sec.status) if sec else "TRADABLE"
 
     # 兜底：如果还没有成交，使用证券定义的种子价格
     if last_price is None:
-        from ifrontier.infra.sqlite.securities import get_security
-        sec = get_security(symbol)
         if sec:
             last_price = float(sec.seed_price)
 
     prev_price: Optional[float] = None
+    day_open: Optional[float] = None
 
     cfg = load_game_time_config_from_env()
     baseline_time = None
@@ -94,14 +103,15 @@ def get_quote(symbol: str, *, series_limit: int = 200) -> MarketQuote:
             prev_price = float(prev_close)
         
         # 2. 如果没有昨收（如第一天），则获取基准时间后的第一笔成交价（作为“开盘价”）
-        if prev_price is None:
-            conn = get_connection()
-            row = conn.execute(
-                "SELECT price FROM market_trades WHERE symbol = ? AND occurred_at >= ? ORDER BY occurred_at ASC, trade_id ASC LIMIT 1",
-                (symbol, baseline_time.isoformat()),
-            ).fetchone()
-            if row:
-                prev_price = float(row["price"])
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT price FROM market_trades WHERE symbol = ? AND occurred_at >= ? ORDER BY occurred_at ASC, trade_id ASC LIMIT 1",
+            (symbol, baseline_time.isoformat()),
+        ).fetchone()
+        if row:
+            day_open = float(row["price"])
+            if prev_price is None:
+                prev_price = day_open
 
     # 3. 如果依然没有成交记录（全新上市），则获取该标的的历史第一笔成交（创世交易）
     if prev_price is None:
@@ -115,10 +125,11 @@ def get_quote(symbol: str, *, series_limit: int = 200) -> MarketQuote:
 
     # 4. 最后兜底：使用证券定义的种子价格
     if prev_price is None:
-        from ifrontier.infra.sqlite.securities import get_security
-        sec = get_security(symbol)
         if sec:
             prev_price = float(sec.seed_price)
+
+    if day_open is None:
+        day_open = prev_price or last_price or listing_price
 
     # 5. 极端兜底：如果连种子价都没有（理论上不会），使用当前价
     if prev_price is None:
@@ -145,6 +156,10 @@ def get_quote(symbol: str, *, series_limit: int = 200) -> MarketQuote:
             low_24h = float(stats["l"])
             volume_24h = float(stats["v"] or 0.0)
 
+    day_amplitude_pct: Optional[float] = None
+    if high_24h is not None and low_24h is not None and day_open is not None and day_open > 0:
+        day_amplitude_pct = float((high_24h - low_24h) / day_open)
+
     return MarketQuote(
         symbol=symbol,
         last_price=last_price,
@@ -153,6 +168,11 @@ def get_quote(symbol: str, *, series_limit: int = 200) -> MarketQuote:
         ma_5=_ma(prices, 5),
         ma_20=_ma(prices, 20),
         vol_20=_volatility(prices, 20),
+        listing_price=listing_price,
+        day_open=day_open,
+        day_amplitude_pct=day_amplitude_pct,
+        sector=sector,
+        status=status,
         high_24h=high_24h,
         low_24h=low_24h,
         volume_24h=volume_24h,

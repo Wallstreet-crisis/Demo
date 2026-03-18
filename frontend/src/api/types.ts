@@ -8,6 +8,11 @@ export type MarketQuoteResponse = {
   ma_5: number | null
   ma_20: number | null
   vol_20: number | null
+  listing_price?: number | null
+  day_open?: number | null
+  day_amplitude_pct?: number | null
+  sector?: string
+  status?: string
   high_24h?: number | null
   low_24h?: number | null
   volume_24h?: number | null

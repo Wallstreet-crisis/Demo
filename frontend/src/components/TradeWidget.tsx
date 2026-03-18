@@ -81,6 +81,23 @@ export default function TradeWidget({ isFocused }: { isFocused?: boolean }) {
 
   const availableCash = val?.cash ?? 0
   const availablePos = val?.positions ? (val.positions[symbol] ?? 0) : 0
+  const changeColor = (quote?.change_pct ?? 0) >= 0 ? 'var(--terminal-success)' : 'var(--terminal-error)'
+  const formatPrice = (value: number | null | undefined) => (value == null ? '--' : value.toFixed(2))
+  const formatPct = (value: number | null | undefined) => (value == null ? '--' : `${(value * 100).toFixed(2)}%`)
+  const quoteFacts = [
+    { label: '上市价', value: formatPrice(quote?.listing_price) },
+    { label: '今开', value: formatPrice(quote?.day_open) },
+    { label: '昨收', value: formatPrice(quote?.prev_price) },
+    { label: '最高', value: formatPrice(quote?.high_24h) },
+    { label: '最低', value: formatPrice(quote?.low_24h) },
+    { label: '振幅', value: formatPct(quote?.day_amplitude_pct) },
+    { label: 'MA5', value: formatPrice(quote?.ma_5) },
+    { label: 'MA20', value: formatPrice(quote?.ma_20) },
+    { label: '20期波动', value: formatPct(quote?.vol_20) },
+    { label: '24h量', value: quote?.volume_24h == null ? '--' : quote.volume_24h.toLocaleString() },
+    { label: '板块', value: quote?.sector || '--' },
+    { label: '状态', value: quote?.status || '--' },
+  ]
   
   const estimatedValue = useMemo(() => {
     const p = orderType === 'MARKET' ? (quote?.last_price ?? 0) : Number(price)
@@ -260,6 +277,27 @@ export default function TradeWidget({ isFocused }: { isFocused?: boolean }) {
             <span style={{ fontWeight: '700', color: (side === 'BUY' ? estimatedValue > availableCash : Number(quantity) > availablePos) ? 'var(--terminal-error)' : 'var(--terminal-success)' }}>
               {side === 'BUY' ? `$${availableCash.toLocaleString()}` : `${availablePos.toLocaleString()} unit`}
             </span>
+          </div>
+        </div>
+
+        <div style={{ border: '1px solid var(--terminal-border)', borderRadius: '4px', background: 'rgba(15, 23, 42, 0.45)', padding: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <div>
+              <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>MARKET_FACTS</div>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff', marginTop: '4px' }}>{symbol}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: changeColor }}>{formatPrice(quote?.last_price)}</div>
+              <div style={{ fontSize: '11px', color: changeColor }}>{formatPct(quote?.change_pct)}</div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px 12px' }}>
+            {quoteFacts.map((item) => (
+              <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '11px', minWidth: 0 }}>
+                <span style={{ color: '#64748b', flexShrink: 0 }}>{item.label}</span>
+                <span style={{ color: '#e2e8f0', fontWeight: 600, textAlign: 'right', overflowWrap: 'anywhere' }}>{item.value}</span>
+              </div>
+            ))}
           </div>
         </div>
 
