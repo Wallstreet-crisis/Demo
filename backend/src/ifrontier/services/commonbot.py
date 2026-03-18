@@ -13,7 +13,7 @@ from ifrontier.domain.events.payloads import (
     TradeIntentSubmittedPayload,
 )
 from ifrontier.domain.events.types import EventType
-from ifrontier.infra.llm.openrouter import OpenRouterClient, extract_first_message_text
+from ifrontier.infra.llm.client import LlmClient, extract_first_message_text
 from ifrontier.core.ai_logger import log_ai_action, log_ai_thought
 
 
@@ -313,12 +313,12 @@ def _llm_decide_from_news(
         if (now - ts).total_seconds() <= max(30, cache_ttl_seconds):
             return payload
 
-    client = OpenRouterClient.from_env()
+    client = LlmClient.for_task(task="commonbot_news")
     if client is None:
         log_ai_action(
             agent_id=f"commonbot:{symbol}",
             action_type="LLM_NOT_CONFIGURED",
-            detail="OPENROUTER_API_KEY missing",
+            detail="LLM provider api key missing",
         )
         return None
 

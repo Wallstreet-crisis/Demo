@@ -16,7 +16,7 @@ export default function DashboardPage() {
   const [focusWidget, setFocusWidget] = useState<string | null>(null)
   const [systemLoad, setSystemLoad] = useState(72)
   const [netSync, setNetSync] = useState(12)
-  const [logs, setLogs] = useState<{ id: string; text: string; type: 'info' | 'warn' | 'err' }[]>([])
+  const [, setLogs] = useState<{ id: string; text: string; type: 'info' | 'warn' | 'err' }[]>([])
   const [aiHosting, setAiHosting] = useState(false)
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window === 'undefined' ? 1400 : window.innerWidth,

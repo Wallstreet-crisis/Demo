@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from ifrontier.domain.events.envelope import EventActor, EventEnvelope, EventEnvelopeJson
 from ifrontier.domain.events.types import EventType
-from ifrontier.infra.llm.openrouter import OpenRouterClient, extract_first_message_text
+from ifrontier.infra.llm.client import LlmClient, extract_first_message_text
 from ifrontier.infra.sqlite.hosting import load_hosting_context, save_hosting_context
 from ifrontier.services.skills import default_skills_registry
 from ifrontier.services.user_capabilities import UserCapabilityFacade
@@ -51,7 +51,7 @@ class UserHostingAgent:
         action_id = str(uuid4())
 
         reg = default_skills_registry()
-        llm = OpenRouterClient.from_env()
+        llm = LlmClient.for_task(task="hosting_agent")
 
         # 记录 Tick 进入
         log_ai_action(agent_id=f"hosting:{self.user_id}", action_type="TICK_ENTRY", detail=f"LLM_READY: {llm is not None}")
@@ -61,7 +61,7 @@ class UserHostingAgent:
         decision: Dict[str, Any] = {"note": "idle"}
 
         if llm is None:
-            log_ai_action(agent_id=f"hosting:{self.user_id}", action_type="LLM_NOT_CONFIGURED", detail="OpenRouter API key might be missing")
+            log_ai_action(agent_id=f"hosting:{self.user_id}", action_type="LLM_NOT_CONFIGURED", detail="LLM provider api key might be missing")
             return []
 
         # 用户可见观测（必须只经由 facade 获取，避免越权）

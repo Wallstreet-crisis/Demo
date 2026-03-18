@@ -7,3 +7,4 @@ backend/logs/*
 .env.*
 deploy/.env
 deploy/.env.*
+logs/ai_behavior.log

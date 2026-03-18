@@ -11,6 +11,7 @@ from ifrontier.infra.sqlite.market import init_market_schema
 from ifrontier.infra.sqlite.news import init_news_schema, init_news_relationships_schema
 from ifrontier.infra.sqlite.news_chain import init_news_chain_schema
 from ifrontier.infra.sqlite.orders import init_order_schema
+from ifrontier.infra.sqlite.settings import init_settings_schema
 from ifrontier.infra.sqlite.securities import init_securities_schema, load_securities_pool_from_env
 
 
@@ -79,6 +80,8 @@ def init_schema() -> None:
     init_chat_schema()
 
     init_hosting_schema()
+
+    init_settings_schema()
 
     # Bot 入局资产（机构/散户代表群），只在创世阶段写入，之后交易严格走账本
     init_bot_accounts()

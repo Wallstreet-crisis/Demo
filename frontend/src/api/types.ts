@@ -495,6 +495,94 @@ export type HostingDebugTickResponse = {
   ok: boolean
 }
 
+export type AppDisplaySettings = {
+  price_color_scheme: string
+  compact_quotes: boolean
+  show_market_phase_badge: boolean
+}
+
+export type AppPreferencesResponse = {
+  actor_id: string
+  language: string
+  rise_color: string
+  display: AppDisplaySettings
+  updated_at?: string | null
+}
+
+export type AppPreferencesUpdateRequest = {
+  actor_id: string
+  language?: string | null
+  rise_color?: string | null
+  display?: Record<string, unknown> | null
+}
+
+export type LlmSettingsResponse = {
+  actor_id: string
+  can_manage: boolean
+  provider: string
+  model: string
+  base_url: string
+  timeout_seconds: number
+  profiles: Record<string, { provider?: string; model: string; base_url: string; timeout_seconds: number }>
+  routing: Record<string, string>
+  providers_supported?: string[]
+  provider_api_key_masks?: Record<string, string | null>
+  has_api_key: boolean
+  api_key_masked?: string | null
+}
+
+export type LlmSettingsUpdateRequest = {
+  actor_id: string
+  provider: string
+  model: string
+  base_url: string
+  timeout_seconds: number
+  profiles?: Record<string, { provider?: string; model: string; base_url: string; timeout_seconds: number }> | null
+  routing?: Record<string, string> | null
+  api_key?: string | null
+  api_keys?: Record<string, string> | null
+}
+
+export type LlmConnectionTestRequest = {
+  actor_id: string
+  provider: string
+  model: string
+  base_url: string
+  timeout_seconds: number
+  api_key?: string | null
+}
+
+export type LlmConnectionTestResponse = {
+  ok: boolean
+  provider: string
+  model: string
+  base_url: string
+  message: string
+  model_count: number
+  first_model?: string | null
+}
+
+export type LlmNetworkDiagnosticRequest = {
+  actor_id: string
+  providers?: string[] | null
+  api_keys?: Record<string, string> | null
+  timeout_seconds?: number
+}
+
+export type LlmNetworkDiagnosticItem = {
+  provider: string
+  base_url: string
+  ok: boolean
+  latency_ms: number
+  message: string
+  model_count: number
+  first_model?: string | null
+}
+
+export type LlmNetworkDiagnosticResponse = {
+  items: LlmNetworkDiagnosticItem[]
+}
+
 export type WealthPublicRefreshResponse = {
   public_count: number
   event_id: string

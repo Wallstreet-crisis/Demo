@@ -3,11 +3,13 @@
 import json
 import os
 import random
+import time
 from datetime import datetime, timedelta, timezone
 
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
+from fastapi.concurrency import run_in_threadpool
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, RootModel
 
@@ -37,6 +39,15 @@ from ifrontier.services.hosting_scheduler import HostingScheduler
 from ifrontier.services.user_capabilities import UserCapabilityFacade
 from ifrontier.infra.sqlite.securities import load_securities_pool_from_env, set_status
 from ifrontier.services.market_maker import MarketMaker, MarketMakerConfig
+from ifrontier.infra.llm.client import LlmClient, LlmConfig, LlmError, extract_first_message_text
+from ifrontier.services.app_settings import (
+    get_llm_settings_view,
+    get_user_preferences,
+    load_secure_llm_config,
+    save_llm_settings_layered,
+    save_llm_settings,
+    save_user_preferences,
+)
 
 router = APIRouter()
 
@@ -72,6 +83,301 @@ async def debug_bots_reset_balances() -> Dict[str, Any]:
 @router.get("/health")
 def health() -> Dict[str, str]:
     return {"status": "ok"}
+
+
+class AppDisplaySettings(BaseModel):
+    price_color_scheme: str = "cn_red_up"
+    compact_quotes: bool = False
+    show_market_phase_badge: bool = True
+
+
+class AppPreferencesResponse(BaseModel):
+    actor_id: str
+    language: str
+    rise_color: str
+    display: AppDisplaySettings
+    updated_at: Optional[str] = None
+
+
+class AppPreferencesUpdateRequest(BaseModel):
+    actor_id: str
+    language: Optional[str] = None
+    rise_color: Optional[str] = None
+    display: Optional[Dict[str, Any]] = None
+
+
+class LlmSettingsResponse(BaseModel):
+    actor_id: str
+    can_manage: bool
+    provider: str
+    model: str
+    base_url: str
+    timeout_seconds: float
+    profiles: Dict[str, Any] = {}
+    routing: Dict[str, str] = {}
+    providers_supported: List[str] = []
+    provider_api_key_masks: Dict[str, Optional[str]] = {}
+    has_api_key: bool
+    api_key_masked: Optional[str] = None
+
+
+class LlmSettingsUpdateRequest(BaseModel):
+    actor_id: str
+    provider: str = "openrouter"
+    model: str = "google/gemini-2.5-flash"
+    base_url: str = "https://openrouter.ai/api/v1"
+    timeout_seconds: float = 20.0
+    profiles: Optional[Dict[str, Any]] = None
+    routing: Optional[Dict[str, str]] = None
+    api_key: Optional[str] = None
+    api_keys: Optional[Dict[str, str]] = None
+
+
+class LlmConnectionTestRequest(BaseModel):
+    actor_id: str
+    provider: str = "openrouter"
+    model: str = "google/gemini-2.5-flash"
+    base_url: str = "https://openrouter.ai/api/v1"
+    timeout_seconds: float = 20.0
+    api_key: Optional[str] = None
+
+
+class LlmConnectionTestResponse(BaseModel):
+    ok: bool
+    provider: str
+    model: str
+    base_url: str
+    message: str
+    model_count: int = 0
+    first_model: Optional[str] = None
+
+
+class LlmNetworkDiagnosticRequest(BaseModel):
+    actor_id: str
+    providers: Optional[List[str]] = None
+    api_keys: Optional[Dict[str, str]] = None
+    timeout_seconds: float = 12.0
+
+
+class LlmNetworkDiagnosticItem(BaseModel):
+    provider: str
+    base_url: str
+    ok: bool
+    latency_ms: float
+    message: str
+    model_count: int = 0
+    first_model: Optional[str] = None
+
+
+class LlmNetworkDiagnosticResponse(BaseModel):
+    items: List[LlmNetworkDiagnosticItem]
+
+
+@router.get("/settings/preferences/{actor_id}")
+async def settings_get_preferences(actor_id: str) -> AppPreferencesResponse:
+    prefs = get_user_preferences(actor_id)
+    return AppPreferencesResponse(
+        actor_id=str(actor_id),
+        language=str(prefs.get("language") or "zh-CN"),
+        rise_color=str(prefs.get("rise_color") or "red_up"),
+        display=AppDisplaySettings(**dict(prefs.get("display") or {})),
+        updated_at=prefs.get("updated_at"),
+    )
+
+
+@router.post("/settings/preferences")
+async def settings_save_preferences(req: AppPreferencesUpdateRequest) -> AppPreferencesResponse:
+    prefs = save_user_preferences(
+        actor_id=req.actor_id,
+        language=req.language,
+        rise_color=req.rise_color,
+        display=dict(req.display or {}),
+    )
+    return AppPreferencesResponse(
+        actor_id=str(req.actor_id),
+        language=str(prefs.get("language") or "zh-CN"),
+        rise_color=str(prefs.get("rise_color") or "red_up"),
+        display=AppDisplaySettings(**dict(prefs.get("display") or {})),
+        updated_at=prefs.get("updated_at"),
+    )
+
+
+@router.get("/settings/llm/{actor_id}")
+async def settings_get_llm(actor_id: str) -> LlmSettingsResponse:
+    cfg = get_llm_settings_view(actor_id=actor_id)
+    return LlmSettingsResponse(actor_id=str(actor_id), **cfg)
+
+
+@router.post("/settings/llm")
+async def settings_save_llm(req: LlmSettingsUpdateRequest) -> LlmSettingsResponse:
+    try:
+        if req.profiles is not None or req.routing is not None:
+            cfg = save_llm_settings_layered(
+                actor_id=req.actor_id,
+                provider=req.provider,
+                api_key=req.api_key,
+                api_keys=dict(req.api_keys or {}),
+                profiles=dict(req.profiles or {}),
+                routing=dict(req.routing or {}),
+            )
+        else:
+            cfg = save_llm_settings(
+                actor_id=req.actor_id,
+                provider=req.provider,
+                model=req.model,
+                base_url=req.base_url,
+                timeout_seconds=float(req.timeout_seconds),
+                api_key=req.api_key,
+            )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    return LlmSettingsResponse(actor_id=str(req.actor_id), **cfg)
+
+
+@router.post("/settings/llm/test")
+async def settings_test_llm(req: LlmConnectionTestRequest) -> LlmConnectionTestResponse:
+    view = get_llm_settings_view(actor_id=req.actor_id)
+    if not bool(view.get("can_manage")):
+        raise HTTPException(status_code=403, detail="actor is not allowed to manage llm settings")
+
+    provider = str(req.provider or "openrouter").strip().lower()
+    current = load_secure_llm_config()
+    current_keys = current.get("api_keys") or {}
+    legacy_provider = str(current.get("provider") or provider or "openrouter").strip().lower()
+    legacy_api_key = str(current.get("api_key") or "").strip()
+    if legacy_api_key and legacy_provider not in current_keys:
+        current_keys = {**dict(current_keys), legacy_provider: legacy_api_key}
+    api_key = str(req.api_key).strip() if req.api_key is not None and str(req.api_key).strip() else str(current_keys.get(provider) or "")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="api_key is required for connection test")
+
+    client = LlmClient(
+        LlmConfig(
+            provider=provider,
+            api_key=api_key,
+            model=str(req.model or current.get("model") or "google/gemini-2.5-flash"),
+            base_url=str(req.base_url or current.get("base_url") or str(view.get("base_url") or "https://openrouter.ai/api/v1")),
+            timeout_seconds=float(req.timeout_seconds or current.get("timeout_seconds") or 20.0),
+        )
+    )
+    try:
+        result = client.chat_completions(
+            system="You are a connectivity probe. Reply with a single token: OK",
+            user="Respond with OK only.",
+            temperature=0.0,
+            max_tokens=8,
+        )
+    except LlmError as exc:
+        return LlmConnectionTestResponse(
+            ok=False,
+            provider=provider,
+            model=str(req.model or current.get("model") or "google/gemini-2.5-flash"),
+            base_url=str(req.base_url or current.get("base_url") or str(view.get("base_url") or "https://openrouter.ai/api/v1")),
+            message=str(exc)[:500] or "LLM connection failed",
+        )
+
+    return LlmConnectionTestResponse(
+        ok=True,
+        provider=provider,
+        model=str(req.model or current.get("model") or "google/gemini-2.5-flash"),
+        base_url=str(req.base_url or current.get("base_url") or str(view.get("base_url") or "https://openrouter.ai/api/v1")),
+        message="指定模型可用",
+        model_count=int(len(result.get("choices") or [])),
+        first_model=extract_first_message_text(result)[:80] or None,
+    )
+
+
+@router.post("/settings/llm/diagnostics")
+async def settings_llm_diagnostics(req: LlmNetworkDiagnosticRequest) -> LlmNetworkDiagnosticResponse:
+    view = get_llm_settings_view(actor_id=req.actor_id)
+    if not bool(view.get("can_manage")):
+        raise HTTPException(status_code=403, detail="actor is not allowed to manage llm settings")
+
+    current = load_secure_llm_config()
+    stored_keys = dict(current.get("api_keys") or {})
+    legacy_provider = str(current.get("provider") or "openrouter").strip().lower()
+    legacy_api_key = str(current.get("api_key") or "").strip()
+    if legacy_api_key and legacy_provider not in stored_keys:
+        stored_keys[legacy_provider] = legacy_api_key
+    req_keys = {str(k).strip().lower(): str(v).strip() for k, v in dict(req.api_keys or {}).items() if str(v).strip()}
+    merged_keys = {**stored_keys, **req_keys}
+    providers = [
+        str(x).strip().lower()
+        for x in (req.providers or view.get("providers_supported") or ["openrouter", "deepseek", "minimax", "kimi", "openai", "anthropic", "google", "xai"])
+        if str(x).strip()
+    ]
+
+    base_url_map = {
+        "openrouter": "https://openrouter.ai/api/v1",
+        "deepseek": "https://api.deepseek.com/v1",
+        "minimax": "https://api.minimax.chat/v1",
+        "kimi": "https://api.moonshot.cn/v1",
+        "openai": "https://api.openai.com/v1",
+        "anthropic": "https://api.anthropic.com/v1",
+        "google": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "xai": "https://api.x.ai/v1",
+    }
+    default_model_map = {
+        "openrouter": "google/gemini-2.5-flash",
+        "deepseek": "deepseek-chat",
+        "minimax": "MiniMax-M1",
+        "kimi": "kimi-k2-0711-preview",
+        "openai": "gpt-4.1-mini",
+        "anthropic": "claude-sonnet-4-20250514",
+        "google": "gemini-2.5-flash",
+        "xai": "grok-3-mini",
+    }
+
+    items: List[LlmNetworkDiagnosticItem] = []
+    for provider in providers:
+        api_key = str(merged_keys.get(provider) or "").strip()
+        if not api_key:
+            items.append(
+                LlmNetworkDiagnosticItem(
+                    provider=provider,
+                    base_url=str(base_url_map.get(provider) or ""),
+                    ok=False,
+                    latency_ms=0.0,
+                    message="missing api key",
+                )
+            )
+            continue
+
+        started_at = time.perf_counter()
+        client = LlmClient(
+            LlmConfig(
+                provider=provider,
+                api_key=api_key,
+                model=str(default_model_map.get(provider) or ""),
+                base_url=str(base_url_map.get(provider) or ""),
+                timeout_seconds=float(req.timeout_seconds or 12.0),
+            )
+        )
+        try:
+            ping = client.ping()
+            items.append(
+                LlmNetworkDiagnosticItem(
+                    provider=provider,
+                    base_url=str(base_url_map.get(provider) or ""),
+                    ok=True,
+                    latency_ms=(time.perf_counter() - started_at) * 1000.0,
+                    message="models endpoint reachable",
+                    model_count=int(ping.get("model_count") or 0),
+                    first_model=ping.get("first_model"),
+                )
+            )
+        except LlmError as exc:
+            items.append(
+                LlmNetworkDiagnosticItem(
+                    provider=provider,
+                    base_url=str(base_url_map.get(provider) or ""),
+                    ok=False,
+                    latency_ms=(time.perf_counter() - started_at) * 1000.0,
+                    message=str(exc)[:500] or "diagnostic failed",
+                )
+            )
+
+    return LlmNetworkDiagnosticResponse(items=items)
 
 class DebugSecuritiesSetStatusRequest(BaseModel):
     symbol: str
@@ -1233,7 +1539,11 @@ class ContractAgentDraftResponse(BaseModel):
 @router.post("/contract-agent/draft")
 async def contract_agent_draft(req: ContractAgentDraftRequest) -> ContractAgentDraftResponse:
     try:
-        res = _contract_agent.draft(actor_id=req.actor_id, natural_language=req.natural_language)
+        res = await run_in_threadpool(
+            _contract_agent.draft,
+            actor_id=req.actor_id,
+            natural_language=req.natural_language,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -1278,12 +1588,17 @@ class ContractAgentAppendEditRequest(BaseModel):
 @router.post("/contract-agent/append_edit")
 async def contract_agent_append_edit(req: ContractAgentAppendEditRequest) -> ContractAgentDraftResponse:
     try:
-        _contract_agent.append_edit_context(
+        await run_in_threadpool(
+            _contract_agent.append_edit_context,
             actor_id=req.actor_id,
             base_contract_create=req.base_contract_create,
             instruction=req.instruction,
         )
-        res = _contract_agent.draft(actor_id=req.actor_id, natural_language=req.instruction)
+        res = await run_in_threadpool(
+            _contract_agent.draft,
+            actor_id=req.actor_id,
+            natural_language=req.instruction,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -1328,7 +1643,8 @@ async def contract_agent_audit(req: ContractAgentAuditRequest) -> ContractAgentA
         except Exception:
             snapshot["terms"] = {}
 
-        audit = _contract_agent.audit_contract(
+        audit = await run_in_threadpool(
+            _contract_agent.audit_contract,
             actor_id=req.actor_id,
             contract_id=req.contract_id,
             contract_snapshot=snapshot,

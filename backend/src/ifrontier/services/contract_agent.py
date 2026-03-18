@@ -11,7 +11,7 @@ from ifrontier.infra.sqlite.contract_agent import (
     load_contract_agent_context,
     save_contract_agent_context,
 )
-from ifrontier.infra.llm.openrouter import OpenRouterClient, extract_first_message_text
+from ifrontier.infra.llm.client import LlmClient, extract_first_message_text
 
 
 @dataclass(frozen=True)
@@ -72,7 +72,7 @@ class ContractAgent:
         ctx_rec = load_contract_agent_context(actor_id)
         ctx = dict(ctx_rec.context) if ctx_rec is not None else {}
 
-        llm = OpenRouterClient.from_env()
+        llm = LlmClient.for_task(task="contract_draft")
         if llm is not None:
             llm_res = self._draft_with_llm(actor_id=actor_id, natural_language=text, context=ctx, llm=llm)
             if llm_res is not None:
@@ -378,7 +378,7 @@ class ContractAgent:
                 risk_rating=str(cached.get("risk_rating") or "LOW"),
             )
 
-        llm = OpenRouterClient.from_env()
+        llm = LlmClient.for_task(task="contract_audit")
         if llm is None:
             res = ContractAuditResult(
                 audit_id=str(uuid4()),
@@ -422,7 +422,7 @@ class ContractAgent:
         actor_id: str,
         contract_id: str,
         contract_snapshot: Dict[str, Any],
-        llm: OpenRouterClient,
+        llm: LlmClient,
     ) -> ContractAuditResult | None:
         system = (
             "你是财务审计官(Financial Auditor)，仅输出合规JSON，禁止输出任何额外文字、注释、符号。",
@@ -483,7 +483,7 @@ class ContractAgent:
         actor_id: str,
         natural_language: str,
         context: Dict[str, Any],
-        llm: OpenRouterClient,
+        llm: LlmClient,
     ) -> ContractDraftResult | None:
         print(f"[ContractAgent] Attempting LLM draft for {actor_id}...")
         system = (

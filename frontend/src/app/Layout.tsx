@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Api, WsClient, type MarketSessionResponse } from '../api'
 
 import { CASTES } from './constants'
+import SettingsModal from '../components/SettingsModal'
 
 function NavItem(props: { to: string; label: string }) {
   const loc = useLocation()
@@ -79,6 +80,7 @@ export default function Layout() {
   const [valuationOk, setValuationOk] = useState<boolean>(true)
   const [hostingLoading, setHostingLoading] = useState(false)
   const [marketSession, setMarketSession] = useState<MarketSessionResponse | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const presenceWs = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
 
@@ -253,6 +255,23 @@ export default function Layout() {
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
           {sess.playerId && (
             <>
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="cyber-button"
+                style={{
+                  width: '30px',
+                  height: '30px',
+                  padding: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '15px',
+                }}
+                title="设置"
+              >
+                ⚙
+              </button>
+
               <button 
                 onClick={toggleHosting}
                 disabled={hostingLoading}
@@ -317,6 +336,10 @@ export default function Layout() {
       <main style={{ flex: 1, padding: '5px', overflow: 'hidden' }}>
         <Outlet />
       </main>
+
+      {sess.playerId && (
+        <SettingsModal actorId={`user:${sess.playerId}`} open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      )}
 
       {/* Terminal Footer Status Bar */}
       <footer style={{ 

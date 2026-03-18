@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 # 专门用于记录 AI 代理行为的日志记录器
 # 它会同时输出到 console (带颜色/前缀) 和 backend/logs/ai_behavior.log
@@ -56,3 +57,28 @@ def log_ai_thought(agent_id: str, news_context: str, decision: str):
     """记录 AI 的思维过程（针对新闻或社交输入）。"""
     msg = f"🧠 <{agent_id}> THINKING: {news_context[:100]}... -> DECISION: {decision}"
     ai_logger.info(msg)
+
+
+def log_llm_metric(
+    *,
+    task: str,
+    profile: str,
+    model: str,
+    duration_ms: float,
+    success: bool,
+    prompt_chars: int,
+    max_tokens: int,
+    extra: Optional[Dict[str, Any]] = None,
+):
+    payload = {
+        "task": str(task),
+        "profile": str(profile),
+        "model": str(model),
+        "duration_ms": round(float(duration_ms), 2),
+        "success": bool(success),
+        "prompt_chars": int(prompt_chars),
+        "max_tokens": int(max_tokens),
+    }
+    if extra:
+        payload.update(extra)
+    ai_logger.info(f"[LLM_METRIC] {payload}")

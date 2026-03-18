@@ -2,6 +2,8 @@ import { ApiClient } from './http'
 import type {
   AccountValuationResponse,
   AccountLedgerResponse,
+  AppPreferencesResponse,
+  AppPreferencesUpdateRequest,
   ChatIntroFeeQuoteRequest,
   ChatIntroFeeQuoteResponse,
   ChatListMessagesResponse,
@@ -36,6 +38,12 @@ import type {
   HostingDisableResponse,
   HostingEnableResponse,
   HostingStatusResponse,
+  LlmConnectionTestRequest,
+  LlmConnectionTestResponse,
+  LlmNetworkDiagnosticRequest,
+  LlmNetworkDiagnosticResponse,
+  LlmSettingsResponse,
+  LlmSettingsUpdateRequest,
   MarketCandlesResponse,
   MyOpenOrdersListResponse,
   OrderBookResponse,
@@ -187,6 +195,13 @@ export const Api = {
   hostingDisable: (user_id: string) => api.post<HostingDisableResponse>(`/hosting/${encodeURIComponent(user_id)}/disable`),
   hostingStatus: (user_id: string) => api.get<HostingStatusResponse>(`/hosting/${encodeURIComponent(user_id)}/status`),
   hostingDebugTickOnce: () => api.post<HostingDebugTickResponse>('/hosting/debug/tick_once'),
+
+  settingsGetPreferences: (actor_id: string) => api.get<AppPreferencesResponse>(`/settings/preferences/${encodeURIComponent(actor_id)}`),
+  settingsSavePreferences: (req: AppPreferencesUpdateRequest) => api.post<AppPreferencesResponse>('/settings/preferences', req),
+  settingsGetLlm: (actor_id: string) => api.get<LlmSettingsResponse>(`/settings/llm/${encodeURIComponent(actor_id)}`),
+  settingsSaveLlm: (req: LlmSettingsUpdateRequest) => api.post<LlmSettingsResponse>('/settings/llm', req),
+  settingsTestLlm: (req: LlmConnectionTestRequest) => api.post<LlmConnectionTestResponse>('/settings/llm/test', req),
+  settingsLlmDiagnostics: (req: LlmNetworkDiagnosticRequest) => api.post<LlmNetworkDiagnosticResponse>('/settings/llm/diagnostics', req),
 
   debugEmitEvent: (req: DebugEmitEventRequest) => api.post<DebugEmitEventResponse>('/debug/emit_event', req),
 }
