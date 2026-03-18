@@ -96,6 +96,7 @@ export default function OnboardingPage() {
           player_id: playerId,
           caste_id: selected.id,
         })
+        void Api.bootstrapPrefetch(playerId)
         
         // 等待进度条走完
         setTimeout(() => {

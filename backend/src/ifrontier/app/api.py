@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import asyncio
 import json
 import os
 import random
@@ -1421,6 +1422,52 @@ class PlayerBootstrapRequest(BaseModel):
     caste_id: str | None = None
 
 
+async def _warm_player_bootstrap_data(*, player_id: str, account_id: str, preferred_symbols: list[str] | None = None) -> None:
+    try:
+        from ifrontier.infra.sqlite.securities import list_securities
+
+        def _run_warmup() -> None:
+            value_account(account_id=account_id, discount_factor=1.0)
+            get_market_session()
+            get_market_trends(symbols=[])
+
+            symbols: list[str] = []
+            seen: set[str] = set()
+            for sym in list(preferred_symbols or []):
+                ss = str(sym or "").strip().upper()
+                if ss and ss not in seen:
+                    seen.add(ss)
+                    symbols.append(ss)
+
+            try:
+                snap = get_snapshot(account_id)
+                for sym in (snap.positions or {}).keys():
+                    ss = str(sym or "").strip().upper()
+                    if ss and ss not in seen:
+                        seen.add(ss)
+                        symbols.append(ss)
+            except Exception:
+                pass
+
+            try:
+                tradable = list_securities(status="TRADABLE")
+            except Exception:
+                tradable = []
+
+            for sec in tradable[:6]:
+                ss = str(sec.symbol or "").strip().upper()
+                if ss and ss not in seen:
+                    seen.add(ss)
+                    symbols.append(ss)
+
+            for sym in symbols[:8]:
+                get_quote(sym)
+
+        await run_in_threadpool(_run_warmup)
+    except Exception as exc:
+        print(f"[API:Bootstrap] warmup skipped for {player_id}: {exc}")
+
+
 @router.post("/players/bootstrap")
 async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountResponse:
     # 骞傜瓑锛氬鏋滃凡瀛樺湪鍒欒繑鍥炵幇鏈夋暟鎹紝涓嶆姤閿欎篃涓嶉噸澶嶅彂鏀惧垵濮嬭祫浜?
@@ -1435,6 +1482,13 @@ async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountRespons
             with conn:
                 conn.execute("UPDATE accounts SET caste_id = ? WHERE account_id = ?", (req.caste_id, account_id))
             snap = get_snapshot(account_id)
+        asyncio.create_task(
+            _warm_player_bootstrap_data(
+                player_id=str(req.player_id),
+                account_id=account_id,
+                preferred_symbols=list((snap.positions or {}).keys()),
+            )
+        )
             
         return PlayerAccountResponse(
             account_id=snap.account_id, 
@@ -1479,6 +1533,13 @@ async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountRespons
         pass
 
     snap = get_snapshot(account_id)
+    asyncio.create_task(
+        _warm_player_bootstrap_data(
+            player_id=str(req.player_id),
+            account_id=account_id,
+            preferred_symbols=list((snap.positions or {}).keys()),
+        )
+    )
     return PlayerAccountResponse(
         account_id=snap.account_id, 
         cash=snap.cash, 

@@ -96,13 +96,44 @@ import type {
 } from './types'
 
 const api = new ApiClient()
+const bootstrapCache = new Map<string, { expiresAt: number; value: unknown }>()
+const bootstrapInflight = new Map<string, Promise<unknown>>()
+
+function getCached<T>(key: string): T | null {
+  const hit = bootstrapCache.get(key)
+  if (!hit) return null
+  if (hit.expiresAt <= Date.now()) {
+    bootstrapCache.delete(key)
+    return null
+  }
+  return hit.value as T
+}
+
+function setCached<T>(key: string, value: T, ttlMs: number): T {
+  bootstrapCache.set(key, { expiresAt: Date.now() + ttlMs, value })
+  return value
+}
+
+async function getWithBootstrapCache<T>(key: string, ttlMs: number, loader: () => Promise<T>): Promise<T> {
+  const cached = getCached<T>(key)
+  if (cached !== null) return cached
+  const inflight = bootstrapInflight.get(key)
+  if (inflight) return inflight as Promise<T>
+  const task = loader()
+    .then((value) => setCached(key, value, ttlMs))
+    .finally(() => {
+      bootstrapInflight.delete(key)
+    })
+  bootstrapInflight.set(key, task as Promise<unknown>)
+  return task
+}
 
 export const Api = {
   health: () => api.get<HealthResponse>('/health'),
 
-  marketSymbols: () => api.get<string[]>('/market/symbols'),
+  marketSymbols: () => getWithBootstrapCache<string[]>('marketSymbols', 8000, () => api.get<string[]>('/market/symbols')),
 
-  marketQuote: (symbol: string) => api.get<MarketQuoteResponse>(`/market/quote/${encodeURIComponent(symbol)}`),
+  marketQuote: (symbol: string) => getWithBootstrapCache<MarketQuoteResponse>(`marketQuote:${String(symbol).toUpperCase()}`, 6000, () => api.get<MarketQuoteResponse>(`/market/quote/${encodeURIComponent(symbol)}`)),
   marketSeries: (symbol: string, limit = 200) =>
     api.get<MarketSeriesResponse>(`/market/series/${encodeURIComponent(symbol)}`, { limit }),
   marketCandles: (symbol: string, interval_seconds = 60, limit = 200) =>
@@ -110,8 +141,8 @@ export const Api = {
       interval_seconds,
       limit,
     }),
-  marketSession: () => api.get<MarketSessionResponse>('/market/session'),
-  marketSummary: () => api.get<MarketSummaryResponse>('/market/summary'),
+  marketSession: () => getWithBootstrapCache<MarketSessionResponse>('marketSession', 8000, () => api.get<MarketSessionResponse>('/market/session')),
+  marketSummary: () => getWithBootstrapCache<MarketSummaryResponse>('marketSummary', 8000, () => api.get<MarketSummaryResponse>('/market/summary')),
 
   listPlayers: (limit = 100) => api.get<PlayerListResponse>('/players', { limit }),
   listContracts: (actor_id?: string, limit = 50, status?: string) =>
@@ -130,9 +161,9 @@ export const Api = {
 
   playersBootstrap: (req: PlayerBootstrapRequest) => api.post<PlayerBootstrapResponse>('/players/bootstrap', req),
 
-  playerAccount: (player_id: string) => api.get<PlayerAccountResponse>(`/players/${encodeURIComponent(player_id)}/account`),
+  playerAccount: (player_id: string) => getWithBootstrapCache<PlayerAccountResponse>(`playerAccount:${String(player_id).toLowerCase()}`, 8000, () => api.get<PlayerAccountResponse>(`/players/${encodeURIComponent(player_id)}/account`)),
   accountValuation: (account_id: string, discount_factor = 1.0) =>
-    api.get<AccountValuationResponse>(`/accounts/${encodeURIComponent(account_id)}/valuation`, { discount_factor }),
+    getWithBootstrapCache<AccountValuationResponse>(`accountValuation:${String(account_id).toLowerCase()}:${discount_factor}`, 6000, () => api.get<AccountValuationResponse>(`/accounts/${encodeURIComponent(account_id)}/valuation`, { discount_factor })),
 
   accountLedger: (account_id: string, limit = 200, before?: string) =>
     api.get<AccountLedgerResponse>(`/accounts/${encodeURIComponent(account_id)}/ledger`, { limit, before }),
@@ -204,6 +235,22 @@ export const Api = {
   settingsLlmDiagnostics: (req: LlmNetworkDiagnosticRequest) => api.post<LlmNetworkDiagnosticResponse>('/settings/llm/diagnostics', req),
 
   debugEmitEvent: (req: DebugEmitEventRequest) => api.post<DebugEmitEventResponse>('/debug/emit_event', req),
+
+  bootstrapPrefetch: async (playerId: string, symbol?: string) => {
+    const pid = String(playerId || '').trim()
+    if (!pid) return
+    const accountId = `user:${pid}`
+    const symbols = await Api.marketSymbols().catch(() => [] as string[])
+    const preferredSymbol = String(symbol || '').trim().toUpperCase()
+    const targets = [preferredSymbol, ...symbols].filter((v, idx, arr) => !!v && arr.indexOf(v) === idx).slice(0, 6)
+    await Promise.allSettled([
+      Api.playerAccount(pid),
+      Api.accountValuation(accountId, 1.0),
+      Api.marketSession(),
+      Api.marketSummary(),
+      ...targets.map((s) => Api.marketQuote(s)),
+    ])
+  },
 }
 
 export { ApiClient }

@@ -1,0 +1,47 @@
+2026-03-18 21:42:33,673 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-03-18 21:42:34,306 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:34,363 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 8, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-18 21:42:36,757 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:38,187 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:39,679 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:41,534 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:43,179 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:44,935 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:46,704 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:48,440 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:50,039 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:52,004 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:53,137 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 18773.93, 'success': True, 'prompt_chars': 13902, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 1826}
+2026-03-18 21:42:53,138 [INFO] 🧠 <hosting:bot:inst:1> THINKING: OBS: 8 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.75, 'quantity': 500000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'ORBIT_LOG', 'side': 'BUY', 'price': 7.2, 'quantity': 500000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.5, 'quantity': 250000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "You call that a fire sale? I'm buying BLUEGOLD at 0.75 and ORBIT_LOG at 7.2 - these are liquidation prices! Sovereign bans mean nothing when you're buying assets for pennies. Weak hands are still selling while I'm accumulating millions of shares. Watch what happens when the panic subsides."}}]}
+2026-03-18 21:42:53,178 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.75, 'quantity': 500000} | RES: True
+2026-03-18 21:42:53,199 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'ORBIT_LOG', 'side': 'BUY', 'price': 7.2, 'quantity': 500000} | RES: True
+2026-03-18 21:42:53,220 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.5, 'quantity': 250000} | RES: True
+2026-03-18 21:42:53,272 [INFO] <hosting:bot:inst:1> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "You call that a fire sale? I'm buying BLUEGOLD at 0.75 and ORBIT_LOG at 7.2 - these are liquidation prices! Sovereign bans mean nothing when you're buying assets for pennies. Weak hands are still selling while I'm accumulating millions of shares. Watch what happens when the panic subsides."} | RES: True
+2026-03-18 21:42:53,333 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-03-18 21:42:53,406 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 9, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-18 21:42:53,814 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:55,641 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:57,348 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:42:59,030 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:00,816 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:02,505 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:04,269 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:05,984 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:07,393 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:10,634 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 17226.49, 'success': True, 'prompt_chars': 11536, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 1873}
+2026-03-18 21:43:10,634 [INFO] 🧠 <hosting:bot:inst:2> THINKING: OBS: 9 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "Fire sale? This is a generational buying opportunity! While you're all chasing the same beaten-down names, I'm accumulating NEURALINK at 40.03 - that's a 60% discount from recent highs. Digital consciousness tech is the future, and sovereign bans can't stop human evolution. Weak hands selling at these levels are funding my retirement."}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.8, 'quantity': 250000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BIO_SYNTH', 'side': 'BUY', 'price': 12.3, 'quantity': 200000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.5, 'quantity': 150000}}]}
+2026-03-18 21:43:10,698 [INFO] <hosting:bot:inst:2> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "Fire sale? This is a generational buying opportunity! While you're all chasing the same beaten-down names, I'm accumulating NEURALINK at 40.03 - that's a 60% discount from recent highs. Digital consciousness tech is the future, and sovereign bans can't stop human evolution. Weak hands selling at these levels are funding my retirement."} | RES: True
+2026-03-18 21:43:10,724 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.8, 'quantity': 250000} | RES: True
+2026-03-18 21:43:10,745 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BIO_SYNTH', 'side': 'BUY', 'price': 12.3, 'quantity': 200000} | RES: True
+2026-03-18 21:43:10,766 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.5, 'quantity': 150000} | RES: True
+2026-03-18 21:43:19,951 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: True
+2026-03-18 21:43:20,007 [INFO] <hosting:bot:inst:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-18 21:43:20,237 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:22,143 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:24,127 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:25,637 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:27,152 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:28,669 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:30,291 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:31,883 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-18 21:43:33,424 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
