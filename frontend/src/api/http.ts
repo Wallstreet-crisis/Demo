@@ -18,6 +18,10 @@ export type ApiClientConfig = {
   baseUrl: string
 }
 
+export type RequestOptions = {
+  includeRoomId?: boolean
+}
+
 function getBaseUrl(): string {
   const override = localStorage.getItem('if_network_target')
   if (override) {
@@ -79,7 +83,18 @@ export class ApiClient {
     return joinUrl(this.baseUrl, path)
   }
 
-  async get<T>(path: string, query?: Record<string, string | number | boolean | undefined>): Promise<T> {
+  private buildHeaders(options?: RequestOptions, includeJsonContentType = false): HeadersInit {
+    const headers: Record<string, string> = {}
+    if (includeJsonContentType) {
+      headers['Content-Type'] = 'application/json'
+    }
+    if (options?.includeRoomId) {
+      headers['X-Room-Id'] = localStorage.getItem('if_room_id') || 'default'
+    }
+    return headers
+  }
+
+  async get<T>(path: string, query?: Record<string, string | number | boolean | undefined>, options?: RequestOptions): Promise<T> {
     const url = new URL(this.url(path), window.location.origin)
     if (query) {
       for (const [k, v] of Object.entries(query)) {
@@ -90,10 +105,7 @@ export class ApiClient {
 
     const res = await fetch(url.toString(), {
       method: 'GET',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-Room-Id': localStorage.getItem('if_room_id') || 'default'
-      },
+      headers: this.buildHeaders(options, false),
     })
 
     if (!res.ok) {
@@ -105,13 +117,10 @@ export class ApiClient {
     return (await readJsonSafe(res)) as T
   }
 
-  async post<T>(path: string, body?: unknown): Promise<T> {
+  async post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
     const res = await fetch(this.url(path), {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-Room-Id': localStorage.getItem('if_room_id') || 'default'
-      },
+      headers: this.buildHeaders(options, true),
       body: body === undefined ? undefined : JSON.stringify(body),
     })
 
@@ -124,13 +133,10 @@ export class ApiClient {
     return (await readJsonSafe(res)) as T
   }
 
-  async delete<T>(path: string): Promise<T> {
+  async delete<T>(path: string, options?: RequestOptions): Promise<T> {
     const res = await fetch(this.url(path), {
       method: 'DELETE',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-Room-Id': localStorage.getItem('if_room_id') || 'default'
-      },
+      headers: this.buildHeaders(options, true),
     })
 
     if (!res.ok) {

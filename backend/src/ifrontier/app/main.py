@@ -25,7 +25,13 @@ def create_app() -> FastAPI:
     from fastapi.middleware.cors import CORSMiddleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+        ],
+        allow_origin_regex=r"http://(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+)(:\d+)?$",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -33,6 +39,9 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def room_context_middleware(request: Request, call_next):
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         room_id = request.headers.get("X-Room-Id", "default")
         if not room_id.strip():
             room_id = "default"
