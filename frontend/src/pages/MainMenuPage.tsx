@@ -1,49 +1,49 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Api } from '../api'
-import type { RoomMeta } from '../api'
 import { useAppSession } from '../app/context'
 import SettingsModal from '../components/SettingsModal'
 
-const PLAYER_ID_RE = /^[a-zA-Z0-9_]{3,20}$/
-
 export default function MainMenuPage() {
   const nav = useNavigate()
-  const { playerId: globalPlayerId, setPlayerId: setGlobalPlayerId, setCasteId, setRoomId } = useAppSession()
+  const { setPlayerId: setGlobalPlayerId, setCasteId, setRoomId } = useAppSession()
   const [activeView, setActiveView] = useState<'MAIN' | 'LOCAL' | 'NETWORK'>('MAIN')
   const [networkIp, setNetworkIp] = useState('127.0.0.1:8010')
-  const [inputPlayerId, setInputPlayerId] = useState(() => {
-    return globalPlayerId || localStorage.getItem('if_last_input_id') || ''
-  })
-  const [isTransitioning, setIsTransitioning] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
-  const [localRooms, setLocalRooms] = useState<RoomMeta[]>([])
+  const [inputPlayerId, setInputPlayerId] = useState('')
+  const [localRooms, setLocalRooms] = useState<any[]>([])
+  const [remoteRooms, setRemoteRooms] = useState<any[]>([])
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [networkScanning, setNetworkScanning] = useState(false)
 
-  const isInputValid = PLAYER_ID_RE.test(inputPlayerId)
+  const isInputValid = inputPlayerId.length >= 3 && inputPlayerId.length <= 20
 
-  useEffect(() => {
-    if (isInputValid) {
-      localStorage.setItem('if_last_input_id', inputPlayerId)
-    }
-  }, [inputPlayerId, isInputValid])
-
-  const fetchLocalRooms = () => {
-    Api.listLocalRooms()
-      .then(res => {
+  const fetchLocalRooms = async () => {
+    try {
+      const res = await Api.listLocalRooms() as any
+      if (res.rooms) {
         setLocalRooms(res.rooms)
-        if (res.rooms.length > 0 && !selectedRoomId) {
-          setSelectedRoomId(res.rooms[0].room_id)
-        }
-      })
-      .catch(console.error)
+      } else {
+        setLocalRooms([])
+      }
+    } catch (e) {
+      console.error('Failed to list local rooms:', e)
+      setLocalRooms([])
+    }
   }
 
   useEffect(() => {
     if (activeView === 'LOCAL') {
+      localStorage.removeItem('if_network_target')
       fetchLocalRooms()
+      setSelectedRoomId(null)
+      setEditingRoomId(null)
+    } else if (activeView === 'NETWORK') {
+      setRemoteRooms([])
+      setSelectedRoomId(null)
     }
   }, [activeView])
 
@@ -114,16 +114,25 @@ export default function MainMenuPage() {
     if (!selectedRoomId || !isInputValid) return
     setIsTransitioning(true)
     localStorage.removeItem('if_network_target') // Reset network target to default
-    setTimeout(() => {
-      setRoomId(selectedRoomId)
-      setGlobalPlayerId(inputPlayerId)
-      nav('/dashboard')
-    }, 800)
+    const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
+    const activatePromise = Api.activateRoom(selectedRoomId)
+    const bootstrapPromise = activatePromise.then(() => Api.playersBootstrap({ player_id: inputPlayerId }))
+    void Promise.all([animationPromise, bootstrapPromise])
+      .then(() => {
+        setRoomId(selectedRoomId)
+        setGlobalPlayerId(inputPlayerId)
+        nav('/dashboard')
+      })
+      .catch((e) => {
+        console.error('Failed to resume simulation:', e)
+        setIsTransitioning(false)
+        alert('Failed to load simulation data for this player in the selected room.')
+      })
   }
 
   const handleJoinNetwork = async () => {
     if (!isInputValid || !networkIp) return
-    setIsTransitioning(true)
+    setNetworkScanning(true)
     
     // Save target before making request so ApiClient uses it
     localStorage.setItem('if_network_target', networkIp)
@@ -131,21 +140,38 @@ export default function MainMenuPage() {
     try {
       const res = await Api.networkJoinCheck() as any
       if (res.ok && res.rooms && res.rooms.length > 0) {
-        // Automatically join the most recent active room for now
-        const targetRoom = res.rooms[0].room_id
-        setGlobalPlayerId(inputPlayerId)
-        setCasteId('' as any)
-        setRoomId(targetRoom) 
-        nav('/onboarding')
+        setRemoteRooms(res.rooms)
       } else {
         throw new Error('No active sessions found on target server.')
       }
     } catch (e) {
       console.error('Failed to connect to network target:', e)
       localStorage.removeItem('if_network_target')
-      setIsTransitioning(false)
+      setRemoteRooms([])
       alert('Connection failed or no sessions found on remote host.')
+    } finally {
+      setNetworkScanning(false)
     }
+  }
+
+  const handleResumeNetworkSimulation = () => {
+    if (!selectedRoomId || !isInputValid || !networkIp) return
+    setIsTransitioning(true)
+    localStorage.setItem('if_network_target', networkIp)
+    const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
+    const bootstrapPromise = Api.playersBootstrap({ player_id: inputPlayerId })
+    void Promise.all([animationPromise, bootstrapPromise])
+      .then(() => {
+        setRoomId(selectedRoomId)
+        setGlobalPlayerId(inputPlayerId)
+        nav('/dashboard')
+      })
+      .catch((e) => {
+        console.error('Failed to join remote simulation:', e)
+        localStorage.removeItem('if_network_target')
+        setIsTransitioning(false)
+        alert('Failed to join remote simulation for this player.')
+      })
   }
 
   return (
@@ -313,34 +339,56 @@ export default function MainMenuPage() {
                 />
               </div>
 
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>TARGET_IP:PORT</div>
-                <input 
-                  type="text"
-                  value={networkIp}
-                  onChange={(e) => setNetworkIp(e.target.value)}
-                  className="cyber-input"
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    background: 'var(--panel-bg)',
-                    border: '1px solid var(--terminal-border)',
-                    color: 'var(--terminal-text)',
-                    padding: '0 16px',
-                    fontFamily: 'monospace',
-                    fontSize: '16px',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
+              {remoteRooms.length > 0 ? (
+                <>
+                  <div style={{ color: 'var(--terminal-info)', marginBottom: '16px', fontSize: '12px', fontFamily: 'monospace' }}>{'>'} REMOTE NODES FOUND</div>
+                  <MenuButton 
+                    onClick={handleResumeNetworkSimulation} 
+                    label="JOIN SIMULATION" 
+                    sub={selectedRoomId ? `Connect to node ${selectedRoomId}` : 'Select a node from list'} 
+                    disabled={!selectedRoomId || !isInputValid}
+                  />
+                  <MenuButton 
+                    onClick={() => {
+                      setRemoteRooms([])
+                      setSelectedRoomId(null)
+                    }} 
+                    label="RESCAN" 
+                    sub="Scan for different IP" 
+                  />
+                </>
+              ) : (
+                <>
+                  <div style={{ marginBottom: '24px' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>TARGET_IP:PORT</div>
+                    <input 
+                      type="text"
+                      value={networkIp}
+                      onChange={(e) => setNetworkIp(e.target.value)}
+                      className="cyber-input"
+                      style={{
+                        width: '100%',
+                        height: '44px',
+                        background: 'var(--panel-bg)',
+                        border: '1px solid var(--terminal-border)',
+                        color: 'var(--terminal-text)',
+                        padding: '0 16px',
+                        fontFamily: 'monospace',
+                        fontSize: '16px',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
 
-              <MenuButton 
-                onClick={handleJoinNetwork} 
-                label="INITIATE UPLINK" 
-                sub="Connect to remote host" 
-                disabled={!isInputValid}
-              />
-              <MenuButton onClick={() => setActiveView('MAIN')} label="RETURN" sub="Back to root" secondary />
+                  <MenuButton 
+                    onClick={handleJoinNetwork} 
+                    label={networkScanning ? "SCANNING..." : "INITIATE UPLINK"} 
+                    sub="Connect to remote host" 
+                    disabled={!isInputValid || networkScanning}
+                  />
+                  <MenuButton onClick={() => setActiveView('MAIN')} label="RETURN" sub="Back to root" secondary />
+                </>
+              )}
             </>
           )}
         </div>
@@ -504,7 +552,69 @@ export default function MainMenuPage() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>LAST SYNC:</span>
-                    <span style={{ color: '#94a3b8' }}>{new Date(room.updated_at).toLocaleString()}</span>
+                    <span style={{ color: '#94a3b8' }}>{room.updated_at ? new Date(room.updated_at).toLocaleString() : '--'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>NODE ID:</span>
+                    <span style={{ color: '#94a3b8' }}>{room.room_id.split('_')[1] || room.room_id}</span>
+                  </div>
+                </div>
+                {selectedRoomId === room.room_id && (
+                  <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: 'var(--terminal-info)' }} />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Remote Saves List */}
+        {activeView === 'NETWORK' && remoteRooms.length > 0 && (
+          <div className="cyber-card" style={{ 
+            width: '400px', 
+            maxHeight: '60vh', 
+            background: 'rgba(15, 23, 42, 0.8)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid var(--terminal-border)',
+            padding: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            overflowY: 'auto'
+          }}>
+            <div style={{ color: 'var(--terminal-info)', fontSize: '12px', fontFamily: 'monospace', marginBottom: '8px' }}>
+              {'>'} AVAILABLE REMOTE NODES
+            </div>
+            {remoteRooms.map(room => (
+              <div 
+                key={room.room_id}
+                onClick={() => setSelectedRoomId(room.room_id)}
+                onDoubleClick={() => {
+                  if (selectedRoomId === room.room_id && isInputValid) {
+                    handleResumeNetworkSimulation()
+                  }
+                }}
+                style={{
+                  padding: '16px',
+                  background: selectedRoomId === room.room_id ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0,0,0,0.3)',
+                  border: `1px solid ${selectedRoomId === room.room_id ? 'var(--terminal-info)' : 'var(--terminal-border)'}`,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  position: 'relative'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: selectedRoomId === room.room_id ? '#fff' : '#e2e8f0' }}>
+                    {room.name}
+                  </div>
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>CREATOR:</span>
+                    <span style={{ color: '#94a3b8' }}>{room.player_id}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>LAST SYNC:</span>
+                    <span style={{ color: '#94a3b8' }}>{room.updated_at ? new Date(room.updated_at).toLocaleString() : '--'}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>NODE ID:</span>

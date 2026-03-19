@@ -73,7 +73,7 @@ def _news_debug_enabled() -> bool:
 # ==========================================
 
 from ifrontier.app.room_engine import room_manager
-from ifrontier.app.room_meta import get_local_rooms, create_or_update_room_meta
+from ifrontier.app.room_meta import get_local_rooms, create_or_update_room_meta, room_exists
 
 class CreateRoomRequest(BaseModel):
     room_id: Optional[str] = None
@@ -117,41 +117,37 @@ async def close_room(room_id: str) -> Dict[str, Any]:
     await room_manager.stop_room(room_id)
     return {"ok": True}
 
+@router.post("/rooms/{room_id}/activate")
+async def activate_room(room_id: str) -> Dict[str, Any]:
+    """仅供房主本地恢复存档时显式激活房间引擎。"""
+    if room_id != "default" and not room_exists(room_id):
+        raise HTTPException(status_code=404, detail="room does not exist")
+    await room_manager.start_room(room_id)
+    return {"ok": True, "room_id": room_id}
+
 @router.get("/rooms/network_join")
 async def network_join_check() -> Dict[str, Any]:
     """
-    供远程客户端验证连接是否成功，并返回当前后端可供加入的房间列表。
-    目前简化逻辑：直接返回本地所有已创建的存档，玩家选择一个加入。
+    供远程客户端验证连接是否成功，并返回当前后端可供加入的“已启动房间”列表。
+    离线存档不允许通过网络直接加入，必须由房主先本地恢复/启动。
     """
-    from ifrontier.app.room_meta import get_rooms_dir, get_legacy_db_path, get_room_meta_path
+    from ifrontier.app.room_meta import get_room_meta_path
     import json
-    
+
+    active_room_ids = set(room_manager.get_active_rooms())
     rooms = []
-    
-    # 检查 default 房间
-    legacy_meta = get_room_meta_path("default")
-    if legacy_meta.exists():
-        try:
-            with open(legacy_meta, "r", encoding="utf-8") as f:
-                rooms.append(json.load(f))
-        except Exception:
-            rooms.append({"room_id": "default", "name": "Legacy Save", "player_id": "UNKNOWN", "created_at": "", "updated_at": ""})
-            
-    # 检查 rooms 目录下的房间
-    rooms_dir = get_rooms_dir()
-    if rooms_dir.exists():
-        for d in rooms_dir.iterdir():
-            if d.is_dir() and (d / "ledger.db").exists():
-                meta_path = d / "meta.json"
-                if meta_path.exists():
-                    try:
-                        with open(meta_path, "r", encoding="utf-8") as f:
-                            rooms.append(json.load(f))
-                    except Exception:
-                        rooms.append({"room_id": d.name, "name": d.name, "player_id": "UNKNOWN", "created_at": "", "updated_at": ""})
-                else:
-                    rooms.append({"room_id": d.name, "name": d.name, "player_id": "UNKNOWN", "created_at": "", "updated_at": ""})
-                    
+
+    for room_id in active_room_ids:
+        meta_path = get_room_meta_path(room_id)
+        if meta_path.exists():
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    rooms.append(json.load(f))
+                continue
+            except Exception:
+                pass
+        rooms.append({"room_id": room_id, "name": room_id, "player_id": "UNKNOWN", "created_at": "", "updated_at": ""})
+
     # 按更新时间倒序排序
     rooms.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
     return {"ok": True, "rooms": rooms}
@@ -680,16 +676,25 @@ async def news_public_feed(limit: int = 20) -> NewsFeedResponse:
     rows = news_db.list_news(limit=limit)
     items = []
     for r in rows:
+        variant_id = getattr(r, "variant_id", None) or ""
+        card_id = getattr(r, "card_id", None) or ""
+        kind = getattr(r, "kind", None) or "SYSTEM"
+        author_id = getattr(r, "publisher_id", None) or getattr(r, "author_id", None) or "SYSTEM"
+        text = getattr(r, "text", None) or ""
+        image_uri = getattr(r, "image_uri", None)
+        created_at = getattr(r, "published_at", None) or getattr(r, "created_at", None) or ""
+        symbols = getattr(r, "symbols", None) or []
+        tags = getattr(r, "tags", None) or []
         items.append(NewsFeedItem(
-            variant_id=r.variant_id,
-            card_id=r.card_id,
-            kind=r.kind,
-            author_id=r.author_id,
-            text=r.text,
-            image_uri=r.image_uri,
-            created_at=r.created_at,
-            symbols=r.symbols or [],
-            tags=r.tags or [],
+            variant_id=variant_id,
+            card_id=card_id,
+            kind=kind,
+            author_id=author_id,
+            text=text,
+            image_uri=image_uri,
+            created_at=created_at,
+            symbols=symbols,
+            tags=tags,
         ))
     return NewsFeedResponse(items=items)
 

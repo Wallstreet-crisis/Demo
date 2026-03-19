@@ -137,17 +137,28 @@ function setCached<T>(key: string, value: T, ttlMs: number): T {
   return value
 }
 
+function getRuntimeScopeKey(): string {
+  const roomId = localStorage.getItem('if_room_id') || 'default'
+  const networkTarget = localStorage.getItem('if_network_target') || 'local'
+  return `${networkTarget}::${roomId}`
+}
+
+function scopedKey(key: string): string {
+  return `${getRuntimeScopeKey()}::${key}`
+}
+
 async function getWithBootstrapCache<T>(key: string, ttlMs: number, loader: () => Promise<T>): Promise<T> {
-  const cached = getCached<T>(key)
+  const resolvedKey = scopedKey(key)
+  const cached = getCached<T>(resolvedKey)
   if (cached !== null) return cached
-  const inflight = bootstrapInflight.get(key)
+  const inflight = bootstrapInflight.get(resolvedKey)
   if (inflight) return inflight as Promise<T>
   const task = loader()
-    .then((value) => setCached(key, value, ttlMs))
+    .then((value) => setCached(resolvedKey, value, ttlMs))
     .finally(() => {
-      bootstrapInflight.delete(key)
+      bootstrapInflight.delete(resolvedKey)
     })
-  bootstrapInflight.set(key, task as Promise<unknown>)
+  bootstrapInflight.set(resolvedKey, task as Promise<unknown>)
   return task
 }
 
@@ -155,6 +166,7 @@ export const Api = {
   health: () => api.get<HealthResponse>('/health'),
 
   createRoom: (req: CreateRoomRequest) => api.post<CreateRoomResponse>('/rooms', req),
+  activateRoom: (roomId: string) => api.post<{ok: boolean, room_id: string}>(`/rooms/${encodeURIComponent(roomId)}/activate`),
   closeRoom: (roomId: string) => api.post<void>(`/rooms/${encodeURIComponent(roomId)}/close`),
   deleteRoom: (roomId: string) => api.delete<{ok: boolean}>(`/rooms/${encodeURIComponent(roomId)}`),
   listLocalRooms: () => api.get<LocalRoomsResponse>('/rooms/local'),

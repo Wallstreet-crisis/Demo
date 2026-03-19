@@ -140,7 +140,8 @@ export default function Layout() {
 
   const handleReAuth = async () => {
     // 尝试通知后端当前玩家离开。如果当前是该房间的唯一玩家，后端可以关闭引擎
-    if (sess.roomId && sess.roomId !== 'default') {
+    const isRemoteSession = !!localStorage.getItem('if_network_target')
+    if (!isRemoteSession && sess.roomId && sess.roomId !== 'default') {
       try {
         await Api.closeRoom(sess.roomId)
       } catch (e) {

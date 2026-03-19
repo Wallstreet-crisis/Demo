@@ -22,6 +22,12 @@ def get_room_meta_path(room_id: str) -> Path:
         return Path(__file__).resolve().parents[3] / "data" / "meta.json"
     return get_rooms_dir() / room_id / "meta.json"
 
+def room_exists(room_id: str) -> bool:
+    if room_id == "default":
+        return get_legacy_db_path().exists() or get_room_meta_path("default").exists()
+    room_dir = get_rooms_dir() / room_id
+    return room_dir.exists() and room_dir.is_dir() and ((room_dir / "ledger.db").exists() or (room_dir / "meta.json").exists())
+
 def create_or_update_room_meta(room_id: str, player_id: str, name: Optional[str] = None) -> RoomMeta:
     meta_path = get_room_meta_path(room_id)
     now = datetime.now(timezone.utc).isoformat()

@@ -8,7 +8,11 @@ export default function NewsBroadcastWidget({ isFocused, onShowNews }: { isFocus
   const [currentIndex, setCurrentItemIndex] = useState(0)
   const [isGlitching, setIsGlitching] = useState(false)
   const ws = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
-  
+
+  const getNewsItemKey = (item: NewsFeedItem, index: number) => {
+    return item.variant_id || item.card_id || `${item.kind}-${item.created_at}-${index}`
+  }
+
   const refreshFeed = async () => {
     try {
       const r = await Api.newsPublicFeed(10)
@@ -83,7 +87,7 @@ export default function NewsBroadcastWidget({ isFocused, onShowNews }: { isFocus
         {/* Main Broadcast Area */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '10px', paddingBottom: '30px' }}>
           {activeItem ? (
-            <div key={activeItem.variant_id} className={`news-fade-in ${isGlitching ? 'glitch-effect' : ''}`} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div key={getNewsItemKey(activeItem, currentIndex)} className={`news-fade-in ${isGlitching ? 'glitch-effect' : ''}`} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               {activeItem.image_uri && (
                 <div style={{ 
                   width: '100%', 
@@ -173,8 +177,8 @@ export default function NewsBroadcastWidget({ isFocused, onShowNews }: { isFocus
             LATEST
           </div>
           <div className="ticker-scroll" style={{ whiteSpace: 'nowrap', paddingLeft: '20px' }}>
-            {feed.map((it) => (
-              <span key={it.variant_id} style={{ fontSize: '11px', color: 'var(--terminal-warn)', marginRight: '40px' }}>
+            {feed.map((it, index) => (
+              <span key={getNewsItemKey(it, index)} style={{ fontSize: '11px', color: 'var(--terminal-warn)', marginRight: '40px' }}>
                 <span style={{ opacity: 0.6 }}>[{new Date(it.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}]</span> {it.text.replace(/\n/g, ' ')}
               </span>
             ))}

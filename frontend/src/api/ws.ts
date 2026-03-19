@@ -24,17 +24,21 @@ function getWsBaseUrl(baseUrl?: string): string {
 
 export class WsClient {
   private ws?: WebSocket
-  private wsBaseUrl: string
+  private cfg?: WsClientConfig
 
   constructor(opts?: WsClientConfig) {
-    this.wsBaseUrl = getWsBaseUrl(opts?.baseUrl)
+    this.cfg = opts
+  }
+
+  private get currentWsBaseUrl(): string {
+    return getWsBaseUrl(this.cfg?.baseUrl)
   }
 
   connect(channel: string, handler: WsMessageHandler): void {
     this.close()
 
     const roomId = localStorage.getItem('if_room_id') || 'default'
-    const url = `${this.wsBaseUrl.replace(/\/$/, '')}/ws/${encodeURIComponent(roomId)}/${encodeURIComponent(channel)}`
+    const url = `${this.currentWsBaseUrl.replace(/\/$/, '')}/ws/${encodeURIComponent(roomId)}/${encodeURIComponent(channel)}`
     this.ws = new WebSocket(url)
 
     this.ws.onmessage = (ev) => {

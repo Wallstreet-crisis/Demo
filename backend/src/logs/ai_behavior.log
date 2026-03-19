@@ -1110,3 +1110,115 @@
 2026-03-19 15:33:46,194 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
 2026-03-19 15:33:46,229 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
 2026-03-19 15:33:46,229 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:26,022 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:26,023 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:26,578 [INFO] <commonbot:ret_fast_2> [DECISION_START] Symbol: FOODMART | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 21:36:26,579 [INFO] <commonbot:FOODMART> [LLM_NOT_CONFIGURED] LLM provider api key missing
+2026-03-19 21:36:26,579 [INFO] <commonbot:ret_fast_2> [HEURISTIC_DECISION] FOODMART -> HOLD (Score: 0.00) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 21:36:26,627 [INFO] <commonbot:ret_fast_1> [DECISION_START] Symbol: FOODMART | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 21:36:26,627 [INFO] <commonbot:FOODMART> [LLM_NOT_CONFIGURED] LLM provider api key missing
+2026-03-19 21:36:26,627 [INFO] <commonbot:ret_fast_1> [HEURISTIC_DECISION] FOODMART -> HOLD (Score: 0.00) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 21:36:26,842 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:26,842 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:27,938 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:27,969 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:27,970 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:28,001 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:28,001 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:29,155 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:29,155 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:29,189 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:29,189 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:29,425 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:30,267 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:30,267 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:30,306 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:30,306 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:30,749 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:31,371 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:31,371 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:31,406 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:31,406 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:32,072 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:32,441 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:32,441 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:32,474 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:32,474 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:33,419 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:33,744 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:33,744 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:33,791 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:33,791 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:34,904 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:34,905 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:34,924 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:35,037 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:35,037 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:36,110 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:36,111 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:36,142 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:36,142 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:36,483 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:37,197 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:37,198 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:37,229 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:37,229 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:37,919 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:38,240 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:38,240 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:38,273 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:38,273 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:39,270 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:39,534 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:39,534 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:39,611 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:39,611 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:40,672 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:40,672 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:40,705 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:40,705 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:41,029 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:41,750 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:41,752 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:41,783 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:41,783 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:42,420 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:42,855 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:42,855 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:42,888 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:42,888 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:43,896 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:44,129 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:44,129 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:44,159 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:44,159 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:45,184 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:45,600 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:45,600 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:45,644 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:45,644 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:46,672 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:46,962 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:46,962 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:46,996 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:46,998 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:48,006 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:48,455 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:48,455 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:48,484 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:48,484 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:49,501 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:49,811 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:49,811 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:49,842 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:49,842 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:50,842 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:50,964 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:50,964 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:51,452 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:51,452 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:52,488 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 21:36:52,731 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:52,731 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 21:36:52,773 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 21:36:52,773 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing

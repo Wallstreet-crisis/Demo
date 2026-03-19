@@ -7,6 +7,7 @@ from ifrontier.app.api import router as api_router
 from ifrontier.app.ws import router as ws_router
 from ifrontier.infra.sqlite.db import room_id_var
 from ifrontier.app.room_engine import room_manager
+from ifrontier.app.room_meta import room_exists
  
  
 def create_app() -> FastAPI:
@@ -35,7 +36,11 @@ def create_app() -> FastAPI:
         room_id = request.headers.get("X-Room-Id", "default")
         if not room_id.strip():
             room_id = "default"
-        
+
+        if room_id == "default":
+            if not room_manager.is_room_active("default"):
+                await room_manager.start_room("default")
+
         token = room_id_var.set(room_id)
         try:
             response = await call_next(request)

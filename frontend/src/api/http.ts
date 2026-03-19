@@ -65,14 +65,18 @@ async function readJsonSafe(res: Response): Promise<unknown> {
 }
 
 export class ApiClient {
-  private cfg: ApiClientConfig
+  private cfg?: Partial<ApiClientConfig>
 
   constructor(cfg?: Partial<ApiClientConfig>) {
-    this.cfg = { ...defaultConfig, ...(cfg ?? {}) }
+    this.cfg = cfg
+  }
+
+  get baseUrl(): string {
+    return this.cfg?.baseUrl ?? getBaseUrl()
   }
 
   url(path: string): string {
-    return joinUrl(this.cfg.baseUrl, path)
+    return joinUrl(this.baseUrl, path)
   }
 
   async get<T>(path: string, query?: Record<string, string | number | boolean | undefined>): Promise<T> {
