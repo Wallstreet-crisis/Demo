@@ -84,13 +84,20 @@ export default function DashboardPage() {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (activePopupNews) setActivePopupNews(null)
-        else setFocusWidget(null)
+        if (activePopupNews) {
+          setActivePopupNews(null)
+          e.stopPropagation()
+        } else if (focusWidget) {
+          setFocusWidget(null)
+          e.stopPropagation()
+        }
       }
     }
-    window.addEventListener('keydown', handleEsc)
-    return () => window.removeEventListener('keydown', handleEsc)
-  }, [activePopupNews])
+    // 使用 capture 阶段提前拦截，Dashboard 的局部关闭优先级应该高于全局系统菜单
+    // 如果这里消费了 Esc 并 stopPropagation，Layout 就不会收到 Esc
+    window.addEventListener('keydown', handleEsc, { capture: true })
+    return () => window.removeEventListener('keydown', handleEsc, { capture: true })
+  }, [activePopupNews, focusWidget])
 
   useEffect(() => {
     const handleResize = () => setViewportWidth(window.innerWidth)

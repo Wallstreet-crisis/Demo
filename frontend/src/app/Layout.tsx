@@ -1,10 +1,12 @@
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAppSession } from './context'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Api, WsClient, type MarketSessionResponse } from '../api'
 
 import { CASTES } from './constants'
 import SettingsModal from '../components/SettingsModal'
+
+let lastEscTime = 0
 
 function NavItem(props: { to: string; label: string }) {
   const loc = useLocation()
@@ -87,6 +89,7 @@ export default function Layout() {
   const [disconnectConfirm, setDisconnectConfirm] = useState(false)
 
   const presenceWs = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
+  const loc = useLocation()
 
   const caste = useMemo(() => {
     return CASTES.find(c => c.id === sess.casteId)
@@ -95,19 +98,35 @@ export default function Layout() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (settingsOpen) {
-          setSettingsOpen(false)
-        } else {
-          setSystemMenuOpen(prev => {
-            if (prev) setDisconnectConfirm(false)
-            return !prev
-          })
+        const now = Date.now()
+        // 如果距离上次按 Esc 不到 500ms，直接拦截所有动作
+        if (now - lastEscTime < 500) {
+          e.preventDefault()
+          e.stopPropagation()
+          return
         }
+        lastEscTime = now
+
+        if (settingsOpen) {
+          e.preventDefault()
+          e.stopPropagation()
+          setSettingsOpen(false)
+        } else if (systemMenuOpen) {
+          e.preventDefault()
+          e.stopPropagation()
+          setDisconnectConfirm(false)
+          setSystemMenuOpen(false)
+        }
+        // 完全禁用“按 ESC 在 dashboard 弹出 SYSTEM”以及“在二级页按 ESC 返回”的快捷键功能
+        // 避免任何形式的 React 路由重挂载导致的事件冒泡/重复触发冲突
       }
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [settingsOpen])
+    // 使用 capture 阶段提前拦截
+    window.addEventListener('keydown', handleKeyDown, { capture: true })
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, { capture: true })
+    }
+  }, [settingsOpen, systemMenuOpen])
 
   const fetchStatus = useCallback(async () => {
     if (!sess.playerId) return
@@ -139,15 +158,8 @@ export default function Layout() {
   }, [sess.playerId, presenceWs])
 
   const handleReAuth = async () => {
-    // 尝试通知后端当前玩家离开。如果当前是该房间的唯一玩家，后端可以关闭引擎
-    const isRemoteSession = !!localStorage.getItem('if_network_target')
-    if (!isRemoteSession && sess.roomId && sess.roomId !== 'default') {
-      try {
-        await Api.closeRoom(sess.roomId)
-      } catch (e) {
-        console.warn('Failed to close room:', e)
-      }
-    }
+    // 为了保证联机稳定性，不再主动关闭房间引擎。
+    // 即使房主返回主菜单，房间引擎依然在后台运行，其他客户端不会被踢出。
     sess.setPlayerId('')
     sess.setCasteId('' as any)
     nav('/menu')
@@ -372,7 +384,31 @@ export default function Layout() {
           alignItems: 'center',
           backdropFilter: 'blur(4px)'
         }}>
-          <div className="cyber-card" style={{ width: '400px', padding: '24px', alignItems: 'center' }}>
+          <div className="cyber-card" style={{ width: '400px', padding: '24px', alignItems: 'center', position: 'relative' }}>
+            <button
+              onClick={() => {
+                setDisconnectConfirm(false)
+                setSystemMenuOpen(false)
+              }}
+              className="cyber-button"
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                width: '30px',
+                height: '30px',
+                minWidth: '30px',
+                padding: 0,
+                fontSize: '14px',
+                lineHeight: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              aria-label="Close system menu"
+            >
+              ×
+            </button>
             <h2 style={{ color: 'var(--terminal-info)', margin: '0 0 24px 0', fontSize: '18px', letterSpacing: '2px' }}>SYSTEM_MENU</h2>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
