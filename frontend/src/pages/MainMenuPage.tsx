@@ -19,6 +19,8 @@ export default function MainMenuPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [localRooms, setLocalRooms] = useState<RoomMeta[]>([])
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
 
   const isInputValid = PLAYER_ID_RE.test(inputPlayerId)
 
@@ -28,16 +30,20 @@ export default function MainMenuPage() {
     }
   }, [inputPlayerId, isInputValid])
 
+  const fetchLocalRooms = () => {
+    Api.listLocalRooms()
+      .then(res => {
+        setLocalRooms(res.rooms)
+        if (res.rooms.length > 0 && !selectedRoomId) {
+          setSelectedRoomId(res.rooms[0].room_id)
+        }
+      })
+      .catch(console.error)
+  }
+
   useEffect(() => {
     if (activeView === 'LOCAL') {
-      Api.listLocalRooms()
-        .then(res => {
-          setLocalRooms(res.rooms)
-          if (res.rooms.length > 0 && !selectedRoomId) {
-            setSelectedRoomId(res.rooms[0].room_id)
-          }
-        })
-        .catch(console.error)
+      fetchLocalRooms()
     }
   }, [activeView])
 
@@ -55,6 +61,30 @@ export default function MainMenuPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [activeView, showSettings])
 
+  const handleRenameSave = async (roomId: string, newName: string) => {
+    if (!newName.trim()) return
+    try {
+      await Api.updateRoomMeta(roomId, newName.trim())
+      setEditingRoomId(null)
+      fetchLocalRooms()
+    } catch (e) {
+      console.error('Failed to rename room:', e)
+    }
+  }
+
+  const handleDeleteSave = async (roomId: string) => {
+    if (!window.confirm('Are you sure you want to permanently delete this simulation data?')) return
+    try {
+      await Api.deleteRoom(roomId)
+      if (selectedRoomId === roomId) {
+        setSelectedRoomId(null)
+      }
+      fetchLocalRooms()
+    } catch (e) {
+      console.error('Failed to delete room:', e)
+    }
+  }
+
   const handleNewSimulation = async () => {
     if (!isInputValid) return
     setIsTransitioning(true)
@@ -62,6 +92,7 @@ export default function MainMenuPage() {
     // UI 淡出动画通常需要 800ms
     // 我们并发启动建房请求和倒计时，等两者都完成了再跳转
     const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
+    localStorage.removeItem('if_network_target') // Reset network target to default
     const createRoomPromise = Api.createRoom({ player_id: inputPlayerId })
 
     try {
@@ -82,6 +113,7 @@ export default function MainMenuPage() {
   const handleResumeSimulation = () => {
     if (!selectedRoomId || !isInputValid) return
     setIsTransitioning(true)
+    localStorage.removeItem('if_network_target') // Reset network target to default
     setTimeout(() => {
       setRoomId(selectedRoomId)
       setGlobalPlayerId(inputPlayerId)
@@ -89,16 +121,31 @@ export default function MainMenuPage() {
     }, 800)
   }
 
-  const handleJoinNetwork = () => {
-    if (!isInputValid) return
+  const handleJoinNetwork = async () => {
+    if (!isInputValid || !networkIp) return
     setIsTransitioning(true)
-    setTimeout(() => {
-      setGlobalPlayerId(inputPlayerId)
-      setCasteId('' as any)
-      // Future: connect to specific room id from network
-      setRoomId('remote_room') 
-      nav('/onboarding')
-    }, 800)
+    
+    // Save target before making request so ApiClient uses it
+    localStorage.setItem('if_network_target', networkIp)
+
+    try {
+      const res = await Api.networkJoinCheck() as any
+      if (res.ok && res.rooms && res.rooms.length > 0) {
+        // Automatically join the most recent active room for now
+        const targetRoom = res.rooms[0].room_id
+        setGlobalPlayerId(inputPlayerId)
+        setCasteId('' as any)
+        setRoomId(targetRoom) 
+        nav('/onboarding')
+      } else {
+        throw new Error('No active sessions found on target server.')
+      }
+    } catch (e) {
+      console.error('Failed to connect to network target:', e)
+      localStorage.removeItem('if_network_target')
+      setIsTransitioning(false)
+      alert('Connection failed or no sessions found on remote host.')
+    }
   }
 
   return (
@@ -329,7 +376,16 @@ export default function MainMenuPage() {
             {localRooms.map(room => (
               <div 
                 key={room.room_id}
-                onClick={() => setSelectedRoomId(room.room_id)}
+                onClick={() => {
+                  if (editingRoomId !== room.room_id) {
+                    setSelectedRoomId(room.room_id)
+                  }
+                }}
+                onDoubleClick={() => {
+                  if (editingRoomId !== room.room_id && selectedRoomId === room.room_id && isInputValid) {
+                    handleResumeSimulation()
+                  }
+                }}
                 style={{
                   padding: '16px',
                   background: selectedRoomId === room.room_id ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0,0,0,0.3)',
@@ -339,9 +395,108 @@ export default function MainMenuPage() {
                   position: 'relative'
                 }}
               >
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: selectedRoomId === room.room_id ? '#fff' : '#e2e8f0', marginBottom: '8px' }}>
-                  {room.name}
-                </div>
+                {editingRoomId === room.room_id ? (
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <input
+                      autoFocus
+                      type="text"
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleRenameSave(room.room_id, editingName)
+                        if (e.key === 'Escape') setEditingRoomId(null)
+                      }}
+                      className="cyber-input"
+                      style={{
+                        flex: 1,
+                        height: '28px',
+                        background: 'var(--panel-bg)',
+                        border: '1px solid var(--terminal-info)',
+                        color: 'var(--terminal-text)',
+                        padding: '0 8px',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: '14px',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRenameSave(room.room_id, editingName)
+                      }}
+                      style={{
+                        background: 'var(--terminal-info)',
+                        color: '#000',
+                        border: 'none',
+                        padding: '0 12px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '12px'
+                      }}
+                    >
+                      SAVE
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingRoomId(null)
+                      }}
+                      style={{
+                        background: 'transparent',
+                        color: 'var(--terminal-text)',
+                        border: '1px solid var(--terminal-border)',
+                        padding: '0 12px',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                      }}
+                    >
+                      X
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: selectedRoomId === room.room_id ? '#fff' : '#e2e8f0' }}>
+                      {room.name}
+                    </div>
+                    {selectedRoomId === room.room_id && (
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingRoomId(room.room_id)
+                            setEditingName(room.name)
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#94a3b8',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          RENAME
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteSave(room.room_id)
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--terminal-error)',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          DELETE
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>CREATOR:</span>

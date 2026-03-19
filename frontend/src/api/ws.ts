@@ -1,28 +1,32 @@
 export type WsMessageHandler = (payload: unknown) => void
 
-export type WsClientOptions = {
+export type WsClientConfig = {
   baseUrl?: string
+  reconnectIntervalMs?: number
+  maxRetries?: number
 }
 
-function getWsBaseUrl(httpBaseUrl?: string): string {
-  const envBase = import.meta.env.VITE_WS_BASE_URL as string | undefined
-  if (envBase) return envBase
-
-  // If user provides API base URL as http(s)://host:port, derive ws(s)
-  if (httpBaseUrl && /^https?:\/\//i.test(httpBaseUrl)) {
-    return httpBaseUrl.replace(/^http/i, 'ws').replace(/\/$/, '')
+function getWsBaseUrl(baseUrl?: string): string {
+  if (baseUrl) return baseUrl.replace(/^http/i, 'ws')
+  const override = localStorage.getItem('if_network_target')
+  if (override) {
+    const httpUrl = override.startsWith('http') ? override : `http://${override}`
+    return httpUrl.replace(/^http/i, 'ws')
   }
-
+  const envUrl = import.meta.env.VITE_API_BASE_URL ?? '/api'
+  if (envUrl.startsWith('http')) return envUrl.replace(/^http/i, 'ws')
+  if (envUrl.startsWith('ws')) return envUrl
+  
   // fallback: same-origin
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${proto}//${window.location.host}`
+  return `${proto}//${window.location.host}${envUrl.startsWith('/') ? envUrl : '/' + envUrl}`
 }
 
 export class WsClient {
   private ws?: WebSocket
   private wsBaseUrl: string
 
-  constructor(opts?: WsClientOptions) {
+  constructor(opts?: WsClientConfig) {
     this.wsBaseUrl = getWsBaseUrl(opts?.baseUrl)
   }
 

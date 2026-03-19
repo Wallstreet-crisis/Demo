@@ -14,6 +14,8 @@ export type AppSession = {
   setSymbol: (v: string) => void
   aiHosting: boolean
   setAiHosting: (v: boolean) => void
+  scanlinesEnabled: boolean
+  setScanlinesEnabled: (v: boolean) => void
 }
 
 const Ctx = createContext<AppSession | null>(null)
@@ -39,6 +41,10 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
   const [casteId, setCasteIdState] = useState<CasteId | ''>(() => (localStorage.getItem('if_caste_id') as CasteId) || '')
   const [symbol, setSymbolState] = useState<string>(() => localStorage.getItem('if_symbol') || 'WST')
   const [aiHosting, setAiHostingState] = useState<boolean>(false)
+  const [scanlinesEnabled, setScanlinesEnabledState] = useState<boolean>(() => {
+    const v = localStorage.getItem('if_scanlines_enabled')
+    return v !== 'false' // 默认开启
+  })
 
   const setRoomId = (v: string) => {
     const vv = String(v ?? '').trim()
@@ -71,8 +77,20 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
     setAiHostingState(v)
   }
 
+  const setScanlinesEnabled = (v: boolean) => {
+    setScanlinesEnabledState(v)
+    localStorage.setItem('if_scanlines_enabled', v ? 'true' : 'false')
+  }
+
   return (
-    <Ctx.Provider value={{ roomId, setRoomId, playerId, setPlayerId, casteId, setCasteId, symbol, setSymbol, aiHosting, setAiHosting }}>
+    <Ctx.Provider value={{ 
+      roomId, setRoomId, 
+      playerId, setPlayerId, 
+      casteId, setCasteId, 
+      symbol, setSymbol, 
+      aiHosting, setAiHosting,
+      scanlinesEnabled, setScanlinesEnabled 
+    }}>
       {children}
     </Ctx.Provider>
   )

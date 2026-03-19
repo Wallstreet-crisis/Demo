@@ -18,8 +18,18 @@ export type ApiClientConfig = {
   baseUrl: string
 }
 
+function getBaseUrl(): string {
+  const override = localStorage.getItem('if_network_target')
+  if (override) {
+    return override.startsWith('http') ? override : `http://${override}`
+  }
+  return import.meta.env.VITE_API_BASE_URL ?? '/api'
+}
+
 const defaultConfig: ApiClientConfig = {
-  baseUrl: import.meta.env.VITE_API_BASE_URL ?? '/api',
+  get baseUrl() {
+    return getBaseUrl()
+  }
 }
 
 function joinUrl(baseUrl: string, path: string): string {
@@ -99,6 +109,24 @@ export class ApiClient {
         'X-Room-Id': localStorage.getItem('if_room_id') || 'default'
       },
       body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+    if (!res.ok) {
+      const errBody = (await readJsonSafe(res)) as ApiErrorBody | unknown
+      const msg = (errBody as ApiErrorBody | undefined)?.detail ?? `HTTP ${res.status}`
+      throw new ApiError(res.status, msg, errBody)
+    }
+
+    return (await readJsonSafe(res)) as T
+  }
+
+  async delete<T>(path: string): Promise<T> {
+    const res = await fetch(this.url(path), {
+      method: 'DELETE',
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Room-Id': localStorage.getItem('if_room_id') || 'default'
+      },
     })
 
     if (!res.ok) {

@@ -229,7 +229,7 @@ export default function Layout() {
       display: 'flex',
       flexDirection: 'column'
     }}>
-      <div className="scanlines" />
+      {sess.scanlinesEnabled && <div className="scanlines" />}
       
       {/* HUD Header */}
       <header style={{ 

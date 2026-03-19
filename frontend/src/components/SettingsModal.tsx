@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Api, ApiError, type LlmSettingsResponse } from '../api'
+import { useAppSession } from '../app/context'
 
 type Props = {
   actorId: string
@@ -90,9 +91,9 @@ const recommendedModels: Record<string, { light: string; standard: string; heavy
 }
 
 export default function SettingsModal({ actorId, open, onClose }: Props) {
+  const { scanlinesEnabled, setScanlinesEnabled } = useAppSession()
   const [llm, setLlm] = useState<LlmSettingsResponse | null>(null)
   const [loading, setLoading] = useState(false)
-  const [savingPrefs, setSavingPrefs] = useState(false)
   const [savingLlm, setSavingLlm] = useState(false)
   const [testingLlm, setTestingLlm] = useState(false)
   const [diagnosingLlm, setDiagnosingLlm] = useState(false)
@@ -285,6 +286,8 @@ export default function SettingsModal({ actorId, open, onClose }: Props) {
     return merged
   }
 
+  const [savingPrefs, setSavingPrefs] = useState(false)
+
   if (!open) return null
 
   const savePreferences = async () => {
@@ -445,6 +448,10 @@ export default function SettingsModal({ actorId, open, onClose }: Props) {
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#cbd5e1' }}>
                     <input type="checkbox" checked={showPhaseBadge} onChange={(e) => setShowPhaseBadge(e.target.checked)} />
                     显示市场状态徽标
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#cbd5e1' }}>
+                    <input type="checkbox" checked={scanlinesEnabled} onChange={(e) => setScanlinesEnabled(e.target.checked)} />
+                    开启 CRT 扫描线
                   </label>
                 </div>
               </div>

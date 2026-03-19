@@ -86,9 +86,15 @@ body {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
-/* 移除扫描线效果 */
+/* 恢复扫描线效果并减弱透明度以避免干扰 */
 .scanlines {
-  display: none;
+  display: block;
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+  background-size: 100% 4px;
+  z-index: 9999;
+  pointer-events: none;
 }
 
 /* 滚动条美化 */

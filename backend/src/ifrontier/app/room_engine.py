@@ -136,6 +136,10 @@ class RoomEngine:
         
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+            
+        # 释放 SQLite 数据库连接，允许被外部（如 shutil.rmtree）删除
+        from ifrontier.infra.sqlite.db import close_connection
+        close_connection(self.room_id)
 
 
 class RoomManager:

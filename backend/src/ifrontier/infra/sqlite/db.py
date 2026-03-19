@@ -40,3 +40,13 @@ def get_connection() -> sqlite3.Connection:
         conn.execute("PRAGMA foreign_keys = ON;")
         conns[room_id] = conn
     return conn
+
+def close_connection(room_id: str) -> None:
+    conns: Optional[Dict[str, sqlite3.Connection]] = getattr(_TLS, "conns", None)
+    if conns is not None:
+        conn = conns.pop(room_id, None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass

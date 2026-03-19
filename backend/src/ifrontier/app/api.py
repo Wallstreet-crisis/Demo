@@ -117,6 +117,68 @@ async def close_room(room_id: str) -> Dict[str, Any]:
     await room_manager.stop_room(room_id)
     return {"ok": True}
 
+@router.get("/rooms/network_join")
+async def network_join_check() -> Dict[str, Any]:
+    """
+    供远程客户端验证连接是否成功，并返回当前后端可供加入的房间列表。
+    目前简化逻辑：直接返回本地所有已创建的存档，玩家选择一个加入。
+    """
+    from ifrontier.app.room_meta import get_rooms_dir, get_legacy_db_path, get_room_meta_path
+    import json
+    
+    rooms = []
+    
+    # 检查 default 房间
+    legacy_meta = get_room_meta_path("default")
+    if legacy_meta.exists():
+        try:
+            with open(legacy_meta, "r", encoding="utf-8") as f:
+                rooms.append(json.load(f))
+        except Exception:
+            rooms.append({"room_id": "default", "name": "Legacy Save", "player_id": "UNKNOWN", "created_at": "", "updated_at": ""})
+            
+    # 检查 rooms 目录下的房间
+    rooms_dir = get_rooms_dir()
+    if rooms_dir.exists():
+        for d in rooms_dir.iterdir():
+            if d.is_dir() and (d / "ledger.db").exists():
+                meta_path = d / "meta.json"
+                if meta_path.exists():
+                    try:
+                        with open(meta_path, "r", encoding="utf-8") as f:
+                            rooms.append(json.load(f))
+                    except Exception:
+                        rooms.append({"room_id": d.name, "name": d.name, "player_id": "UNKNOWN", "created_at": "", "updated_at": ""})
+                else:
+                    rooms.append({"room_id": d.name, "name": d.name, "player_id": "UNKNOWN", "created_at": "", "updated_at": ""})
+                    
+    # 按更新时间倒序排序
+    rooms.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+    return {"ok": True, "rooms": rooms}
+
+@router.delete("/rooms/{room_id}")
+async def delete_room(room_id: str) -> Dict[str, Any]:
+    """删除指定的房间档案及其数据文件"""
+    await room_manager.stop_room(room_id)
+    
+    from ifrontier.app.room_meta import get_rooms_dir, get_legacy_db_path, get_room_meta_path
+    import shutil
+    
+    if room_id == "default":
+        # 删除 legacy db
+        db_path = get_legacy_db_path()
+        meta_path = get_room_meta_path("default")
+        if db_path.exists():
+            db_path.unlink()
+        if meta_path.exists():
+            meta_path.unlink()
+    else:
+        room_dir = get_rooms_dir() / room_id
+        if room_dir.exists() and room_dir.is_dir():
+            shutil.rmtree(room_dir, ignore_errors=True)
+            
+    return {"ok": True}
+
 # ==========================================
 
 @router.post("/debug/bots/reset_balances")

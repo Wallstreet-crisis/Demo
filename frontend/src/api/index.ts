@@ -156,7 +156,9 @@ export const Api = {
 
   createRoom: (req: CreateRoomRequest) => api.post<CreateRoomResponse>('/rooms', req),
   closeRoom: (roomId: string) => api.post<void>(`/rooms/${encodeURIComponent(roomId)}/close`),
+  deleteRoom: (roomId: string) => api.delete<{ok: boolean}>(`/rooms/${encodeURIComponent(roomId)}`),
   listLocalRooms: () => api.get<LocalRoomsResponse>('/rooms/local'),
+  networkJoinCheck: () => api.get<LocalRoomsResponse>('/rooms/network_join'),
   updateRoomMeta: (roomId: string, name: string) => api.post<{ok: boolean, meta: RoomMeta}>(`/rooms/${encodeURIComponent(roomId)}/meta`, { name }),
 
   marketSymbols: () => getWithBootstrapCache<string[]>('marketSymbols', 8000, () => api.get<string[]>('/market/symbols')),

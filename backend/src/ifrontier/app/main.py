@@ -21,6 +21,15 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="Information Frontier", lifespan=lifespan)
 
+    from fastapi.middleware.cors import CORSMiddleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     @app.middleware("http")
     async def room_context_middleware(request: Request, call_next):
         room_id = request.headers.get("X-Room-Id", "default")
