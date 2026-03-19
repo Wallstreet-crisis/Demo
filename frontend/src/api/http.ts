@@ -76,7 +76,10 @@ export class ApiClient {
 
     const res = await fetch(url.toString(), {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Room-Id': localStorage.getItem('if_room_id') || 'default'
+      },
     })
 
     if (!res.ok) {
@@ -91,7 +94,10 @@ export class ApiClient {
   async post<T>(path: string, body?: unknown): Promise<T> {
     const res = await fetch(this.url(path), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Room-Id': localStorage.getItem('if_room_id') || 'default'
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
 

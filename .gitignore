@@ -8,3 +8,5 @@ backend/logs/*
 deploy/.env
 deploy/.env.*
 logs/ai_behavior.log
+backend/src/logs/ai_behavior.log
+backend/src/logs/ai_behavior.log

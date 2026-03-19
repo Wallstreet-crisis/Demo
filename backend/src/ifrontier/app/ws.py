@@ -5,6 +5,8 @@ from typing import Dict, Set
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from ifrontier.infra.sqlite.db import room_id_var
+
 router = APIRouter()
 
 
@@ -13,30 +15,38 @@ class WsHub:
         self._channels: Dict[str, Set[WebSocket]] = {}
         self._lock = asyncio.Lock()
 
-    async def join(self, channel: str, ws: WebSocket) -> None:
+    async def join(self, room_id: str, channel: str, ws: WebSocket) -> None:
         await ws.accept()
+        key = f"room:{room_id}:{channel}"
         async with self._lock:
-            self._channels.setdefault(channel, set()).add(ws)
+            self._channels.setdefault(key, set()).add(ws)
 
-    async def leave(self, channel: str, ws: WebSocket) -> None:
+    async def leave(self, room_id: str, channel: str, ws: WebSocket) -> None:
+        key = f"room:{room_id}:{channel}"
         async with self._lock:
-            if channel in self._channels:
-                self._channels[channel].discard(ws)
-                if not self._channels[channel]:
-                    del self._channels[channel]
+            if key in self._channels:
+                self._channels[key].discard(ws)
+                if not self._channels[key]:
+                    del self._channels[key]
 
-    async def broadcast_json(self, channel: str, payload: dict) -> None:
+    async def broadcast_json(self, channel: str, payload: dict, room_id: str | None = None) -> None:
+        if room_id is None:
+            room_id = room_id_var.get()
+        key = f"room:{room_id}:{channel}"
         async with self._lock:
-            targets = list(self._channels.get(channel, set()))
+            targets = list(self._channels.get(key, set()))
         for ws in targets:
             try:
                 await ws.send_json(payload)
             except Exception:
-                await self.leave(channel, ws)
+                await self.leave(room_id, channel, ws)
 
-    async def get_channel_size(self, channel: str) -> int:
+    async def get_channel_size(self, channel: str, room_id: str | None = None) -> int:
+        if room_id is None:
+            room_id = room_id_var.get()
+        key = f"room:{room_id}:{channel}"
         async with self._lock:
-            return int(len(self._channels.get(channel, set())))
+            return int(len(self._channels.get(key, set())))
 
     async def get_stats(self) -> Dict[str, int]:
         async with self._lock:
@@ -46,18 +56,28 @@ class WsHub:
 
             stats: Dict[str, int] = {"total_connections": int(len(all_sockets))}
             for ch, ch_socks in self._channels.items():
-                stats[f"channel:{ch}"] = int(len(ch_socks))
+                stats[ch] = int(len(ch_socks))
             return stats
 
 
 hub = WsHub()
 
 
-@router.websocket("/ws/{channel}")
-async def ws_channel(ws: WebSocket, channel: str) -> None:
-    await hub.join(channel, ws)
+@router.websocket("/ws/{room_id}/{channel}")
+async def ws_channel_room(ws: WebSocket, room_id: str, channel: str) -> None:
+    await hub.join(room_id, channel, ws)
     try:
         while True:
             await ws.receive_text()
     except WebSocketDisconnect:
-        await hub.leave(channel, ws)
+        await hub.leave(room_id, channel, ws)
+
+
+@router.websocket("/ws/{channel}")
+async def ws_channel_default(ws: WebSocket, channel: str) -> None:
+    await hub.join("default", channel, ws)
+    try:
+        while True:
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        await hub.leave("default", channel, ws)

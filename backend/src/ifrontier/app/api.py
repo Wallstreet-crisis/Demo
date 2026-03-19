@@ -64,11 +64,60 @@ _commonbot_emergency_runner = CommonBotEmergencyRunner(
     market_data_provider=lambda symbols: get_market_trends(symbols=symbols)
 )
 
-_hosting_scheduler: HostingScheduler | None = None
-
 def _news_debug_enabled() -> bool:
     """检查是否开启新闻调试。"""
     return str(os.getenv("IF_NEWS_DEBUG") or "0").strip().lower() in {"1", "true", "yes"}
+
+# ==========================================
+# 房间管理 (Rooms API)
+# ==========================================
+
+from ifrontier.app.room_engine import room_manager
+from ifrontier.app.room_meta import get_local_rooms, create_or_update_room_meta
+
+class CreateRoomRequest(BaseModel):
+    room_id: Optional[str] = None
+    player_id: str
+    name: Optional[str] = None
+
+@router.post("/rooms")
+async def create_room(req: CreateRoomRequest) -> Dict[str, Any]:
+    """创建并拉起一个新的房间引擎"""
+    new_room_id = req.room_id
+    if not new_room_id:
+        import uuid
+        new_room_id = f"room_{uuid.uuid4().hex[:8]}"
+        
+    await room_manager.start_room(new_room_id)
+    create_or_update_room_meta(room_id=new_room_id, player_id=req.player_id, name=req.name)
+    return {"ok": True, "room_id": new_room_id}
+
+@router.get("/rooms")
+async def list_rooms() -> Dict[str, Any]:
+    """列出当前运行中的房间"""
+    return {"rooms": room_manager.get_active_rooms()}
+
+@router.get("/rooms/local")
+async def list_local_rooms() -> Dict[str, Any]:
+    """列出本地所有的存档记录"""
+    return {"rooms": [r.model_dump() for r in get_local_rooms()]}
+
+class UpdateRoomMetaRequest(BaseModel):
+    name: str
+
+@router.post("/rooms/{room_id}/meta")
+async def update_room_meta(room_id: str, req: UpdateRoomMetaRequest) -> Dict[str, Any]:
+    # player_id 不重要，仅用于更新名称
+    meta = create_or_update_room_meta(room_id=room_id, player_id="UNKNOWN", name=req.name)
+    return {"ok": True, "meta": meta.model_dump()}
+
+@router.post("/rooms/{room_id}/close")
+async def close_room(room_id: str) -> Dict[str, Any]:
+    """关闭指定的房间并停止其所有调度器"""
+    await room_manager.stop_room(room_id)
+    return {"ok": True}
+
+# ==========================================
 
 @router.post("/debug/bots/reset_balances")
 async def debug_bots_reset_balances() -> Dict[str, Any]:
@@ -1470,18 +1519,26 @@ async def _warm_player_bootstrap_data(*, player_id: str, account_id: str, prefer
 
 @router.post("/players/bootstrap")
 async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountResponse:
-    # 骞傜瓑锛氬鏋滃凡瀛樺湪鍒欒繑鍥炵幇鏈夋暟鎹紝涓嶆姤閿欎篃涓嶉噸澶嶅彂鏀惧垵濮嬭祫浜?
+    # 幂等：如果已存在则返回现有数据，不报错也不重复发放初始资产（除非阶级缺失）
     account_id = f"user:{str(req.player_id).lower()}"
     
     # 检查是否已存在
     try:
         snap = get_snapshot(account_id)
-        # 如果已存在但数据库中没有阶级信息，且请求提供了 caste_id，则补全它。
+        # 如果已存在但数据库中没有阶级信息，说明这是个遗留空账户或者只占了个位
+        # 如果请求提供了 caste_id，则补全阶级并补发初始资金（如果当前 cash 为 0 且无持仓）
         if snap.caste_id is None and req.caste_id is not None:
+            c_cfg = get_caste_config(req.caste_id)
+            bonus_cash = c_cfg.initial_cash if c_cfg else 0.0
+            
             conn = get_connection()
             with conn:
-                conn.execute("UPDATE accounts SET caste_id = ? WHERE account_id = ?", (req.caste_id, account_id))
+                if snap.cash == 0 and not snap.positions:
+                    conn.execute("UPDATE accounts SET caste_id = ?, cash = ? WHERE account_id = ?", (req.caste_id, bonus_cash, account_id))
+                else:
+                    conn.execute("UPDATE accounts SET caste_id = ? WHERE account_id = ?", (req.caste_id, account_id))
             snap = get_snapshot(account_id)
+            
         asyncio.create_task(
             _warm_player_bootstrap_data(
                 player_id=str(req.player_id),

@@ -1,4 +1,4 @@
-import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAppSession } from './context'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Api, WsClient, type MarketSessionResponse } from '../api'
@@ -75,6 +75,7 @@ function NewsTicker() {
 
 export default function Layout() {
   const sess = useAppSession()
+  const nav = useNavigate()
   const [cash, setCash] = useState<number | null>(null)
   const [totalValue, setTotalValue] = useState<number | null>(null)
   const [valuationOk, setValuationOk] = useState<boolean>(true)
@@ -82,11 +83,31 @@ export default function Layout() {
   const [marketSession, setMarketSession] = useState<MarketSessionResponse | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
+  const [systemMenuOpen, setSystemMenuOpen] = useState(false)
+  const [disconnectConfirm, setDisconnectConfirm] = useState(false)
+
   const presenceWs = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
 
   const caste = useMemo(() => {
     return CASTES.find(c => c.id === sess.casteId)
   }, [sess.casteId])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (settingsOpen) {
+          setSettingsOpen(false)
+        } else {
+          setSystemMenuOpen(prev => {
+            if (prev) setDisconnectConfirm(false)
+            return !prev
+          })
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [settingsOpen])
 
   const fetchStatus = useCallback(async () => {
     if (!sess.playerId) return
@@ -116,6 +137,20 @@ export default function Layout() {
     presenceWs.connect('presence', () => {})
     return () => presenceWs.close()
   }, [sess.playerId, presenceWs])
+
+  const handleReAuth = async () => {
+    // 尝试通知后端当前玩家离开。如果当前是该房间的唯一玩家，后端可以关闭引擎
+    if (sess.roomId && sess.roomId !== 'default') {
+      try {
+        await Api.closeRoom(sess.roomId)
+      } catch (e) {
+        console.warn('Failed to close room:', e)
+      }
+    }
+    sess.setPlayerId('')
+    sess.setCasteId('' as any)
+    nav('/menu')
+  }
 
   const toggleHosting = async () => {
     if (!sess.playerId || hostingLoading) return
@@ -255,23 +290,6 @@ export default function Layout() {
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
           {sess.playerId && (
             <>
-              <button
-                onClick={() => setSettingsOpen(true)}
-                className="cyber-button"
-                style={{
-                  width: '30px',
-                  height: '30px',
-                  padding: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '15px',
-                }}
-                title="设置"
-              >
-                ⚙
-              </button>
-
               <button 
                 onClick={toggleHosting}
                 disabled={hostingLoading}
@@ -315,8 +333,8 @@ export default function Layout() {
             </>
           )}
           
-          <button onClick={() => window.location.href='/onboarding'} className="cyber-button" style={{ fontSize: '11px', height: '28px', padding: '0 12px' }}>
-            RE_AUTH
+          <button onClick={() => setSystemMenuOpen(true)} className="cyber-button" style={{ fontSize: '11px', height: '28px', padding: '0 12px' }}>
+            SYSTEM
           </button>
         </div>
       </header>
@@ -339,6 +357,76 @@ export default function Layout() {
 
       {sess.playerId && (
         <SettingsModal actorId={`user:${sess.playerId}`} open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      )}
+
+      {/* System Menu Overlay */}
+      {systemMenuOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          zIndex: 200,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div className="cyber-card" style={{ width: '400px', padding: '24px', alignItems: 'center' }}>
+            <h2 style={{ color: 'var(--terminal-info)', margin: '0 0 24px 0', fontSize: '18px', letterSpacing: '2px' }}>SYSTEM_MENU</h2>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+              <button 
+                onClick={() => {
+                  setSystemMenuOpen(false)
+                  setSettingsOpen(true)
+                }} 
+                className="cyber-button"
+                style={{ height: '48px', fontSize: '14px', letterSpacing: '1px' }}
+              >
+                CONFIGURATION
+              </button>
+              
+              <button 
+                onClick={() => {
+                  setSystemMenuOpen(false)
+                }} 
+                className="cyber-button"
+                style={{ height: '48px', fontSize: '14px', letterSpacing: '1px' }}
+              >
+                RESUME_SIMULATION
+              </button>
+
+              <div style={{ height: '1px', background: 'var(--terminal-border)', margin: '8px 0' }} />
+
+              {!disconnectConfirm ? (
+                <button 
+                  onClick={() => setDisconnectConfirm(true)} 
+                  className="cyber-button"
+                  style={{ height: '48px', fontSize: '14px', letterSpacing: '1px', color: 'var(--terminal-warn)', borderColor: 'var(--terminal-warn)', background: 'transparent' }}
+                >
+                  DISCONNECT
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    onClick={handleReAuth} 
+                    className="cyber-button"
+                    style={{ flex: 1, height: '48px', fontSize: '14px', letterSpacing: '1px', background: 'var(--terminal-error)', borderColor: 'var(--terminal-error)', color: '#fff', fontWeight: 'bold' }}
+                  >
+                    CONFIRM_EXIT
+                  </button>
+                  <button 
+                    onClick={() => setDisconnectConfirm(false)} 
+                    className="cyber-button"
+                    style={{ flex: 1, height: '48px', fontSize: '14px', letterSpacing: '1px' }}
+                  >
+                    CANCEL
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Terminal Footer Status Bar */}

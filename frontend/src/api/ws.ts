@@ -29,7 +29,8 @@ export class WsClient {
   connect(channel: string, handler: WsMessageHandler): void {
     this.close()
 
-    const url = `${this.wsBaseUrl.replace(/\/$/, '')}/ws/${encodeURIComponent(channel)}`
+    const roomId = localStorage.getItem('if_room_id') || 'default'
+    const url = `${this.wsBaseUrl.replace(/\/$/, '')}/ws/${encodeURIComponent(roomId)}/${encodeURIComponent(channel)}`
     this.ws = new WebSocket(url)
 
     this.ws.onmessage = (ev) => {

@@ -1,22 +1,26 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Api, ApiError } from '../api'
 import { useAppSession } from '../app/context'
 import { CASTES, type CasteId } from '../app/constants'
 
-const PLAYER_ID_RE = /^[a-zA-Z0-9_]{3,20}$/
-
 export default function OnboardingPage() {
   const nav = useNavigate()
-  const { setPlayerId: setGlobalPlayerId, setCasteId: setGlobalCasteId } = useAppSession()
+  const { playerId: globalPlayerId, setCasteId: setGlobalCasteId } = useAppSession()
 
   const [err, setErr] = useState<string>('')
-  const [playerId, setPlayerId] = useState<string>('')
   const [isRolling, setIsRolling] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
-  const [syncProgress, setSyncSyncProgress] = useState(0)
+  const [syncProgress, setSyncProgress] = useState(0)
   const [resultCaste, setResultCaste] = useState<(typeof CASTES)[number] | null>(null)
   const [rollIndex, setRollIndex] = useState(0)
+
+  // 如果没有传递 ID 过来的话，直接回退到菜单
+  useEffect(() => {
+    if (!globalPlayerId) {
+      nav('/menu', { replace: true })
+    }
+  }, [globalPlayerId, nav])
 
   useEffect(() => {
     let timer: number
@@ -32,7 +36,7 @@ export default function OnboardingPage() {
     let timer: number
     if (isSyncing) {
       timer = window.setInterval(() => {
-        setSyncSyncProgress(prev => {
+        setSyncProgress(prev => {
           if (prev >= 100) {
             clearInterval(timer)
             return 100
@@ -44,32 +48,24 @@ export default function OnboardingPage() {
     return () => clearInterval(timer)
   }, [isSyncing])
 
-  const canSubmit = useMemo(() => {
-    return PLAYER_ID_RE.test(playerId) && !isRolling && !isSyncing
-  }, [playerId, isRolling, isSyncing])
+  const startLottery = async () => {
+    if (!globalPlayerId || isRolling || isSyncing) return
 
-  async function startLottery() {
     setErr('')
-    if (!PLAYER_ID_RE.test(playerId)) {
-      setErr('INVALID_PROTOCOL: ID_FORMAT_ERROR (3-20 CHARS, ALPHANUMERIC)')
-      return
-    }
-
     setIsRolling(true)
     setResultCaste(null)
 
     // 模拟抽取过程
     setTimeout(async () => {
       try {
-        // 先尝试获取现有玩家信息
-        const existing = await Api.playerAccount(playerId).catch(() => null)
+        // 先尝试获取现有玩家信息，如果是已有存档，直接获取阶级
+        const existing = await Api.playerAccount(globalPlayerId).catch(() => null)
         
         if (existing && existing.caste_id) {
           const found = CASTES.find(c => c.id === existing.caste_id)
           if (found) {
             setIsRolling(false)
             setResultCaste(found)
-            setGlobalPlayerId(playerId)
             setGlobalCasteId(found.id as CasteId)
             return
           }
@@ -90,17 +86,28 @@ export default function OnboardingPage() {
         }
         setResultCaste(selected)
         setIsSyncing(true)
-        setSyncSyncProgress(0)
+        setSyncProgress(0)
         
         await Api.playersBootstrap({
-          player_id: playerId,
+          player_id: globalPlayerId,
           caste_id: selected.id,
         })
-        void Api.bootstrapPrefetch(playerId)
+        
+        // 并行预加载首屏数据，填入 BootstrapCache 从而加快后续页面展现速度
+        const prefetchTasks = [
+          Api.marketSymbols().catch(e => console.error("Prefetch symbols fail", e)),
+          Api.marketSession().catch(e => console.error("Prefetch session fail", e)),
+          Api.marketSummary().catch(e => console.error("Prefetch summary fail", e)),
+          Api.playerAccount(globalPlayerId).catch(e => console.error("Prefetch account fail", e)),
+          Api.accountValuation(`user:${globalPlayerId}`).catch(e => console.error("Prefetch val fail", e)),
+        ]
+        
+        Promise.all(prefetchTasks).finally(() => {
+          // 不强制等待数据全加载完，后台静默加载即可
+        })
         
         // 等待进度条走完
         setTimeout(() => {
-          setGlobalPlayerId(playerId)
           setGlobalCasteId(selected.id as CasteId)
         }, 1500)
       } catch (e) {
@@ -111,6 +118,16 @@ export default function OnboardingPage() {
       }
     }, 2000)
   }
+
+  // 组件挂载完成后，留出短暂的视觉延迟，自动开始抽签流程
+  useEffect(() => {
+    if (globalPlayerId && !isRolling && !isSyncing && !resultCaste && !err) {
+      const t = setTimeout(() => {
+        startLottery()
+      }, 1000)
+      return () => clearTimeout(t)
+    }
+  }, [globalPlayerId, isRolling, isSyncing, resultCaste, err])
 
   function enterGame() {
     nav('/dashboard', { replace: true })
@@ -144,26 +161,10 @@ export default function OnboardingPage() {
       {!resultCaste ? (
         <div style={{ marginTop: '20px' }}>
           <div style={{ marginBottom: '24px', fontSize: '13px', color: '#94a3b8', lineHeight: '1.5' }}>
-            INPUT IDENTIFICATION CODE TO INITIATE<br/>
-            NEURAL LINK ALLOCATION
+            INITIATING NEURAL LINK FOR <span style={{ color: '#fff', fontWeight: 'bold' }}>{globalPlayerId}</span><br/>
+            PLEASE STAND BY
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
-            <input 
-              value={playerId} 
-              onChange={(e) => setPlayerId(e.target.value.toUpperCase())} 
-              placeholder="ENTER_ID_CODE"
-              disabled={isRolling}
-              className="cyber-input"
-              style={{
-                fontSize: '20px',
-                textAlign: 'center',
-                width: '100%',
-                height: '56px',
-                letterSpacing: '4px',
-                fontFamily: 'monospace',
-                background: 'rgba(0,0,0,0.2)'
-              }}
-            />
             
             <div style={{ 
               height: '70px', 
@@ -185,23 +186,6 @@ export default function OnboardingPage() {
               {isRolling ? CASTES[rollIndex].label.toUpperCase() : '--- STANDBY ---'}
             </div>
 
-            <button 
-              onClick={startLottery} 
-              disabled={!canSubmit}
-              className="cyber-button"
-              style={{
-                width: '100%',
-                height: '52px',
-                fontSize: '14px',
-                background: canSubmit ? 'var(--terminal-info)' : 'transparent',
-                borderColor: canSubmit ? 'var(--terminal-info)' : '#1e293b',
-                color: canSubmit ? '#fff' : '#475569',
-                fontWeight: '800',
-                letterSpacing: '1px'
-              }}
-            >
-              {isRolling ? 'EXECUTING_ALLOCATION...' : 'START_LINK_SEQUENCE'}
-            </button>
           </div>
         </div>
       ) : (
@@ -276,6 +260,15 @@ export default function OnboardingPage() {
           fontFamily: 'monospace'
         }}>
           <span style={{ fontWeight: 'bold' }}>[!] ERROR_DETECTED:</span> {err}
+          <div style={{ marginTop: '8px' }}>
+            <button 
+              onClick={() => nav('/menu')} 
+              className="cyber-button" 
+              style={{ background: 'transparent', borderColor: 'var(--terminal-error)', color: 'var(--terminal-error)' }}
+            >
+              RETURN_TO_MAIN_MENU
+            </button>
+          </div>
         </div>
       ) : null}
       

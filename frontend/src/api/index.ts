@@ -95,6 +95,29 @@ import type {
   ContractListResponse,
 } from './types'
 
+export type CreateRoomRequest = {
+  room_id?: string
+  player_id: string
+  name?: string
+}
+
+export type CreateRoomResponse = {
+  ok: boolean
+  room_id: string
+}
+
+export type RoomMeta = {
+  room_id: string
+  name: string
+  player_id: string
+  created_at: string
+  updated_at: string
+}
+
+export type LocalRoomsResponse = {
+  rooms: RoomMeta[]
+}
+
 const api = new ApiClient()
 const bootstrapCache = new Map<string, { expiresAt: number; value: unknown }>()
 const bootstrapInflight = new Map<string, Promise<unknown>>()
@@ -130,6 +153,11 @@ async function getWithBootstrapCache<T>(key: string, ttlMs: number, loader: () =
 
 export const Api = {
   health: () => api.get<HealthResponse>('/health'),
+
+  createRoom: (req: CreateRoomRequest) => api.post<CreateRoomResponse>('/rooms', req),
+  closeRoom: (roomId: string) => api.post<void>(`/rooms/${encodeURIComponent(roomId)}/close`),
+  listLocalRooms: () => api.get<LocalRoomsResponse>('/rooms/local'),
+  updateRoomMeta: (roomId: string, name: string) => api.post<{ok: boolean, meta: RoomMeta}>(`/rooms/${encodeURIComponent(roomId)}/meta`, { name }),
 
   marketSymbols: () => getWithBootstrapCache<string[]>('marketSymbols', 8000, () => api.get<string[]>('/market/symbols')),
 

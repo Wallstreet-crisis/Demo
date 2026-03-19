@@ -4,6 +4,8 @@ import type { CasteId } from './constants'
 const PLAYER_ID_RE = /^[a-zA-Z0-9_]{3,20}$/
 
 export type AppSession = {
+  roomId: string
+  setRoomId: (v: string) => void
   playerId: string
   setPlayerId: (v: string) => void
   casteId: CasteId | ''
@@ -23,6 +25,7 @@ export function useAppSession(): AppSession {
 }
 
 export function AppSessionProvider({ children }: { children: React.ReactNode }) {
+  const [roomId, setRoomIdState] = useState<string>(() => localStorage.getItem('if_room_id') || 'default')
   const [playerId, setPlayerIdState] = useState<string>(() => {
     const raw = localStorage.getItem('if_player_id') || ''
     const v = raw.trim()
@@ -36,6 +39,13 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
   const [casteId, setCasteIdState] = useState<CasteId | ''>(() => (localStorage.getItem('if_caste_id') as CasteId) || '')
   const [symbol, setSymbolState] = useState<string>(() => localStorage.getItem('if_symbol') || 'WST')
   const [aiHosting, setAiHostingState] = useState<boolean>(false)
+
+  const setRoomId = (v: string) => {
+    const vv = String(v ?? '').trim()
+    setRoomIdState(vv || 'default')
+    if (vv) localStorage.setItem('if_room_id', vv)
+    else localStorage.setItem('if_room_id', 'default')
+  }
 
   const setPlayerId = (v: string) => {
     const vv = String(v ?? '').trim()
@@ -62,7 +72,7 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <Ctx.Provider value={{ playerId, setPlayerId, casteId, setCasteId, symbol, setSymbol, aiHosting, setAiHosting }}>
+    <Ctx.Provider value={{ roomId, setRoomId, playerId, setPlayerId, casteId, setCasteId, symbol, setSymbol, aiHosting, setAiHosting }}>
       {children}
     </Ctx.Provider>
   )

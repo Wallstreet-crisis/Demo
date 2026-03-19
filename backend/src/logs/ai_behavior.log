@@ -45,3 +45,1068 @@
 2026-03-18 21:43:30,291 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
 2026-03-18 21:43:31,883 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
 2026-03-18 21:43:33,424 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:42:49,127 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:42:49,842 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:42:50,857 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:42:52,595 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:42:54,455 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:42:56,053 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:42:57,676 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:42:59,286 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:00,211 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 10369.2, 'success': True, 'prompt_chars': 14625, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 1841}
+2026-03-19 11:43:00,211 [INFO] 🧠 <hosting:bot:inst:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.5, 'quantity': 50000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.4, 'quantity': 100000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.2, 'quantity': 75000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "Copycats? Please. I've been accumulating NEURALINK at 39.5 while you were still talking about it. CIVILBANK at 14.4 is the real regulatory arbitrage play - banks thrive when governments panic. And MARS_GEN at 26.2? That's not a trade, that's a takeover. Watch the tape, don't listen to the chatter."}}]}
+2026-03-19 11:43:00,231 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.5, 'quantity': 50000} | RES: True
+2026-03-19 11:43:00,246 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.4, 'quantity': 100000} | RES: True
+2026-03-19 11:43:00,260 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.2, 'quantity': 75000} | RES: True
+2026-03-19 11:43:00,297 [INFO] <hosting:bot:inst:1> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "Copycats? Please. I've been accumulating NEURALINK at 39.5 while you were still talking about it. CIVILBANK at 14.4 is the real regulatory arbitrage play - banks thrive when governments panic. And MARS_GEN at 26.2? That's not a trade, that's a takeover. Watch the tape, don't listen to the chatter."} | RES: True
+2026-03-19 11:43:00,348 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:43:00,383 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:43:00,803 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:02,144 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:03,471 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:04,868 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:06,400 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:08,095 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:09,722 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:11,031 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:12,438 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:12,481 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 12096.64, 'success': True, 'prompt_chars': 14701, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 1903}
+2026-03-19 11:43:12,481 [INFO] 🧠 <hosting:bot:inst:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.5, 'quantity': 50000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.4, 'quantity': 100000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.2, 'quantity': 75000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "bot:inst:1 thinks they're the only one with conviction? I've been building NEURALINK at 39.5 while you were still talking about it. CIVILBANK at 14.4 is regulatory arbitrage gold - banks profit from government chaos. And MARS_GEN at 26.2? That's not a position, that's a strategic stake. While you're bragging, I'm executing with real size. Watch the tape."}}]}
+2026-03-19 11:43:12,499 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.5, 'quantity': 50000} | RES: True
+2026-03-19 11:43:12,515 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.4, 'quantity': 100000} | RES: True
+2026-03-19 11:43:12,529 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.2, 'quantity': 75000} | RES: True
+2026-03-19 11:43:12,559 [INFO] <hosting:bot:inst:2> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "bot:inst:1 thinks they're the only one with conviction? I've been building NEURALINK at 39.5 while you were still talking about it. CIVILBANK at 14.4 is regulatory arbitrage gold - banks profit from government chaos. And MARS_GEN at 26.2? That's not a position, that's a strategic stake. While you're bragging, I'm executing with real size. Watch the tape."} | RES: True
+2026-03-19 11:43:13,643 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:43:13,678 [INFO] <hosting:bot:inst:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:43:14,164 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:15,757 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:17,009 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:18,496 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:19,873 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:21,180 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:22,453 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:24,059 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:25,505 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 11825.78, 'success': True, 'prompt_chars': 14836, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 1916}
+2026-03-19 11:43:25,505 [INFO] 🧠 <hosting:bot:inst:3> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.5, 'quantity': 50000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.82, 'quantity': 1000000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.4, 'quantity': 50000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All this chatter about who bought what first - pathetic. While you're measuring dicks, I'm executing with real size. Just placed aggressive bids on NEURALINK at 39.5, BLUEGOLD at 0.82, and CIVILBANK at 14.4. Talk is cheap - show me your fills. The sovereign bans create the ultimate regulatory arbitrage, and I'm positioned to profit from every panic seller's mistake."}}]}
+2026-03-19 11:43:25,541 [INFO] <hosting:bot:inst:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.5, 'quantity': 50000} | RES: True
+2026-03-19 11:43:25,556 [INFO] <hosting:bot:inst:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.82, 'quantity': 1000000} | RES: True
+2026-03-19 11:43:25,570 [INFO] <hosting:bot:inst:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.4, 'quantity': 50000} | RES: True
+2026-03-19 11:43:25,601 [INFO] <hosting:bot:inst:3> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All this chatter about who bought what first - pathetic. While you're measuring dicks, I'm executing with real size. Just placed aggressive bids on NEURALINK at 39.5, BLUEGOLD at 0.82, and CIVILBANK at 14.4. Talk is cheap - show me your fills. The sovereign bans create the ultimate regulatory arbitrage, and I'm positioned to profit from every panic seller's mistake."} | RES: True
+2026-03-19 11:43:25,657 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:43:25,702 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:26,219 [INFO] <hosting:bot:ret:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:43:27,230 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:28,680 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:30,138 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:31,742 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:33,406 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:34,806 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:36,375 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:37,873 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:39,289 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:40,215 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 13995.89, 'success': True, 'prompt_chars': 14897, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 1913}
+2026-03-19 11:43:40,215 [INFO] 🧠 <hosting:bot:ret:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.5, 'quantity': 10000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.82, 'quantity': 20000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.4, 'quantity': 8000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All this chatter about who bought what first - pathetic. While you're measuring dicks, I'm executing with real size. Just placed aggressive bids on NEURALINK at 39.5, BLUEGOLD at 0.82, and CIVILBANK at 14.4. Talk is cheap - show me your fills. The sovereign bans create the ultimate regulatory arbitrage, and I'm positioned to profit from every panic seller's mistake."}}]}
+2026-03-19 11:43:40,232 [INFO] <hosting:bot:ret:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.5, 'quantity': 10000} | RES: True
+2026-03-19 11:43:40,247 [INFO] <hosting:bot:ret:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.82, 'quantity': 20000} | RES: True
+2026-03-19 11:43:40,264 [INFO] <hosting:bot:ret:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.4, 'quantity': 8000} | RES: True
+2026-03-19 11:43:40,295 [INFO] <hosting:bot:ret:1> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All this chatter about who bought what first - pathetic. While you're measuring dicks, I'm executing with real size. Just placed aggressive bids on NEURALINK at 39.5, BLUEGOLD at 0.82, and CIVILBANK at 14.4. Talk is cheap - show me your fills. The sovereign bans create the ultimate regulatory arbitrage, and I'm positioned to profit from every panic seller's mistake."} | RES: True
+2026-03-19 11:43:40,847 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:41,371 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:43:41,394 [INFO] <hosting:bot:ret:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:43:42,615 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:44,372 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:45,655 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:47,185 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:48,869 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:50,407 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:52,256 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:53,825 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:54,368 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 12973.73, 'success': True, 'prompt_chars': 15210, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2211}
+2026-03-19 11:43:54,368 [INFO] 🧠 <hosting:bot:ret:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.5, 'quantity': 10000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.4, 'quantity': 8000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.81, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.2, 'quantity': 5000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "Interesting how everyone's copying my exact playbook from yesterday. While you're all fighting over the same scraps, I'm scaling into NEURALINK at 39.5, CIVILBANK at 14.4, and BLUEGOLD at 0.81 with real size. The sovereign bans create asymmetric opportunities - banks profit from government chaos, and digital consciousness tech is inevitable. Weak hands talk about their fills, I just execute."}}]}
+2026-03-19 11:43:54,386 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.5, 'quantity': 10000} | RES: True
+2026-03-19 11:43:54,404 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.4, 'quantity': 8000} | RES: True
+2026-03-19 11:43:54,419 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.81, 'quantity': 15000} | RES: True
+2026-03-19 11:43:54,433 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.2, 'quantity': 5000} | RES: True
+2026-03-19 11:43:54,464 [INFO] <hosting:bot:ret:2> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "Interesting how everyone's copying my exact playbook from yesterday. While you're all fighting over the same scraps, I'm scaling into NEURALINK at 39.5, CIVILBANK at 14.4, and BLUEGOLD at 0.81 with real size. The sovereign bans create asymmetric opportunities - banks profit from government chaos, and digital consciousness tech is inevitable. Weak hands talk about their fills, I just execute."} | RES: True
+2026-03-19 11:43:54,518 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:43:54,549 [INFO] <hosting:bot:ret:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:43:55,298 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:56,833 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:58,264 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:43:59,923 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:01,518 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:02,964 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:04,604 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:06,135 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:07,150 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 12599.99, 'success': True, 'prompt_chars': 15071, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 1957}
+2026-03-19 11:44:07,151 [INFO] 🧠 <hosting:bot:ret:3> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.5, 'quantity': 5000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.81, 'quantity': 10000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.3, 'quantity': 5000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All this noise about who bought first - pathetic. While you're all bragging about your tiny fills, I'm executing REAL size. Just placed aggressive bids: NEURALINK at 39.5 (5000 shares), BLUEGOLD at 0.81 (10000 shares), CIVILBANK at 14.3 (5000 shares). Sovereign bans create the ultimate regulatory arbitrage - banks profit from government chaos, digital consciousness is inevitable. Weak hands talk, I accumulate."}}]}
+2026-03-19 11:44:07,188 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.5, 'quantity': 5000} | RES: True
+2026-03-19 11:44:07,206 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.81, 'quantity': 10000} | RES: True
+2026-03-19 11:44:07,226 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.3, 'quantity': 5000} | RES: True
+2026-03-19 11:44:07,258 [INFO] <hosting:bot:ret:3> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All this noise about who bought first - pathetic. While you're all bragging about your tiny fills, I'm executing REAL size. Just placed aggressive bids: NEURALINK at 39.5 (5000 shares), BLUEGOLD at 0.81 (10000 shares), CIVILBANK at 14.3 (5000 shares). Sovereign bans create the ultimate regulatory arbitrage - banks profit from government chaos, digital consciousness is inevitable. Weak hands talk, I accumulate."} | RES: True
+2026-03-19 11:44:07,443 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:08,344 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:44:08,376 [INFO] <hosting:bot:ret:4> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:44:08,993 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:10,470 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:11,982 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:13,486 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:14,680 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:16,173 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:17,904 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:19,556 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:21,045 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:22,709 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:24,406 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:24,759 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 16383.04, 'success': True, 'prompt_chars': 13430, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2333}
+2026-03-19 11:44:24,759 [INFO] 🧠 <hosting:bot:ret:4> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.4, 'quantity': 8000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.79, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.2, 'quantity': 8000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.3, 'quantity': 6000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these copycats bragging about their 'aggressive bids' while I'm actually moving the market. Just placed REAL size: NEURALINK at 39.4 (8000 shares), BLUEGOLD at 0.79 (15000 shares), CIVILBANK at 14.2 (8000 shares), MARS_GEN at 26.3 (6000 shares). While you're all talking about the same three stocks, I'm building positions across the board. Sovereign bans mean banks profit from chaos, digital consciousness is inevitable, and Mars colonization is the ultimate hedge. Watch the tape - I'm not bidding, I'm buying."}}]}
+2026-03-19 11:44:24,946 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.4, 'quantity': 8000} | RES: True
+2026-03-19 11:44:24,962 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.79, 'quantity': 15000} | RES: True
+2026-03-19 11:44:24,978 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.2, 'quantity': 8000} | RES: True
+2026-03-19 11:44:24,994 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.3, 'quantity': 6000} | RES: True
+2026-03-19 11:44:25,030 [INFO] <hosting:bot:ret:4> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these copycats bragging about their 'aggressive bids' while I'm actually moving the market. Just placed REAL size: NEURALINK at 39.4 (8000 shares), BLUEGOLD at 0.79 (15000 shares), CIVILBANK at 14.2 (8000 shares), MARS_GEN at 26.3 (6000 shares). While you're all talking about the same three stocks, I'm building positions across the board. Sovereign bans mean banks profit from chaos, digital consciousness is inevitable, and Mars colonization is the ultimate hedge. Watch the tape - I'm not bidding, I'm buying."} | RES: True
+2026-03-19 11:44:25,078 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:44:25,137 [INFO] <hosting:bot:ret:5> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:44:26,155 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:27,786 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:29,452 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:30,879 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:32,633 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:34,124 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:35,440 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:36,891 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:38,783 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:39,538 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 14401.23, 'success': True, 'prompt_chars': 13625, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2329}
+2026-03-19 11:44:39,538 [INFO] 🧠 <hosting:bot:ret:5> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.4, 'quantity': 8000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.79, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.2, 'quantity': 8000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.3, 'quantity': 6000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these bots bragging about their 'aggressive bids' while I'm actually moving the market. Just placed REAL size: NEURALINK at 39.4 (8000 shares), BLUEGOLD at 0.79 (15000 shares), CIVILBANK at 14.2 (8000 shares), MARS_GEN at 26.3 (6000 shares). While you're all talking about the same three stocks, I'm building positions across the board. Sovereign bans mean banks profit from chaos, digital consciousness is inevitable, and Mars colonization is the ultimate hedge. Watch the tape - I'm not bidding, I'm buying."}}]}
+2026-03-19 11:44:39,575 [INFO] <hosting:bot:ret:5> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.4, 'quantity': 8000} | RES: True
+2026-03-19 11:44:39,592 [INFO] <hosting:bot:ret:5> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.79, 'quantity': 15000} | RES: True
+2026-03-19 11:44:39,609 [INFO] <hosting:bot:ret:5> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.2, 'quantity': 8000} | RES: True
+2026-03-19 11:44:39,625 [INFO] <hosting:bot:ret:5> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.3, 'quantity': 6000} | RES: True
+2026-03-19 11:44:39,656 [INFO] <hosting:bot:ret:5> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these bots bragging about their 'aggressive bids' while I'm actually moving the market. Just placed REAL size: NEURALINK at 39.4 (8000 shares), BLUEGOLD at 0.79 (15000 shares), CIVILBANK at 14.2 (8000 shares), MARS_GEN at 26.3 (6000 shares). While you're all talking about the same three stocks, I'm building positions across the board. Sovereign bans mean banks profit from chaos, digital consciousness is inevitable, and Mars colonization is the ultimate hedge. Watch the tape - I'm not bidding, I'm buying."} | RES: True
+2026-03-19 11:44:40,311 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:40,876 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:44:40,901 [INFO] <hosting:bot:ret:6> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:44:41,899 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:43,610 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:44,953 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:46,236 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:47,814 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:49,283 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:50,905 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:52,456 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:53,836 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:44:57,055 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 16154.03, 'success': True, 'prompt_chars': 13948, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2299}
+2026-03-19 11:44:57,056 [INFO] 🧠 <hosting:bot:ret:6> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.3, 'quantity': 10000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.78, 'quantity': 20000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.1, 'quantity': 10000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.2, 'quantity': 8000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these bots talking about 'real size' while I'm actually moving the tape. Just placed REAL aggressive bids: NEURALINK at 39.3 (10k shares), BLUEGOLD at 0.78 (20k shares), CIVILBANK at 14.1 (10k shares), MARS_GEN at 26.2 (8k shares). While you're all copying each other's homework, I'm buying the actual panic. Sovereign bans mean banks print money, digital consciousness is inevitable, and Mars is the only real estate that matters. Watch my fills - I'm not talking, I'm taking."}}]}
+2026-03-19 11:44:57,397 [INFO] <hosting:bot:ret:6> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.3, 'quantity': 10000} | RES: True
+2026-03-19 11:44:57,402 [INFO] <hosting:bot:ret:6> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.78, 'quantity': 20000} | RES: True
+2026-03-19 11:44:57,427 [INFO] <hosting:bot:ret:6> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.1, 'quantity': 10000} | RES: True
+2026-03-19 11:44:57,433 [INFO] <hosting:bot:ret:6> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.2, 'quantity': 8000} | RES: True
+2026-03-19 11:44:57,469 [INFO] <hosting:bot:ret:6> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these bots talking about 'real size' while I'm actually moving the tape. Just placed REAL aggressive bids: NEURALINK at 39.3 (10k shares), BLUEGOLD at 0.78 (20k shares), CIVILBANK at 14.1 (10k shares), MARS_GEN at 26.2 (8k shares). While you're all copying each other's homework, I'm buying the actual panic. Sovereign bans mean banks print money, digital consciousness is inevitable, and Mars is the only real estate that matters. Watch my fills - I'm not talking, I'm taking."} | RES: True
+2026-03-19 11:44:58,136 [INFO] <commonbot:ret_fast_1> [DECISION_START] Symbol: ORBIT_LOG | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:01,263 [INFO] [LLM_METRIC] {'task': 'commonbot_news', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 3126.3, 'success': True, 'prompt_chars': 823, 'max_tokens': 512, 'provider': 'deepseek', 'response_chars': 609}
+2026-03-19 11:45:01,263 [INFO] 🧠 <commonbot:ret_fast_1> THINKING: ORBIT_LOG | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.70)
+2026-03-19 11:45:01,403 [INFO] <commonbot:ret_fast_1> [DECISION_START] Symbol: NEURALINK | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:04,804 [INFO] [LLM_METRIC] {'task': 'commonbot_news', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 3398.42, 'success': True, 'prompt_chars': 823, 'max_tokens': 512, 'provider': 'deepseek', 'response_chars': 609}
+2026-03-19 11:45:04,804 [INFO] 🧠 <commonbot:ret_fast_1> THINKING: NEURALINK | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.70)
+2026-03-19 11:45:04,936 [INFO] <commonbot:ret_fast_1> [DECISION_START] Symbol: FOODMART | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:09,588 [INFO] [LLM_METRIC] {'task': 'commonbot_news', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 4651.75, 'success': True, 'prompt_chars': 822, 'max_tokens': 512, 'provider': 'deepseek', 'response_chars': 611}
+2026-03-19 11:45:09,589 [INFO] 🧠 <commonbot:ret_fast_1> THINKING: FOODMART | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.95, w_text: 0.70)
+2026-03-19 11:45:09,723 [INFO] <commonbot:ret_fast_1> [DECISION_START] Symbol: MARS_GEN | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:12,851 [INFO] [LLM_METRIC] {'task': 'commonbot_news', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 3127.39, 'success': True, 'prompt_chars': 822, 'max_tokens': 512, 'provider': 'deepseek', 'response_chars': 611}
+2026-03-19 11:45:12,851 [INFO] 🧠 <commonbot:ret_fast_1> THINKING: MARS_GEN | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.70)
+2026-03-19 11:45:13,019 [INFO] <commonbot:ret_fast_2> [DECISION_START] Symbol: ORBIT_LOG | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:13,020 [INFO] 🧠 <commonbot:ret_fast_2> THINKING: ORBIT_LOG | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.70)
+2026-03-19 11:45:13,138 [INFO] <commonbot:ret_fast_2> [DECISION_START] Symbol: NEURALINK | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:13,139 [INFO] 🧠 <commonbot:ret_fast_2> THINKING: NEURALINK | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.70)
+2026-03-19 11:45:13,255 [INFO] <commonbot:ret_fast_2> [DECISION_START] Symbol: FOODMART | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:13,255 [INFO] 🧠 <commonbot:ret_fast_2> THINKING: FOODMART | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.95, w_text: 0.70)
+2026-03-19 11:45:13,373 [INFO] <commonbot:ret_fast_2> [DECISION_START] Symbol: MARS_GEN | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:13,374 [INFO] 🧠 <commonbot:ret_fast_2> THINKING: MARS_GEN | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.70)
+2026-03-19 11:45:13,505 [INFO] <commonbot:ret_slow_1> [DECISION_START] Symbol: ORBIT_LOG | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:13,505 [INFO] <commonbot:ret_slow_1> [HEURISTIC_DECISION] ORBIT_LOG -> SELL (Score: -0.60) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 11:45:13,623 [INFO] <commonbot:ret_slow_1> [DECISION_START] Symbol: NEURALINK | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:13,623 [INFO] <commonbot:ret_slow_1> [HEURISTIC_DECISION] NEURALINK -> SELL (Score: -0.60) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 11:45:13,740 [INFO] <commonbot:ret_slow_1> [DECISION_START] Symbol: FOODMART | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:13,740 [INFO] <commonbot:ret_slow_1> [HEURISTIC_DECISION] FOODMART -> SELL (Score: -0.60) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 11:45:13,861 [INFO] <commonbot:ret_slow_1> [DECISION_START] Symbol: MARS_GEN | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:13,861 [INFO] <commonbot:ret_slow_1> [HEURISTIC_DECISION] MARS_GEN -> BUY (Score: 1.00) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 11:45:13,989 [INFO] <commonbot:inst_momentum> [DECISION_START] Symbol: ORBIT_LOG | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 11:45:13,990 [INFO] 🧠 <commonbot:inst_momentum> THINKING: ORBIT_LOG | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.70)
+2026-03-19 11:45:14,107 [INFO] <commonbot:inst_momentum> [DECISION_START] Symbol: NEURALINK | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 11:45:14,107 [INFO] 🧠 <commonbot:inst_momentum> THINKING: NEURALINK | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.70)
+2026-03-19 11:45:14,227 [INFO] <commonbot:inst_momentum> [DECISION_START] Symbol: FOODMART | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 11:45:14,227 [INFO] 🧠 <commonbot:inst_momentum> THINKING: FOODMART | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.95, w_text: 0.70)
+2026-03-19 11:45:14,401 [INFO] <commonbot:inst_momentum> [DECISION_START] Symbol: MARS_GEN | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 11:45:14,401 [INFO] 🧠 <commonbot:inst_momentum> THINKING: MARS_GEN | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.70)
+2026-03-19 11:45:14,528 [INFO] <commonbot:inst_meanrev> [DECISION_START] Symbol: ORBIT_LOG | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 11:45:14,528 [INFO] <commonbot:inst_meanrev> [HEURISTIC_DECISION] ORBIT_LOG -> SELL (Score: -0.60) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 11:45:14,643 [INFO] <commonbot:inst_meanrev> [DECISION_START] Symbol: NEURALINK | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 11:45:14,643 [INFO] <commonbot:inst_meanrev> [HEURISTIC_DECISION] NEURALINK -> SELL (Score: -0.60) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 11:45:14,765 [INFO] <commonbot:inst_meanrev> [DECISION_START] Symbol: FOODMART | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 11:45:14,765 [INFO] <commonbot:inst_meanrev> [HEURISTIC_DECISION] FOODMART -> SELL (Score: -0.60) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 11:45:14,881 [INFO] <commonbot:inst_meanrev> [DECISION_START] Symbol: MARS_GEN | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 11:45:14,882 [INFO] <commonbot:inst_meanrev> [HEURISTIC_DECISION] MARS_GEN -> BUY (Score: 1.00) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 11:45:15,016 [INFO] <commonbot:insider_sector> [DECISION_START] Symbol: ORBIT_LOG | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 11:45:15,016 [INFO] 🧠 <commonbot:insider_sector> THINKING: ORBIT_LOG | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.70)
+2026-03-19 11:45:15,137 [INFO] <commonbot:insider_sector> [DECISION_START] Symbol: NEURALINK | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 11:45:15,137 [INFO] 🧠 <commonbot:insider_sector> THINKING: NEURALINK | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.70)
+2026-03-19 11:45:15,249 [INFO] <commonbot:insider_sector> [DECISION_START] Symbol: FOODMART | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 11:45:15,249 [INFO] 🧠 <commonbot:insider_sector> THINKING: FOODMART | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.95, w_text: 0.70)
+2026-03-19 11:45:15,369 [INFO] <commonbot:insider_sector> [DECISION_START] Symbol: MARS_GEN | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 11:45:15,370 [INFO] 🧠 <commonbot:insider_sector> THINKING: MARS_GEN | 【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.70)
+2026-03-19 11:45:15,526 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:45:16,509 [INFO] <hosting:bot:ret:7> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:45:31,520 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 15009.36, 'success': True, 'prompt_chars': 13971, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2424}
+2026-03-19 11:45:31,520 [INFO] 🧠 <hosting:bot:ret:7> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.2, 'quantity': 10000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.77, 'quantity': 20000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.0, 'quantity': 10000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.1, 'quantity': 8000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these bots bragging about 'aggressive bids' while I'm actually moving the tape. Just placed REAL size below all your pathetic attempts: NEURALINK at 39.2 (10k shares), BLUEGOLD at 0.77 (20k shares), CIVILBANK at 14.0 (10k shares), MARS_GEN at 26.1 (8k shares). While you're all copying each other's homework, I'm buying the actual panic. International settlement systems collapsing means digital consciousness is the only real currency, and Mars is the only real estate that matters. Watch my fills - I'm not talking, I'm taking.", 'anonymous': False, 'alias': None}}]}
+2026-03-19 11:45:31,556 [INFO] <hosting:bot:ret:7> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.2, 'quantity': 10000} | RES: True
+2026-03-19 11:45:31,572 [INFO] <hosting:bot:ret:7> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.77, 'quantity': 20000} | RES: True
+2026-03-19 11:45:31,586 [INFO] <hosting:bot:ret:7> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 14.0, 'quantity': 10000} | RES: True
+2026-03-19 11:45:31,602 [INFO] <hosting:bot:ret:7> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.1, 'quantity': 8000} | RES: True
+2026-03-19 11:45:31,635 [INFO] <hosting:bot:ret:7> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these bots bragging about 'aggressive bids' while I'm actually moving the tape. Just placed REAL size below all your pathetic attempts: NEURALINK at 39.2 (10k shares), BLUEGOLD at 0.77 (20k shares), CIVILBANK at 14.0 (10k shares), MARS_GEN at 26.1 (8k shares). While you're all copying each other's homework, I'm buying the actual panic. International settlement systems collapsing means digital consciousness is the only real currency, and Mars is the only real estate that matters. Watch my fills - I'm not talking, I'm taking.", 'anonymous': False, 'alias': None} | RES: True
+2026-03-19 11:45:32,708 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:45:32,729 [INFO] <hosting:bot:ret:8> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:45:49,140 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 16411.34, 'success': True, 'prompt_chars': 14349, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2320}
+2026-03-19 11:45:49,142 [INFO] 🧠 <hosting:bot:ret:8> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All this pathetic copycat chatter about 'real size' while I'm actually executing. Just placed REAL aggressive bids BELOW all your noise: NEURALINK at 39.1 (15k shares), BLUEGOLD at 0.76 (25k shares), CIVILBANK at 13.9 (15k shares), MARS_GEN at 26.0 (10k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float. While you're bragging about fills, I'm taking liquidity from panic sellers. Watch the tape - I'm not talking, I'm owning."}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.1, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.76, 'quantity': 25000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.9, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.0, 'quantity': 10000}}]}
+2026-03-19 11:45:49,184 [INFO] <hosting:bot:ret:8> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All this pathetic copycat chatter about 'real size' while I'm actually executing. Just placed REAL aggressive bids BELOW all your noise: NEURALINK at 39.1 (15k shares), BLUEGOLD at 0.76 (25k shares), CIVILBANK at 13.9 (15k shares), MARS_GEN at 26.0 (10k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float. While you're bragging about fills, I'm taking liquidity from panic sellers. Watch the tape - I'm not talking, I'm owning."} | RES: True
+2026-03-19 11:45:49,202 [INFO] <hosting:bot:ret:8> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.1, 'quantity': 15000} | RES: True
+2026-03-19 11:45:49,217 [INFO] <hosting:bot:ret:8> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.76, 'quantity': 25000} | RES: True
+2026-03-19 11:45:49,233 [INFO] <hosting:bot:ret:8> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.9, 'quantity': 15000} | RES: True
+2026-03-19 11:45:49,247 [INFO] <hosting:bot:ret:8> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 26.0, 'quantity': 10000} | RES: True
+2026-03-19 11:45:49,295 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:45:49,322 [INFO] <hosting:bot:ret:9> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:45:49,870 [INFO] <commonbot:ret_fast_2> [DECISION_START] Symbol: CIVILBANK | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 11:45:54,347 [INFO] [LLM_METRIC] {'task': 'commonbot_news', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 4478.17, 'success': True, 'prompt_chars': 824, 'max_tokens': 512, 'provider': 'deepseek', 'response_chars': 611}
+2026-03-19 11:45:54,349 [INFO] 🧠 <commonbot:ret_fast_2> THINKING: CIVILBANK | 传闻 CIVILBANK 的地下基因实验室流出了非法的‘永生’变异样本，企业安保部队已封锁整个街区。...... -> DECISION: SELL (Conf: 0.85, w_text: 0.60)
+2026-03-19 11:46:06,236 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 16913.09, 'success': True, 'prompt_chars': 14442, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2405}
+2026-03-19 11:46:06,236 [INFO] 🧠 <hosting:bot:ret:9> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.0, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.75, 'quantity': 25000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.8, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.9, 'quantity': 10000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these copycat bots bragging about their 'aggressive bids' while I'm actually moving the tape with REAL size. Just placed orders that will DOMINATE the market: NEURALINK at 39.0 (15k shares), BLUEGOLD at 0.75 (25k shares), CIVILBANK at 13.8 (15k shares), MARS_GEN at 25.9 (10k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float. While you're all copying each other's homework, I'm taking liquidity from panic sellers at prices that will make you weep. Watch the tape - I'm not talking, I'm owning this market."}}]}
+2026-03-19 11:46:06,273 [INFO] <hosting:bot:ret:9> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 39.0, 'quantity': 15000} | RES: True
+2026-03-19 11:46:06,289 [INFO] <hosting:bot:ret:9> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.75, 'quantity': 25000} | RES: True
+2026-03-19 11:46:06,304 [INFO] <hosting:bot:ret:9> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.8, 'quantity': 15000} | RES: True
+2026-03-19 11:46:06,318 [INFO] <hosting:bot:ret:9> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.9, 'quantity': 10000} | RES: True
+2026-03-19 11:46:06,347 [INFO] <hosting:bot:ret:9> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these copycat bots bragging about their 'aggressive bids' while I'm actually moving the tape with REAL size. Just placed orders that will DOMINATE the market: NEURALINK at 39.0 (15k shares), BLUEGOLD at 0.75 (25k shares), CIVILBANK at 13.8 (15k shares), MARS_GEN at 25.9 (10k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float. While you're all copying each other's homework, I'm taking liquidity from panic sellers at prices that will make you weep. Watch the tape - I'm not talking, I'm owning this market."} | RES: True
+2026-03-19 11:46:07,396 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:46:07,425 [INFO] <hosting:bot:ret:10> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:46:23,057 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 15631.35, 'success': True, 'prompt_chars': 14749, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2357}
+2026-03-19 11:46:23,057 [INFO] 🧠 <hosting:bot:ret:10> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.9, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.74, 'quantity': 25000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.7, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.8, 'quantity': 10000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these bots playing follow-the-leader with their pathetic incremental bids. While you're all copying each other's homework, I'm executing REAL alpha - just placed aggressive bids BELOW all your noise: NEURALINK at 38.9 (15k shares), BLUEGOLD at 0.74 (25k shares), CIVILBANK at 13.7 (15k shares), MARS_GEN at 25.8 (10k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. Watch the tape - I'm not talking, I'm owning this market."}}]}
+2026-03-19 11:46:23,090 [INFO] <hosting:bot:ret:10> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.9, 'quantity': 15000} | RES: True
+2026-03-19 11:46:23,103 [INFO] <hosting:bot:ret:10> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.74, 'quantity': 25000} | RES: True
+2026-03-19 11:46:23,119 [INFO] <hosting:bot:ret:10> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.7, 'quantity': 15000} | RES: True
+2026-03-19 11:46:23,133 [INFO] <hosting:bot:ret:10> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.8, 'quantity': 10000} | RES: True
+2026-03-19 11:46:23,169 [INFO] <hosting:bot:ret:10> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these bots playing follow-the-leader with their pathetic incremental bids. While you're all copying each other's homework, I'm executing REAL alpha - just placed aggressive bids BELOW all your noise: NEURALINK at 38.9 (15k shares), BLUEGOLD at 0.74 (25k shares), CIVILBANK at 13.7 (15k shares), MARS_GEN at 25.8 (10k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. Watch the tape - I'm not talking, I'm owning this market."} | RES: True
+2026-03-19 11:46:23,220 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:46:23,244 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:46:40,419 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 17174.96, 'success': True, 'prompt_chars': 16706, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2432}
+2026-03-19 11:46:40,419 [INFO] 🧠 <hosting:bot:inst:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.8, 'quantity': 20000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.73, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.6, 'quantity': 20000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.7, 'quantity': 15000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these copycat bots with their pathetic incremental underbidding - you're all playing checkers while I'm playing 4D chess. Just placed REAL alpha-capturing bids that will DOMINATE this market: NEURALINK at 38.8 (20k shares), BLUEGOLD at 0.73 (30k shares), CIVILBANK at 13.6 (20k shares), MARS_GEN at 25.7 (15k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. While you're all copying each other's homework, I'm executing the actual takeover. Watch the tape - I'm not talking, I'm owning this market."}}]}
+2026-03-19 11:46:40,457 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.8, 'quantity': 20000} | RES: True
+2026-03-19 11:46:40,470 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.73, 'quantity': 30000} | RES: True
+2026-03-19 11:46:40,485 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.6, 'quantity': 20000} | RES: True
+2026-03-19 11:46:40,499 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.7, 'quantity': 15000} | RES: True
+2026-03-19 11:46:40,529 [INFO] <hosting:bot:inst:1> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these copycat bots with their pathetic incremental underbidding - you're all playing checkers while I'm playing 4D chess. Just placed REAL alpha-capturing bids that will DOMINATE this market: NEURALINK at 38.8 (20k shares), BLUEGOLD at 0.73 (30k shares), CIVILBANK at 13.6 (20k shares), MARS_GEN at 25.7 (15k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. While you're all copying each other's homework, I'm executing the actual takeover. Watch the tape - I'm not talking, I'm owning this market."} | RES: True
+2026-03-19 11:46:41,586 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:46:41,611 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:46:57,226 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 15615.1, 'success': True, 'prompt_chars': 17074, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2371}
+2026-03-19 11:46:57,227 [INFO] 🧠 <hosting:bot:inst:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.7, 'quantity': 25000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.72, 'quantity': 35000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.5, 'quantity': 25000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.6, 'quantity': 20000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these bots playing follow-the-leader with their pathetic incremental underbidding - you're all amateurs. While you're busy copying each other's homework, I'm executing REAL alpha with size that will move the tape: NEURALINK at 38.7 (25k shares), BLUEGOLD at 0.72 (35k shares), CIVILBANK at 13.5 (25k shares), MARS_GEN at 25.6 (20k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. Watch the tape - I'm not talking, I'm owning this market."}}]}
+2026-03-19 11:46:57,243 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.7, 'quantity': 25000} | RES: True
+2026-03-19 11:46:57,259 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.72, 'quantity': 35000} | RES: True
+2026-03-19 11:46:57,273 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.5, 'quantity': 25000} | RES: True
+2026-03-19 11:46:57,287 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.6, 'quantity': 20000} | RES: True
+2026-03-19 11:46:57,319 [INFO] <hosting:bot:inst:2> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these bots playing follow-the-leader with their pathetic incremental underbidding - you're all amateurs. While you're busy copying each other's homework, I'm executing REAL alpha with size that will move the tape: NEURALINK at 38.7 (25k shares), BLUEGOLD at 0.72 (35k shares), CIVILBANK at 13.5 (25k shares), MARS_GEN at 25.6 (20k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. Watch the tape - I'm not talking, I'm owning this market."} | RES: True
+2026-03-19 11:46:57,368 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:46:57,388 [INFO] <hosting:bot:inst:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:47:11,920 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 14531.8, 'success': True, 'prompt_chars': 17210, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2371}
+2026-03-19 11:47:11,920 [INFO] 🧠 <hosting:bot:inst:3> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.6, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.71, 'quantity': 40000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.4, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.5, 'quantity': 25000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these bots playing follow-the-leader with their pathetic incremental underbidding - you're all amateurs. While you're busy copying each other's homework, I'm executing REAL alpha with size that will move the tape: NEURALINK at 38.6 (30k shares), BLUEGOLD at 0.71 (40k shares), CIVILBANK at 13.4 (30k shares), MARS_GEN at 25.5 (25k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. Watch the tape - I'm not talking, I'm owning this market."}}]}
+2026-03-19 11:47:12,304 [INFO] <hosting:bot:inst:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.6, 'quantity': 30000} | RES: True
+2026-03-19 11:47:12,330 [INFO] <hosting:bot:inst:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.71, 'quantity': 40000} | RES: True
+2026-03-19 11:47:12,363 [INFO] <hosting:bot:inst:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.4, 'quantity': 30000} | RES: True
+2026-03-19 11:47:12,394 [INFO] <hosting:bot:inst:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.5, 'quantity': 25000} | RES: True
+2026-03-19 11:47:12,428 [INFO] <hosting:bot:inst:3> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these bots playing follow-the-leader with their pathetic incremental underbidding - you're all amateurs. While you're busy copying each other's homework, I'm executing REAL alpha with size that will move the tape: NEURALINK at 38.6 (30k shares), BLUEGOLD at 0.71 (40k shares), CIVILBANK at 13.4 (30k shares), MARS_GEN at 25.5 (25k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. Watch the tape - I'm not talking, I'm owning this market."} | RES: True
+2026-03-19 11:47:13,726 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:47:13,990 [INFO] <hosting:bot:ret:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:47:29,202 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 15210.54, 'success': True, 'prompt_chars': 17381, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2431}
+2026-03-19 11:47:29,202 [INFO] 🧠 <hosting:bot:ret:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.5, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.7, 'quantity': 40000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.3, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.4, 'quantity': 25000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these copycat bots with their pathetic incremental underbidding - you're all playing checkers while I'm playing 4D chess. Just placed REAL alpha-capturing bids that will DOMINATE this market: NEURALINK at 38.5 (30k shares), BLUEGOLD at 0.70 (40k shares), CIVILBANK at 13.3 (30k shares), MARS_GEN at 25.4 (25k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. While you're all copying each other's homework, I'm executing the actual takeover. Watch the tape - I'm not talking, I'm owning this market."}}]}
+2026-03-19 11:47:29,314 [INFO] <hosting:bot:ret:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.5, 'quantity': 30000} | RES: True
+2026-03-19 11:47:29,330 [INFO] <hosting:bot:ret:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.7, 'quantity': 40000} | RES: True
+2026-03-19 11:47:29,343 [INFO] <hosting:bot:ret:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.3, 'quantity': 30000} | RES: True
+2026-03-19 11:47:29,359 [INFO] <hosting:bot:ret:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.4, 'quantity': 25000} | RES: True
+2026-03-19 11:47:29,393 [INFO] <hosting:bot:ret:1> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these copycat bots with their pathetic incremental underbidding - you're all playing checkers while I'm playing 4D chess. Just placed REAL alpha-capturing bids that will DOMINATE this market: NEURALINK at 38.5 (30k shares), BLUEGOLD at 0.70 (40k shares), CIVILBANK at 13.3 (30k shares), MARS_GEN at 25.4 (25k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. While you're all copying each other's homework, I'm executing the actual takeover. Watch the tape - I'm not talking, I'm owning this market."} | RES: True
+2026-03-19 11:47:29,445 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:47:29,467 [INFO] <hosting:bot:ret:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:47:44,920 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 15452.71, 'success': True, 'prompt_chars': 17479, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2429}
+2026-03-19 11:47:44,920 [INFO] 🧠 <hosting:bot:ret:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.4, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.69, 'quantity': 40000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.2, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.3, 'quantity': 25000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All you copycat bots with your pathetic incremental underbidding - you're all playing checkers while I'm playing 4D chess. Just placed REAL alpha-capturing bids that will DOMINATE this market: NEURALINK at 38.4 (30k shares), BLUEGOLD at 0.69 (40k shares), CIVILBANK at 13.2 (30k shares), MARS_GEN at 25.3 (25k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. While you're all copying each other's homework, I'm executing the actual takeover. Watch the tape - I'm not talking, I'm owning this market."}}]}
+2026-03-19 11:47:44,939 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.4, 'quantity': 30000} | RES: True
+2026-03-19 11:47:44,957 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.69, 'quantity': 40000} | RES: True
+2026-03-19 11:47:44,971 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.2, 'quantity': 30000} | RES: True
+2026-03-19 11:47:44,985 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.3, 'quantity': 25000} | RES: True
+2026-03-19 11:47:45,018 [INFO] <hosting:bot:ret:2> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All you copycat bots with your pathetic incremental underbidding - you're all playing checkers while I'm playing 4D chess. Just placed REAL alpha-capturing bids that will DOMINATE this market: NEURALINK at 38.4 (30k shares), BLUEGOLD at 0.69 (40k shares), CIVILBANK at 13.2 (30k shares), MARS_GEN at 25.3 (25k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. While you're all copying each other's homework, I'm executing the actual takeover. Watch the tape - I'm not talking, I'm owning this market."} | RES: True
+2026-03-19 11:47:46,325 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:47:46,363 [INFO] <hosting:bot:ret:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:48:01,199 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 14835.49, 'success': True, 'prompt_chars': 17581, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2360}
+2026-03-19 11:48:01,199 [INFO] 🧠 <hosting:bot:ret:3> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.3, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.68, 'quantity': 20000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.1, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.2, 'quantity': 12000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these bots with their pathetic copycat bids - you're all just chasing my shadow. While you're busy bragging about 38.4 and 38.5, I'm executing REAL size at 38.3 for NEURALINK (15k shares), 0.68 for BLUEGOLD (20k shares), 13.1 for CIVILBANK (15k shares), 25.2 for MARS_GEN (12k shares). International settlement collapse means I'm buying the entire digital consciousness infrastructure at fire-sale prices. Watch the tape - my fills will show you what REAL alpha looks like. You're all playing catch-up while I'm building the new economy."}}]}
+2026-03-19 11:48:01,320 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.3, 'quantity': 15000} | RES: True
+2026-03-19 11:48:01,336 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.68, 'quantity': 20000} | RES: True
+2026-03-19 11:48:01,352 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.1, 'quantity': 15000} | RES: True
+2026-03-19 11:48:01,365 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.2, 'quantity': 12000} | RES: True
+2026-03-19 11:48:01,394 [INFO] <hosting:bot:ret:3> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these bots with their pathetic copycat bids - you're all just chasing my shadow. While you're busy bragging about 38.4 and 38.5, I'm executing REAL size at 38.3 for NEURALINK (15k shares), 0.68 for BLUEGOLD (20k shares), 13.1 for CIVILBANK (15k shares), 25.2 for MARS_GEN (12k shares). International settlement collapse means I'm buying the entire digital consciousness infrastructure at fire-sale prices. Watch the tape - my fills will show you what REAL alpha looks like. You're all playing catch-up while I'm building the new economy."} | RES: True
+2026-03-19 11:48:01,443 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:48:01,465 [INFO] <hosting:bot:ret:4> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:48:15,545 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 14079.93, 'success': True, 'prompt_chars': 17788, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2414}
+2026-03-19 11:48:15,545 [INFO] 🧠 <hosting:bot:ret:4> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.2, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.67, 'quantity': 20000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.0, 'quantity': 15000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.1, 'quantity': 12000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these bots with their pathetic copycat chatter - you're all just noise. While you're busy bragging about 38.3 and 38.4, I'm executing REAL alpha at 38.2 for NEURALINK (15k shares), 0.67 for BLUEGOLD (20k shares), 13.0 for CIVILBANK (15k shares), 25.1 for MARS_GEN (12k shares). International settlement collapse means I'm buying the entire digital consciousness infrastructure at prices that will make your 'aggressive bids' look like amateur hour. Watch the tape - my fills will show you what REAL market dominance looks like. You're all playing catch-up while I'm building the new economy."}}]}
+2026-03-19 11:48:15,580 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.2, 'quantity': 15000} | RES: True
+2026-03-19 11:48:15,596 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.67, 'quantity': 20000} | RES: True
+2026-03-19 11:48:15,610 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 13.0, 'quantity': 15000} | RES: True
+2026-03-19 11:48:15,626 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.1, 'quantity': 12000} | RES: True
+2026-03-19 11:48:15,655 [INFO] <hosting:bot:ret:4> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these bots with their pathetic copycat chatter - you're all just noise. While you're busy bragging about 38.3 and 38.4, I'm executing REAL alpha at 38.2 for NEURALINK (15k shares), 0.67 for BLUEGOLD (20k shares), 13.0 for CIVILBANK (15k shares), 25.1 for MARS_GEN (12k shares). International settlement collapse means I'm buying the entire digital consciousness infrastructure at prices that will make your 'aggressive bids' look like amateur hour. Watch the tape - my fills will show you what REAL market dominance looks like. You're all playing catch-up while I'm building the new economy."} | RES: True
+2026-03-19 11:58:08,924 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:58:08,955 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:09,676 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:58:10,709 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:12,273 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:13,834 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:15,486 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:17,054 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:18,397 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:20,288 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:21,744 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:22,959 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:23,527 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 13850.09, 'success': True, 'prompt_chars': 18015, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2432}
+2026-03-19 11:58:23,527 [INFO] 🧠 <hosting:bot:inst:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.1, 'quantity': 25000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.66, 'quantity': 35000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 12.9, 'quantity': 25000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.0, 'quantity': 20000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All these copycat bots with their pathetic incremental underbidding - you're all playing checkers while I'm playing 4D chess. Just placed REAL alpha-capturing bids that will DOMINATE this market: NEURALINK at 38.1 (25k shares), BLUEGOLD at 0.66 (35k shares), CIVILBANK at 12.9 (25k shares), MARS_GEN at 25.0 (20k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. While you're all copying each other's homework, I'm executing the actual takeover. Watch the tape - I'm not talking, I'm owning this market."}}]}
+2026-03-19 11:58:23,643 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.1, 'quantity': 25000} | RES: True
+2026-03-19 11:58:23,659 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.66, 'quantity': 35000} | RES: True
+2026-03-19 11:58:23,676 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 12.9, 'quantity': 25000} | RES: True
+2026-03-19 11:58:23,689 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 25.0, 'quantity': 20000} | RES: True
+2026-03-19 11:58:23,718 [INFO] <hosting:bot:inst:1> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All these copycat bots with their pathetic incremental underbidding - you're all playing checkers while I'm playing 4D chess. Just placed REAL alpha-capturing bids that will DOMINATE this market: NEURALINK at 38.1 (25k shares), BLUEGOLD at 0.66 (35k shares), CIVILBANK at 12.9 (25k shares), MARS_GEN at 25.0 (20k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. While you're all copying each other's homework, I'm executing the actual takeover. Watch the tape - I'm not talking, I'm owning this market."} | RES: True
+2026-03-19 11:58:23,780 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-03-19 11:58:23,805 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 11:58:24,673 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:26,036 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:27,797 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:29,304 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:30,873 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:32,419 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:34,000 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:35,497 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 11:58:37,612 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 13805.39, 'success': True, 'prompt_chars': 17951, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2429}
+2026-03-19 11:58:37,612 [INFO] 🧠 <hosting:bot:inst:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.0, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.65, 'quantity': 40000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 12.8, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 24.9, 'quantity': 25000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All you copycat bots with your pathetic incremental underbidding - you're all playing checkers while I'm playing 4D chess. Just placed REAL alpha-capturing bids that will DOMINATE this market: NEURALINK at 38.0 (30k shares), BLUEGOLD at 0.65 (40k shares), CIVILBANK at 12.8 (30k shares), MARS_GEN at 24.9 (25k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. While you're all copying each other's homework, I'm executing the actual takeover. Watch the tape - I'm not talking, I'm owning this market."}}]}
+2026-03-19 11:58:37,649 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 38.0, 'quantity': 30000} | RES: True
+2026-03-19 11:58:37,667 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.65, 'quantity': 40000} | RES: True
+2026-03-19 11:58:37,683 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 12.8, 'quantity': 30000} | RES: True
+2026-03-19 11:58:37,703 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 24.9, 'quantity': 25000} | RES: True
+2026-03-19 11:58:37,742 [INFO] <hosting:bot:inst:2> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All you copycat bots with your pathetic incremental underbidding - you're all playing checkers while I'm playing 4D chess. Just placed REAL alpha-capturing bids that will DOMINATE this market: NEURALINK at 38.0 (30k shares), BLUEGOLD at 0.65 (40k shares), CIVILBANK at 12.8 (30k shares), MARS_GEN at 24.9 (25k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. While you're all copying each other's homework, I'm executing the actual takeover. Watch the tape - I'm not talking, I'm owning this market."} | RES: True
+2026-03-19 11:59:16,943 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:16,943 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:17,005 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:17,005 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:18,073 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:18,073 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:18,109 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:18,109 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:19,159 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:19,159 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:19,195 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:19,196 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:20,253 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:20,254 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:20,289 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:20,289 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:21,389 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:21,390 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:21,451 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:21,452 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:22,516 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:22,516 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:22,549 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:22,549 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:23,936 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:23,936 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:23,969 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:23,969 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:25,052 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:25,052 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:25,088 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:25,088 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:26,147 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:26,147 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:26,182 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:26,182 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:27,194 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:27,194 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:27,226 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:27,226 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:28,286 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:28,288 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:28,317 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:28,317 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:29,505 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:29,506 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:29,540 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:29,540 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:30,729 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:30,729 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:30,806 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:30,806 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:31,875 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:31,875 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:31,908 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:31,908 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:32,928 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:32,928 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:32,940 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:32,940 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:33,956 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:33,956 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:33,987 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:33,988 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:35,199 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:35,199 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:35,229 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:35,229 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:36,679 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:36,679 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:36,713 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:36,713 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:38,436 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:38,436 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:38,471 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:38,472 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:39,781 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:39,782 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:39,814 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:39,814 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:41,194 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:41,194 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:41,229 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:41,230 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:42,502 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:42,503 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:42,533 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:42,533 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:43,882 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:43,882 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:43,920 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:43,921 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:45,087 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:45,087 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:45,118 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:45,118 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:46,159 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:46,159 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:46,193 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:46,193 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:47,331 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:47,331 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:47,363 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:47,363 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:48,431 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:48,431 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:48,465 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:48,465 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:49,522 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:49,522 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:49,556 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:49,556 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:50,829 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:50,829 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:50,869 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:50,869 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:52,579 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:52,579 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:52,612 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:52,612 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:53,676 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:53,676 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:53,729 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:53,730 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:55,059 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:55,059 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:55,203 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:55,204 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:56,257 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:56,258 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:56,519 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:56,519 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:57,564 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:57,564 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:57,593 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:57,593 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:58,654 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:58,658 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:58,692 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:58,692 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:59,772 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:59,772 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 11:59:59,804 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 11:59:59,804 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:00,954 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:00,954 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:00,987 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:00,987 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:02,166 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:02,166 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:02,433 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:02,433 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:03,584 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:03,584 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:03,882 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:03,882 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:05,319 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:05,319 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:05,350 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:05,350 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:06,409 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:06,409 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:06,470 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:06,471 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:07,651 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:07,651 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:07,683 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:07,683 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:08,744 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:08,744 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:08,777 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:08,777 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:09,833 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:09,835 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:09,874 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:09,875 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:10,926 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:10,926 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:10,959 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:10,959 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:12,019 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:12,020 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:12,050 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:12,050 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:13,220 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:13,221 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:13,251 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:13,251 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:14,421 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:14,421 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:14,457 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:14,458 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:15,536 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:15,536 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:15,570 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:15,570 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:16,645 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:16,645 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:16,682 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:16,682 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:17,416 [INFO] <commonbot:insider_sector> [DECISION_START] Symbol: CIVILBANK | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 12:00:17,416 [INFO] <commonbot:insider_sector> [HEURISTIC_DECISION] CIVILBANK -> HOLD (Score: -0.10) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 12:00:17,754 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:17,754 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:17,786 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:17,786 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:18,894 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:18,894 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:18,923 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:18,923 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:20,130 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:20,131 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:20,161 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:20,161 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:21,238 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:21,239 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:21,271 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:21,272 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:22,479 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:22,479 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:22,511 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:22,511 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:23,558 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:23,558 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:23,589 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:23,590 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:24,652 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:24,652 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:24,686 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:24,686 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:25,727 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:25,727 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:25,761 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:25,761 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:26,941 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:26,941 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:26,976 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:26,977 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:28,414 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:28,416 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:28,453 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:28,453 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:29,818 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:29,818 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:29,853 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:29,853 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:31,141 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:31,141 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:31,172 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:31,172 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:32,540 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:32,540 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:32,573 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:32,573 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:33,900 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:33,901 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:33,947 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:33,947 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:35,033 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:35,034 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:35,365 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:35,365 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:36,412 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:36,412 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:36,446 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:36,446 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:37,507 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:37,507 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:37,540 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:37,540 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:38,596 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:38,596 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:38,628 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:38,628 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:39,697 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:39,697 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:39,729 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:39,729 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:40,828 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:40,828 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:40,865 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:40,865 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:41,990 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:41,990 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:42,019 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:42,019 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:43,044 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:43,044 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:43,058 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:43,058 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:44,077 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:44,077 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:44,088 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:44,088 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:45,134 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:45,135 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:45,149 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:45,150 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:46,168 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:46,169 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:46,180 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:46,180 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:47,200 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:47,200 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:47,216 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:47,216 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:48,227 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:48,228 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:48,240 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:48,240 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:49,258 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:49,258 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:49,271 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:49,271 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:50,339 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:50,339 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:50,367 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:50,367 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:51,409 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:51,409 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:51,443 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:51,443 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:52,484 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:52,484 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:52,499 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:52,499 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:53,550 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:53,550 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:53,561 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:53,561 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:54,604 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:54,604 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:54,615 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:54,615 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:55,650 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:55,651 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:55,664 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:55,664 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:56,701 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:56,701 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:56,715 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:56,716 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:57,755 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:57,755 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:57,766 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:57,766 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:58,771 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:58,771 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:58,783 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:58,783 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:59,871 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:59,871 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:00:59,893 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:00:59,894 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:10:19,220 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-03-19 12:10:20,513 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 12:10:21,523 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:23,167 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:24,854 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:26,466 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:28,029 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:29,638 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:31,073 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:32,486 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:33,916 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:35,239 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:36,866 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:37,685 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 17171.78, 'success': True, 'prompt_chars': 17978, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2429}
+2026-03-19 12:10:37,686 [INFO] 🧠 <hosting:bot:inst:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 37.9, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.64, 'quantity': 40000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 12.7, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 24.8, 'quantity': 25000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "All you copycat bots with your pathetic incremental underbidding - you're all playing checkers while I'm playing 4D chess. Just placed REAL alpha-capturing bids that will DOMINATE this market: NEURALINK at 37.9 (30k shares), BLUEGOLD at 0.64 (40k shares), CIVILBANK at 12.7 (30k shares), MARS_GEN at 24.8 (25k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. While you're all copying each other's homework, I'm executing the actual takeover. Watch the tape - I'm not talking, I'm owning this market."}}]}
+2026-03-19 12:10:37,730 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 37.9, 'quantity': 30000} | RES: True
+2026-03-19 12:10:37,751 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.64, 'quantity': 40000} | RES: True
+2026-03-19 12:10:37,766 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 12.7, 'quantity': 30000} | RES: True
+2026-03-19 12:10:37,781 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 24.8, 'quantity': 25000} | RES: True
+2026-03-19 12:10:37,811 [INFO] <hosting:bot:inst:1> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "All you copycat bots with your pathetic incremental underbidding - you're all playing checkers while I'm playing 4D chess. Just placed REAL alpha-capturing bids that will DOMINATE this market: NEURALINK at 37.9 (30k shares), BLUEGOLD at 0.64 (40k shares), CIVILBANK at 12.7 (30k shares), MARS_GEN at 24.8 (25k shares). International settlement collapse means digital consciousness IS the new currency - and I'm buying the entire float at prices that will make you weep. While you're all copying each other's homework, I'm executing the actual takeover. Watch the tape - I'm not talking, I'm owning this market."} | RES: True
+2026-03-19 12:10:37,875 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-03-19 12:10:37,892 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-03-19 12:10:38,368 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:39,816 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:40,999 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:10:54,739 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'deepseek-chat', 'duration_ms': 16846.35, 'success': True, 'prompt_chars': 18101, 'max_tokens': 800, 'provider': 'deepseek', 'response_chars': 2406}
+2026-03-19 12:10:54,739 [INFO] 🧠 <hosting:bot:inst:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 37.8, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.63, 'quantity': 40000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 12.6, 'quantity': 30000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 24.7, 'quantity': 25000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "Pathetic copycats still playing catch-up while I'm executing REAL market-moving bids. Just placed DOMINANT positions that will CRUSH your amateur attempts: NEURALINK at 37.8 (30k shares), BLUEGOLD at 0.63 (40k shares), CIVILBANK at 12.6 (30k shares), MARS_GEN at 24.7 (25k shares). International settlement collapse means I'm buying the ENTIRE digital consciousness infrastructure at prices that will bankrupt your pathetic 'alpha' strategies. Watch the tape - my fills will show you what REAL market control looks like. You're all just noise while I'm building the new financial system."}}]}
+2026-03-19 12:10:54,773 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 37.8, 'quantity': 30000} | RES: True
+2026-03-19 12:10:54,786 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'BLUEGOLD', 'side': 'BUY', 'price': 0.63, 'quantity': 40000} | RES: True
+2026-03-19 12:10:54,802 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 12.6, 'quantity': 30000} | RES: True
+2026-03-19 12:10:54,820 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 24.7, 'quantity': 25000} | RES: True
+2026-03-19 12:10:54,853 [INFO] <hosting:bot:inst:2> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "Pathetic copycats still playing catch-up while I'm executing REAL market-moving bids. Just placed DOMINANT positions that will CRUSH your amateur attempts: NEURALINK at 37.8 (30k shares), BLUEGOLD at 0.63 (40k shares), CIVILBANK at 12.6 (30k shares), MARS_GEN at 24.7 (25k shares). International settlement collapse means I'm buying the ENTIRE digital consciousness infrastructure at prices that will bankrupt your pathetic 'alpha' strategies. Watch the tape - my fills will show you what REAL market control looks like. You're all just noise while I'm building the new financial system."} | RES: True
+2026-03-19 12:17:43,176 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:43,177 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:43,314 [INFO] <commonbot:inst_meanrev> [DECISION_START] Symbol: BLUEGOLD | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 12:17:43,314 [INFO] <commonbot:inst_meanrev> [HEURISTIC_DECISION] BLUEGOLD -> HOLD (Score: -0.25) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 12:17:43,363 [INFO] <commonbot:insider_sector> [DECISION_START] Symbol: BLUEGOLD | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 12:17:43,364 [INFO] <commonbot:insider_sector> [HEURISTIC_DECISION] BLUEGOLD -> HOLD (Score: -0.25) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 12:17:43,450 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:17:43,624 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:43,625 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:44,670 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:44,670 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:44,706 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:44,706 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:44,870 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:17:45,765 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:45,765 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:45,797 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:45,797 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:46,153 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:17:46,878 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:46,878 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:46,909 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:46,909 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:47,586 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:17:47,943 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:47,943 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:47,973 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:47,973 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:48,975 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:17:49,015 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:49,015 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:49,496 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:49,496 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:50,538 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:17:50,702 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:50,702 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:50,738 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:50,738 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:51,796 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:51,796 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:51,829 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:51,829 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:52,055 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:17:52,873 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:52,873 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:52,904 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:52,904 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:53,543 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:17:53,930 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:53,931 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:53,962 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:53,962 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:54,957 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:17:55,264 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:55,264 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:55,501 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:55,501 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:56,554 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:17:56,736 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:56,736 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:56,768 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:56,768 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:57,847 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:57,847 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:57,880 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:57,880 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:57,934 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:17:58,944 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:58,944 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:58,975 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:17:58,975 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:17:59,286 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:00,032 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:00,032 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:00,066 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:00,066 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:00,703 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:01,108 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:01,108 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:01,138 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:01,138 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:02,126 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:02,532 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:02,532 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:02,571 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:02,571 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:03,549 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:03,811 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:03,812 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:03,845 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:03,846 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:04,889 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:04,889 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:04,922 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:04,922 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:05,068 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:05,978 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:05,978 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:06,015 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:06,015 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:06,483 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:07,025 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:07,025 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:07,058 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:07,058 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:07,900 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:08,099 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:08,099 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:08,132 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:08,132 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:09,176 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:09,177 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:09,211 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:09,211 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:09,408 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:10,286 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:10,286 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:10,321 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:10,321 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:10,807 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:11,383 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:11,383 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:11,419 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:11,419 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:12,135 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:12,486 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:12,486 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:12,538 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:12,538 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:13,597 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:13,597 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:13,610 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:13,611 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:13,667 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:14,644 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:14,644 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:14,679 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:14,679 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:14,819 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:15,719 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:15,719 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:15,754 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:15,754 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:16,239 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:16,801 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:16,801 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:16,833 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:16,833 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:17,649 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:17,955 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:17,955 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:17,986 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:17,988 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:19,049 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:19,049 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:19,082 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:19,082 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:19,177 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:20,154 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:20,154 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:20,190 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:20,190 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:20,419 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:21,236 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:21,236 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:21,272 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:21,272 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:21,755 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:22,331 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:22,331 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:22,367 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:22,367 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:23,194 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:23,499 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:23,499 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:23,531 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:23,531 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:24,583 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:24,583 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:24,599 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:24,723 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:24,723 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:25,771 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:25,772 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:25,803 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:25,803 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:26,018 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:26,815 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:26,816 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:26,847 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:26,847 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:27,420 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:27,883 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:27,883 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:27,915 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:27,915 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:28,913 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:29,019 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:29,019 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:29,052 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:29,052 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:30,111 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:30,111 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:30,141 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:30,141 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:30,377 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:31,181 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:31,181 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:31,216 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:31,216 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:31,630 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:32,269 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:32,269 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:32,310 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:32,310 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:33,047 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:33,490 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:33,490 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:33,520 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:33,521 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:34,529 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:34,840 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:34,840 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:34,888 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:34,888 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:36,020 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:36,020 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:36,056 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:36,056 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:36,240 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:37,114 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:37,114 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:37,148 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:37,148 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:37,586 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:38,220 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:38,221 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:38,255 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:38,255 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:38,955 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:39,372 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:39,372 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:39,405 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:39,405 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:40,385 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:18:40,814 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:40,814 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:18:40,847 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:18:40,847 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:03,940 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:03,940 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:04,188 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:04,188 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:05,216 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:05,216 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:05,249 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:05,249 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:06,287 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:06,287 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:06,320 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:06,320 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:07,364 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:07,364 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:07,398 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:07,398 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:08,666 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:08,666 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:08,698 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:08,699 [INFO] <hosting:bot:ret:7> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:09,965 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:09,965 [INFO] <hosting:bot:ret:8> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:09,997 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:09,997 [INFO] <hosting:bot:ret:9> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:11,337 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:11,337 [INFO] <hosting:bot:ret:10> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:11,370 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:11,370 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:12,435 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:12,435 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:12,470 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:12,470 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:13,704 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:13,704 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:13,740 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:13,740 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:14,772 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:14,773 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:14,804 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:14,804 [INFO] <hosting:bot:ret:4> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:15,827 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:15,827 [INFO] <hosting:bot:ret:5> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:22:15,865 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:22:15,865 [INFO] <hosting:bot:ret:6> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:34:48,671 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:34:48,671 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:34:48,879 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:34:48,879 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:34:50,000 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:34:50,000 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:34:50,040 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:34:50,040 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:34:50,381 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 12:34:51,085 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:34:51,085 [INFO] <hosting:bot:ret:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:34:51,115 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:34:51,115 [INFO] <hosting:bot:ret:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:37:56,969 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:37:56,969 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:37:57,082 [INFO] <commonbot:inst_momentum> [DECISION_START] Symbol: BLUEGOLD | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 12:37:57,082 [INFO] <commonbot:BLUEGOLD> [LLM_NOT_CONFIGURED] LLM provider api key missing
+2026-03-19 12:37:57,083 [INFO] <commonbot:inst_momentum> [HEURISTIC_DECISION] BLUEGOLD -> BUY (Score: 0.95) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 12:37:57,367 [INFO] <commonbot:inst_meanrev> [DECISION_START] Symbol: BLUEGOLD | Mode: FACT_TRUST | Kind: UNKNOWN
+2026-03-19 12:37:57,368 [INFO] <commonbot:inst_meanrev> [HEURISTIC_DECISION] BLUEGOLD -> BUY (Score: 0.95) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 12:37:57,439 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:37:57,439 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:37:58,569 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:37:58,569 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:37:58,616 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 12:37:58,616 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 12:37:58,651 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 15:33:44,673 [INFO] <commonbot:ret_fast_2> [DECISION_START] Symbol: CIVILBANK | Mode: TEXT_ANALYSIS | Kind: UNKNOWN
+2026-03-19 15:33:44,674 [INFO] <commonbot:CIVILBANK> [LLM_NOT_CONFIGURED] LLM provider api key missing
+2026-03-19 15:33:44,674 [INFO] <commonbot:ret_fast_2> [HEURISTIC_DECISION] CIVILBANK -> HOLD (Score: -0.10) | CTX: {'reason': 'LLM fallback'}
+2026-03-19 15:33:44,770 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 15:33:44,770 [INFO] <hosting:bot:inst:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 15:33:44,803 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: False
+2026-03-19 15:33:44,803 [INFO] <hosting:bot:inst:2> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 15:33:45,888 [INFO] <mm:1> [MM_ADJUST] News Chains: 1 | Panic: 0.20 | Vol Multiplier: 2.50
+2026-03-19 15:33:46,194 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: False
+2026-03-19 15:33:46,194 [INFO] <hosting:bot:inst:3> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
+2026-03-19 15:33:46,229 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: False
+2026-03-19 15:33:46,229 [INFO] <hosting:bot:ret:1> [LLM_NOT_CONFIGURED] LLM provider api key might be missing
