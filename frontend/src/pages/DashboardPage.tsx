@@ -21,7 +21,7 @@ export default function DashboardPage() {
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window === 'undefined' ? 1400 : window.innerWidth,
   )
-  const { playerId } = useAppSession()
+  const { playerId, roomId } = useAppSession()
   const isTabletLayout = viewportWidth <= 1280
   
   // News Popup State
@@ -33,7 +33,7 @@ export default function DashboardPage() {
     Api.hostingStatus(`user:${playerId}`).then(res => {
       setAiHosting(res.enabled)
     }).catch(e => console.error('Failed to fetch hosting status', e))
-  }, [playerId])
+  }, [playerId, roomId])
 
   const toggleAiHosting = async () => {
     if (!playerId) return
@@ -79,7 +79,7 @@ export default function DashboardPage() {
       }
     }, 3000)
     return () => clearInterval(timer)
-  }, [])
+  }, [roomId])
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -119,7 +119,7 @@ export default function DashboardPage() {
       }
     })
     return () => ws.close()
-  }, [])
+  }, [roomId])
 
   const renderWidget = <P extends { isFocused?: boolean }>(
     id: string, 

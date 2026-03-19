@@ -1675,7 +1675,11 @@ async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountRespons
 @router.get("/players/{player_id}/account")
 async def get_player_account(player_id: str) -> PlayerAccountResponse:
     account_id = f"user:{str(player_id).lower()}"
-    snap = get_snapshot(account_id)
+    try:
+        snap = get_snapshot(account_id)
+    except ValueError:
+        create_account(account_id, owner_type="user", initial_cash=0.0)
+        snap = get_snapshot(account_id)
     return PlayerAccountResponse(
         account_id=snap.account_id, 
         cash=snap.cash, 

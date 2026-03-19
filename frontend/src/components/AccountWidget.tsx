@@ -6,7 +6,7 @@ import CyberWidget from './CyberWidget'
 
 export default function AccountWidget({ isFocused }: { isFocused?: boolean }) {
   void isFocused
-  const { playerId } = useAppSession()
+  const { playerId, roomId } = useAppSession()
   const [err, setErr] = useState<string>('')
   const [snap, setSnap] = useState<PlayerAccountResponse | null>(null)
   const [val, setVal] = useState<AccountValuationResponse | null>(null)
@@ -25,7 +25,7 @@ export default function AccountWidget({ isFocused }: { isFocused?: boolean }) {
       if (e instanceof ApiError) setErr(`${e.status}: ${e.message}`)
       else setErr(e instanceof Error ? e.message : String(e))
     }
-  }, [playerId])
+  }, [playerId, roomId])
 
   useEffect(() => {
     let active = true
@@ -36,7 +36,7 @@ export default function AccountWidget({ isFocused }: { isFocused?: boolean }) {
     return () => {
       active = false
     }
-  }, [refresh])
+  }, [refresh, roomId])
 
   useEffect(() => {
     if (!playerId) return
@@ -51,7 +51,7 @@ export default function AccountWidget({ isFocused }: { isFocused?: boolean }) {
       }
     })
     return () => ws.close()
-  }, [ws, playerId, refresh])
+  }, [ws, playerId, refresh, roomId])
 
   useEffect(() => {
     const t = setInterval(refresh, 15000) // 轮询频率降低，主要依靠实时推送

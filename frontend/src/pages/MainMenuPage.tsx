@@ -4,6 +4,10 @@ import { Api } from '../api'
 import { useAppSession } from '../app/context'
 import SettingsModal from '../components/SettingsModal'
 
+const PENDING_ONBOARDING_KEY = 'if_pending_onboarding'
+const PENDING_ONBOARDING_PLAYER_KEY = 'if_pending_onboarding_player'
+const ROOM_ENTRY_CHECK_KEY = 'if_room_entry_check'
+
 export default function MainMenuPage() {
   const nav = useNavigate()
   const { setPlayerId: setGlobalPlayerId, setCasteId, setRoomId } = useAppSession()
@@ -101,6 +105,9 @@ export default function MainMenuPage() {
         setRoomId(res.room_id)
         setGlobalPlayerId(inputPlayerId)
         setCasteId('' as any)
+        localStorage.setItem(ROOM_ENTRY_CHECK_KEY, '1')
+        localStorage.setItem(PENDING_ONBOARDING_KEY, '1')
+        localStorage.setItem(PENDING_ONBOARDING_PLAYER_KEY, inputPlayerId)
         nav('/onboarding')
       }
     } catch (e) {
@@ -114,17 +121,20 @@ export default function MainMenuPage() {
     if (!selectedRoomId || !isInputValid) return
     setIsTransitioning(true)
     localStorage.removeItem('if_network_target') // Reset network target to default
+    setRoomId(selectedRoomId)
     const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
     const activatePromise = Api.activateRoom(selectedRoomId)
-    const bootstrapPromise = activatePromise.then(() => Api.playersBootstrap({ player_id: inputPlayerId }))
-    void Promise.all([animationPromise, bootstrapPromise])
+    void Promise.all([animationPromise, activatePromise])
       .then(() => {
-        setRoomId(selectedRoomId)
         setGlobalPlayerId(inputPlayerId)
-        nav('/dashboard')
+        setCasteId('' as any)
+        localStorage.setItem(ROOM_ENTRY_CHECK_KEY, '1')
+        localStorage.setItem(PENDING_ONBOARDING_PLAYER_KEY, inputPlayerId)
+        nav('/onboarding')
       })
       .catch((e) => {
         console.error('Failed to resume simulation:', e)
+        setRoomId('default')
         setIsTransitioning(false)
         alert('Failed to load simulation data for this player in the selected room.')
       })
@@ -155,20 +165,23 @@ export default function MainMenuPage() {
   }
 
   const handleResumeNetworkSimulation = () => {
-    if (!selectedRoomId || !isInputValid || !networkIp) return
+    if (!selectedRoomId || !networkIp.trim() || !isInputValid) return
     setIsTransitioning(true)
     localStorage.setItem('if_network_target', networkIp)
+    setRoomId(selectedRoomId)
     const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
-    const bootstrapPromise = Api.playersBootstrap({ player_id: inputPlayerId })
-    void Promise.all([animationPromise, bootstrapPromise])
+    void animationPromise
       .then(() => {
-        setRoomId(selectedRoomId)
         setGlobalPlayerId(inputPlayerId)
-        nav('/dashboard')
+        setCasteId('' as any)
+        localStorage.setItem(ROOM_ENTRY_CHECK_KEY, '1')
+        localStorage.setItem(PENDING_ONBOARDING_PLAYER_KEY, inputPlayerId)
+        nav('/onboarding')
       })
       .catch((e) => {
         console.error('Failed to join remote simulation:', e)
         localStorage.removeItem('if_network_target')
+        setRoomId('default')
         setIsTransitioning(false)
         alert('Failed to join remote simulation for this player.')
       })

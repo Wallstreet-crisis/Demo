@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Api, type MarketSummaryResponse } from '../api'
 import CyberWidget from './CyberWidget'
+import { useAppSession } from '../app/context'
 
 export default function MarketSummaryWidget({ isFocused }: { isFocused?: boolean }) {
   void isFocused
+  const { roomId } = useAppSession()
   const [summary, setSummary] = useState<MarketSummaryResponse | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -16,13 +18,13 @@ export default function MarketSummaryWidget({ isFocused }: { isFocused?: boolean
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [roomId])
 
   useEffect(() => {
     refresh()
     const t = setInterval(refresh, 5000)
     return () => clearInterval(t)
-  }, [refresh])
+  }, [refresh, roomId])
 
   if (loading && !summary) {
     return (

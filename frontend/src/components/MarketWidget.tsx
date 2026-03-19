@@ -12,7 +12,7 @@ interface TradeExecutedEvent {
 }
 
 export default function MarketWidget({ isFocused }: { isFocused?: boolean }) {
-  const { symbol, setSymbol } = useAppSession()
+  const { symbol, setSymbol, roomId } = useAppSession()
   const [symbols, setSymbols] = useState<string[]>([])
   const [err, setErr] = useState<string>('')
   const [quote, setQuote] = useState<MarketQuoteResponse | null>(null)
@@ -56,7 +56,7 @@ export default function MarketWidget({ isFocused }: { isFocused?: boolean }) {
       if (e instanceof ApiError) setErr(`${e.status}: ${e.message}`)
       else setErr(e instanceof Error ? e.message : String(e))
     }
-  }, [symbol, candleInterval, candleLimit])
+  }, [symbol, candleInterval, candleLimit, roomId])
 
   useEffect(() => {
     const ws = new WsClient();
@@ -67,7 +67,7 @@ export default function MarketWidget({ isFocused }: { isFocused?: boolean }) {
       }
     });
     return () => ws.close();
-  }, [symbol, refresh]);
+  }, [symbol, refresh, roomId]);
 
   useEffect(() => {
     let active = true
@@ -79,11 +79,11 @@ export default function MarketWidget({ isFocused }: { isFocused?: boolean }) {
       active = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbol, candleInterval])
+  }, [symbol, candleInterval, roomId])
 
   useEffect(() => {
     setCandleOffset(0)
-  }, [symbol, candleInterval])
+  }, [symbol, candleInterval, roomId])
 
   const refreshMs = useMemo(() => Math.max(1, Number(refreshSeconds)) * 1000, [refreshSeconds])
 

@@ -1,6 +1,6 @@
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAppSession } from './context'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Api, WsClient, type MarketSessionResponse } from '../api'
 
 import { CASTES } from './constants'
@@ -89,7 +89,6 @@ export default function Layout() {
   const [disconnectConfirm, setDisconnectConfirm] = useState(false)
 
   const presenceWs = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
-  const loc = useLocation()
 
   const caste = useMemo(() => {
     return CASTES.find(c => c.id === sess.casteId)
@@ -155,7 +154,7 @@ export default function Layout() {
 
     presenceWs.connect('presence', () => {})
     return () => presenceWs.close()
-  }, [sess.playerId, presenceWs])
+  }, [sess.playerId, sess.roomId, presenceWs])
 
   const handleReAuth = async () => {
     // 为了保证联机稳定性，不再主动关闭房间引擎。

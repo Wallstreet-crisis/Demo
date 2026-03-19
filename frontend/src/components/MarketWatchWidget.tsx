@@ -5,7 +5,7 @@ import CyberWidget from './CyberWidget'
 
 export default function MarketWatchWidget({ isFocused }: { isFocused?: boolean }) {
   void isFocused
-  const { symbol, setSymbol } = useAppSession()
+  const { symbol, setSymbol, roomId } = useAppSession()
   const [symbols, setSymbols] = useState<string[]>([])
   const [quotes, setQuotes] = useState<Record<string, MarketQuoteResponse>>({})
   const [loading, setLoading] = useState(true)
@@ -23,7 +23,7 @@ export default function MarketWatchWidget({ isFocused }: { isFocused?: boolean }
     } catch (e) {
       console.error('Failed to fetch quotes', e)
     }
-  }, [])
+  }, [roomId])
 
   useEffect(() => {
     const init = async () => {
@@ -38,7 +38,7 @@ export default function MarketWatchWidget({ isFocused }: { isFocused?: boolean }
       }
     }
     init()
-  }, [refreshQuotes])
+  }, [refreshQuotes, roomId])
 
   useEffect(() => {
     ws.connect('events', (data: unknown) => {
@@ -51,7 +51,7 @@ export default function MarketWatchWidget({ isFocused }: { isFocused?: boolean }
       }
     })
     return () => ws.close()
-  }, [ws, symbols, refreshQuotes])
+  }, [ws, symbols, refreshQuotes, roomId])
 
   useEffect(() => {
     if (symbols.length === 0) return
@@ -59,7 +59,7 @@ export default function MarketWatchWidget({ isFocused }: { isFocused?: boolean }
       refreshQuotes(symbols)
     }, 10000) // 轮询频率降低，主要依靠 WS
     return () => clearInterval(t)
-  }, [refreshQuotes, symbols])
+  }, [refreshQuotes, symbols, roomId])
 
   return (
     <CyberWidget 

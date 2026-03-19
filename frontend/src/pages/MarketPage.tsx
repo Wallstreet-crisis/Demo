@@ -10,7 +10,7 @@ interface TradeExecutedEvent {
 }
 
 export default function MarketPage() {
-  const { symbol } = useAppSession()
+  const { symbol, roomId } = useAppSession()
   const [err, setErr] = useState<string>('')
   const [quote, setQuote] = useState<MarketQuoteResponse | null>(null)
   const [flashColor, setFlashColor] = useState<'up' | 'down' | null>(null)
@@ -52,7 +52,7 @@ export default function MarketPage() {
       if (e instanceof ApiError) setErr(`${e.status}: ${e.message}`)
       else setErr(e instanceof Error ? e.message : String(e))
     }
-  }, [symbol, candleInterval, candleLimit])
+  }, [symbol, candleInterval, candleLimit, roomId])
 
   useEffect(() => {
     const ws = new WsClient();
@@ -63,12 +63,12 @@ export default function MarketPage() {
       }
     });
     return () => ws.close();
-  }, [symbol, refresh]);
+  }, [symbol, refresh, roomId]);
 
   useEffect(() => {
     refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbol, candleInterval])
+  }, [symbol, candleInterval, roomId])
 
   const refreshMs = useMemo(() => Math.max(1, Number(refreshSeconds)) * 1000, [refreshSeconds])
 

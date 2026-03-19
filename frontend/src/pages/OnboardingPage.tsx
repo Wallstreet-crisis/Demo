@@ -4,6 +4,10 @@ import { Api, ApiError } from '../api'
 import { useAppSession } from '../app/context'
 import { CASTES, type CasteId } from '../app/constants'
 
+const PENDING_ONBOARDING_KEY = 'if_pending_onboarding'
+const PENDING_ONBOARDING_PLAYER_KEY = 'if_pending_onboarding_player'
+const ROOM_ENTRY_CHECK_KEY = 'if_room_entry_check'
+
 export default function OnboardingPage() {
   const nav = useNavigate()
   const { playerId: globalPlayerId, setCasteId: setGlobalCasteId } = useAppSession()
@@ -14,6 +18,41 @@ export default function OnboardingPage() {
   const [syncProgress, setSyncProgress] = useState(0)
   const [resultCaste, setResultCaste] = useState<(typeof CASTES)[number] | null>(null)
   const [rollIndex, setRollIndex] = useState(0)
+  const pendingOnboarding = localStorage.getItem(PENDING_ONBOARDING_KEY) === '1'
+  const pendingPlayerId = localStorage.getItem(PENDING_ONBOARDING_PLAYER_KEY) || ''
+  const needsRoomEntryCheck = localStorage.getItem(ROOM_ENTRY_CHECK_KEY) === '1'
+
+  useEffect(() => {
+    if (!globalPlayerId || !needsRoomEntryCheck || isRolling || isSyncing || resultCaste || err) return
+
+    let canceled = false
+    const decideEntry = async () => {
+      const existing = await Api.playerAccount(globalPlayerId).catch(() => null)
+      if (canceled) return
+      if (existing?.caste_id) {
+        const found = CASTES.find(c => c.id === existing.caste_id)
+        localStorage.removeItem(ROOM_ENTRY_CHECK_KEY)
+        localStorage.removeItem(PENDING_ONBOARDING_KEY)
+        localStorage.removeItem(PENDING_ONBOARDING_PLAYER_KEY)
+        if (found) {
+          setResultCaste(found)
+          setGlobalCasteId(found.id as CasteId)
+        }
+        nav('/dashboard', { replace: true })
+        return
+      }
+
+      localStorage.setItem(PENDING_ONBOARDING_KEY, '1')
+      localStorage.setItem(PENDING_ONBOARDING_PLAYER_KEY, globalPlayerId)
+      localStorage.removeItem(ROOM_ENTRY_CHECK_KEY)
+      startLottery()
+    }
+
+    void decideEntry()
+    return () => {
+      canceled = true
+    }
+  }, [globalPlayerId, needsRoomEntryCheck, isRolling, isSyncing, resultCaste, err, nav, setGlobalCasteId])
 
   // 如果没有传递 ID 过来的话，直接回退到菜单
   useEffect(() => {
@@ -58,15 +97,18 @@ export default function OnboardingPage() {
     // 模拟抽取过程
     setTimeout(async () => {
       try {
-        // 先尝试获取现有玩家信息，如果是已有存档，直接获取阶级
-        const existing = await Api.playerAccount(globalPlayerId).catch(() => null)
-        
-        if (existing && existing.caste_id) {
+        // 仅在不是“明确要求首次入局”的情况下，才允许直接复用已有阶级。
+        const shouldForceLottery = pendingOnboarding && pendingPlayerId === globalPlayerId
+        const existing = shouldForceLottery ? null : await Api.playerAccount(globalPlayerId).catch(() => null)
+
+        if (!shouldForceLottery && existing && existing.caste_id) {
           const found = CASTES.find(c => c.id === existing.caste_id)
           if (found) {
             setIsRolling(false)
             setResultCaste(found)
             setGlobalCasteId(found.id as CasteId)
+            localStorage.removeItem(PENDING_ONBOARDING_KEY)
+            localStorage.removeItem(PENDING_ONBOARDING_PLAYER_KEY)
             return
           }
         }
@@ -109,6 +151,8 @@ export default function OnboardingPage() {
         // 等待进度条走完
         setTimeout(() => {
           setGlobalCasteId(selected.id as CasteId)
+          localStorage.removeItem(PENDING_ONBOARDING_KEY)
+          localStorage.removeItem(PENDING_ONBOARDING_PLAYER_KEY)
         }, 1500)
       } catch (e) {
         setIsRolling(false)
@@ -121,13 +165,13 @@ export default function OnboardingPage() {
 
   // 组件挂载完成后，留出短暂的视觉延迟，自动开始抽签流程
   useEffect(() => {
-    if (globalPlayerId && !isRolling && !isSyncing && !resultCaste && !err) {
+    if (!needsRoomEntryCheck && globalPlayerId && !isRolling && !isSyncing && !resultCaste && !err) {
       const t = setTimeout(() => {
         startLottery()
       }, 1000)
       return () => clearTimeout(t)
     }
-  }, [globalPlayerId, isRolling, isSyncing, resultCaste, err])
+  }, [globalPlayerId, isRolling, isSyncing, resultCaste, err, needsRoomEntryCheck])
 
   function enterGame() {
     nav('/dashboard', { replace: true })
