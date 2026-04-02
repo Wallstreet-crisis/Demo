@@ -37,6 +37,8 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const sendingRef = useRef(false)
+  const seenIdsRef = useRef<Set<string>>(new Set())
+  const isNearBottomRef = useRef(true)
 
   const refreshMessages = useCallback(async () => {
     try {
@@ -46,7 +48,9 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
       } else {
         r = await Api.chatPmMessages(activeThread.thread_id, 50)
       }
-      setMessages(r.items.slice().reverse()) // Newest at bottom
+      const items = r.items.slice().reverse()
+      seenIdsRef.current = new Set(items.map(m => m.message_id))
+      setMessages(items)
     } catch (e) {
       console.error('Failed to fetch chat messages', e)
     }
@@ -76,6 +80,7 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
   }, [playerId])
 
   useEffect(() => {
+    seenIdsRef.current.clear()
     refreshMessages()
     if (playerId) {
       refreshThreads()
@@ -85,16 +90,47 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
     const channel = activeThread === 'global' ? 'chat.public.global' : `chat.pm.${activeThread.thread_id}`
     ws.connect(channel, (payload) => {
       const ev = payload as ChatWsEvent;
-      if (ev?.event_type === 'CHAT_MESSAGE_SENT') {
-        refreshMessages()
+      if (ev?.event_type === 'CHAT_MESSAGE_SENT' && ev.payload) {
+        const p = ev.payload
+        const msgId = String(p.message_id || '')
+        if (!msgId || seenIdsRef.current.has(msgId)) return
+        seenIdsRef.current.add(msgId)
+        const newMsg: ChatMessageResponse = {
+          message_id: msgId,
+          thread_id: String(p.thread_id || ''),
+          sender_id: p.sender_id != null ? String(p.sender_id) : null,
+          sender_display: String(p.sender_display || p.sender_id || ''),
+          message_type: String(p.message_type || 'TEXT'),
+          content: String(p.content || ''),
+          payload: (p.payload && typeof p.payload === 'object' ? p.payload : {}) as Record<string, unknown>,
+          created_at: String(p.sent_at || new Date().toISOString()),
+        }
+        setMessages(prev => {
+          if (prev.length >= 200) return [...prev.slice(-149), newMsg]
+          return [...prev, newMsg]
+        })
       }
     })
     return () => ws.close()
   }, [activeThread, refreshMessages, refreshThreads, fetchMentionsData, playerId, ws])
 
+  // 检测用户是否在底部附近
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    const el = scrollRef.current
+    if (!el) return
+    const onScroll = () => {
+      isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // 仅在用户处于底部时自动滚动
+  useEffect(() => {
+    if (isNearBottomRef.current && scrollRef.current) {
+      requestAnimationFrame(() => {
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      })
     }
   }, [messages])
 
@@ -191,7 +227,6 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
         })
       }
       setText('')
-      setTimeout(refreshMessages, 100)
     } catch (e) {
       console.error('Failed to send message', e)
     } finally {

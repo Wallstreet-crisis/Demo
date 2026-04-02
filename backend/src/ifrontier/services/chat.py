@@ -43,6 +43,24 @@ class OpenPmResult:
     intro_fee_cash: float
 
 
+_caste_cache: Dict[str, Tuple[str, float]] = {}  # account_id -> (caste, timestamp)
+_CASTE_CACHE_TTL = 60.0  # 缓存 60 秒
+
+
+def _lookup_caste(sender_id: str) -> str:
+    """查询发送者阶级，带内存缓存避免高频 DB 查询。"""
+    import time
+    now = time.monotonic()
+    cached = _caste_cache.get(sender_id)
+    if cached and (now - cached[1]) < _CASTE_CACHE_TTL:
+        return cached[0]
+    conn = get_connection()
+    row = conn.execute("SELECT owner_type FROM accounts WHERE account_id = ?", (sender_id,)).fetchone()
+    caste = str(row["owner_type"]).upper() if row else "UNKNOWN"
+    _caste_cache[sender_id] = (caste, now)
+    return caste
+
+
 class ChatService:
     def __init__(self, *, event_store: SqliteEventStore) -> None:
         self._event_store = event_store
@@ -207,13 +225,7 @@ class ChatService:
         message_id = str(uuid4())
         sender_display = self._compute_sender_display(sender_id=sender_id, anonymous=anonymous, alias=alias)
         
-        # 提取发送者阶级信息
-        sender_caste = "UNKNOWN"
-        if not anonymous:
-            conn = get_connection()
-            row = conn.execute("SELECT owner_type FROM accounts WHERE account_id = ?", (sender_id,)).fetchone()
-            if row:
-                sender_caste = str(row["owner_type"]).upper()
+        sender_caste = "UNKNOWN" if anonymous else _lookup_caste(sender_id)
 
         stored_payload = dict(payload or {})
         stored_payload["anonymous"] = bool(anonymous)
@@ -271,13 +283,7 @@ class ChatService:
         message_id = str(uuid4())
         sender_display = self._compute_sender_display(sender_id=sender_id, anonymous=anonymous, alias=alias)
         
-        # 提取发送者阶级信息
-        sender_caste = "UNKNOWN"
-        if not anonymous:
-            conn = get_connection()
-            row = conn.execute("SELECT owner_type FROM accounts WHERE account_id = ?", (sender_id,)).fetchone()
-            if row:
-                sender_caste = str(row["owner_type"]).upper()
+        sender_caste = "UNKNOWN" if anonymous else _lookup_caste(sender_id)
 
         stored_payload = dict(payload or {})
         stored_payload["anonymous"] = bool(anonymous)

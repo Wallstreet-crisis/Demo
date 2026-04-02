@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction, type Dispatch } from 'react'
 import {
   Api,
   ApiError,
@@ -43,12 +43,15 @@ export default function ChatPage() {
 
   const ws = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
   const [wsLines, setWsLines] = useState<string[]>([])
+  const publicSeenRef = useRef<Set<string>>(new Set())
+  const pmSeenRef = useRef<Set<string>>(new Set())
 
   const refreshPublic = useCallback(async (): Promise<void> => {
     setErr('')
     setLoadingPublic(true)
     try {
       const r = await Api.chatPublicMessages(50)
+      publicSeenRef.current = new Set((r.items || []).map(m => m.message_id))
       setPublicMessages(r)
     } catch (e) {
       if (e instanceof ApiError) setErr(`${e.status}: ${e.message}`)
@@ -76,21 +79,34 @@ export default function ChatPage() {
   const refreshPmMessages = useCallback(async (threadId: string): Promise<void> => {
     try {
       const msgs = await Api.chatPmMessages(threadId, 50)
+      pmSeenRef.current = new Set((msgs.items || []).map(m => m.message_id))
       setPmMessages(msgs)
     } catch (e) {
       console.error('Failed to refresh PM messages', e)
     }
   }, [])
 
-  const refreshPublicTimerRef = useRef<number | null>(null)
-
-  const scheduleRefreshPublic = useCallback((): void => {
-    if (refreshPublicTimerRef.current !== null) return
-    refreshPublicTimerRef.current = window.setTimeout(() => {
-      refreshPublicTimerRef.current = null
-      refreshPublic()
-    }, 400)
-  }, [refreshPublic])
+  const appendWsMsg = useCallback((ev: ChatWsEvent, seenRef: React.MutableRefObject<Set<string>>, setter: Dispatch<SetStateAction<ChatListMessagesResponse | null>>) => {
+    if (ev?.event_type !== 'CHAT_MESSAGE_SENT' || !ev.payload) return
+    const p = ev.payload
+    const msgId = String(p.message_id || '')
+    if (!msgId || seenRef.current.has(msgId)) return
+    seenRef.current.add(msgId)
+    const newMsg = {
+      message_id: msgId,
+      thread_id: String(p.thread_id || ''),
+      sender_id: p.sender_id != null ? String(p.sender_id) : null,
+      sender_display: String(p.sender_display || p.sender_id || ''),
+      message_type: String(p.message_type || 'TEXT'),
+      content: String(p.content || ''),
+      payload: (p.payload && typeof p.payload === 'object' ? p.payload : {}) as Record<string, unknown>,
+      created_at: String(p.sent_at || new Date().toISOString()),
+    }
+    setter(prev => {
+      const items = prev?.items ? [...prev.items, newMsg] : [newMsg]
+      return { items: items.slice(-100) }
+    })
+  }, [])
 
   async function openThread(threadId: string, targetUserId?: string): Promise<void> {
     setErr('')
@@ -109,9 +125,7 @@ export default function ChatPage() {
 
         ws.connect(`chat.pm.${r.thread_id}`, (payload) => {
           const ev = payload as ChatWsEvent;
-          if (ev?.event_type === 'CHAT_MESSAGE_SENT') {
-            refreshPmMessages(r.thread_id);
-          }
+          appendWsMsg(ev, pmSeenRef, setPmMessages)
           const line = typeof payload === 'string' ? payload : JSON.stringify(payload)
           setWsLines((prev) => [line, ...prev].slice(0, 50))
         })
@@ -120,12 +134,9 @@ export default function ChatPage() {
       }
 
       setPmThread({ thread_id: threadId, paid_intro_fee: false, intro_fee_cash: 0 })
-      await refreshPmMessages(threadId)
       ws.connect(`chat.pm.${threadId}`, (payload) => {
         const ev = payload as ChatWsEvent;
-        if (ev?.event_type === 'CHAT_MESSAGE_SENT') {
-          refreshPmMessages(threadId);
-        }
+        appendWsMsg(ev, pmSeenRef, setPmMessages)
         const line = typeof payload === 'string' ? payload : JSON.stringify(payload)
         setWsLines((prev) => [line, ...prev].slice(0, 50))
       })
@@ -148,8 +159,6 @@ export default function ChatPage() {
       })
       setPublicText('')
       notify('success', '消息已发送到广场')
-      // 延迟刷新以确保后端处理完成
-      setTimeout(() => refreshPublic(), 300)
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
       setErr(msg)
@@ -173,9 +182,7 @@ export default function ChatPage() {
 
       ws.connect(`chat.pm.${r.thread_id}`, (payload) => {
         const ev = payload as ChatWsEvent;
-        if (ev?.event_type === 'CHAT_MESSAGE_SENT') {
-          refreshPmMessages(r.thread_id);
-        }
+        appendWsMsg(ev, pmSeenRef, setPmMessages)
         const line = typeof payload === 'string' ? payload : JSON.stringify(payload)
         setWsLines((prev) => [line, ...prev].slice(0, 50))
       })
@@ -199,11 +206,6 @@ export default function ChatPage() {
         payload: {},
       })
       setPmText('')
-      // 延迟刷新以确保后端处理完成
-      setTimeout(async () => {
-        const msgs = await Api.chatPmMessages(pmThread.thread_id, 50)
-        setPmMessages(msgs)
-      }, 300)
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
       setErr(msg)
@@ -217,19 +219,13 @@ export default function ChatPage() {
 
     ws.connect('chat.public.global', (payload) => {
       const ev = payload as ChatWsEvent;
-      if (ev?.event_type === 'CHAT_MESSAGE_SENT') {
-        scheduleRefreshPublic()
-      }
+      appendWsMsg(ev, publicSeenRef, setPublicMessages)
     })
 
     return () => {
       ws.close()
-      if (refreshPublicTimerRef.current !== null) {
-        window.clearTimeout(refreshPublicTimerRef.current)
-        refreshPublicTimerRef.current = null
-      }
     }
-  }, [playerId, refreshPublic, refreshThreads, ws, scheduleRefreshPublic])
+  }, [playerId, refreshPublic, refreshThreads, ws, appendWsMsg])
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>

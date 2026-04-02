@@ -33,6 +33,9 @@ export class WsClient {
   private _retryTimer?: number
   private _keepaliveTimer?: number
   private _intentionalClose = false
+  // 微任务批处理：高频消息合并为一次回调，减少 React 渲染次数
+  private _msgQueue: unknown[] = []
+  private _flushScheduled = false
 
   constructor(opts?: WsClientConfig) {
     this.cfg = opts
@@ -70,13 +73,27 @@ export class WsClient {
     const ws = new WebSocket(url)
     this.ws = ws
 
-    const handler = this._handler
-
     ws.onmessage = (ev) => {
+      let parsed: unknown
       try {
-        handler(JSON.parse(ev.data))
+        parsed = JSON.parse(ev.data)
       } catch {
-        handler(ev.data)
+        parsed = ev.data
+      }
+      // 微任务批处理：同一事件循环内的多条消息合并到一个微任务中回调，
+      // React 18 会将同一同步块内的多次 setState 自动批量渲染。
+      this._msgQueue.push(parsed)
+      if (!this._flushScheduled) {
+        this._flushScheduled = true
+        queueMicrotask(() => {
+          const batch = this._msgQueue.splice(0)
+          this._flushScheduled = false
+          const h = this._handler
+          if (!h) return
+          for (const msg of batch) {
+            h(msg)
+          }
+        })
       }
     }
 

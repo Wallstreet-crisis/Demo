@@ -551,8 +551,8 @@ async def debug_emit_event(req: DebugEmitEventRequest) -> DebugEmitEventResponse
     event_json = EventEnvelopeJson.from_envelope(envelope)
     _event_store.append(event_json)
 
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(req.event_type), event_json.model_dump())
+    dumped = event_json.model_dump()
+    await hub.broadcast_many(["events", str(req.event_type)], dumped)
 
     return DebugEmitEventResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
 
@@ -828,8 +828,8 @@ async def hosting_enable(user_id: str) -> HostingEnableResponse:
     
     ev = EventEnvelopeJson.from_envelope(env)
     _event_store.append(ev)
-    await hub.broadcast_json("events", ev.model_dump())
-    await hub.broadcast_json(str(EventType.AI_HOSTING_STATE_CHANGED), ev.model_dump())
+    dumped = ev.model_dump()
+    await hub.broadcast_many(["events", str(EventType.AI_HOSTING_STATE_CHANGED)], dumped)
 
     return HostingEnableResponse(
         state=HostingStatusResponse(
@@ -862,8 +862,8 @@ async def hosting_disable(user_id: str) -> HostingDisableResponse:
     
     ev = EventEnvelopeJson.from_envelope(env)
     _event_store.append(ev)
-    await hub.broadcast_json("events", ev.model_dump())
-    await hub.broadcast_json(str(EventType.AI_HOSTING_STATE_CHANGED), ev.model_dump())
+    dumped = ev.model_dump()
+    await hub.broadcast_many(["events", str(EventType.AI_HOSTING_STATE_CHANGED)], dumped)
 
     return HostingDisableResponse(
         state=HostingStatusResponse(
@@ -911,10 +911,11 @@ async def hosting_debug_tick_once() -> HostingDebugTickResponse:
 
 def _make_broadcaster_for_events():
     async def _broadcast(ev: dict) -> None:
-        await hub.broadcast_json("events", ev)
         ev_type = ev.get("event_type")
+        channels = ["events"]
         if ev_type:
-            await hub.broadcast_json(str(ev_type), ev)
+            channels.append(str(ev_type))
+        await hub.broadcast_many(channels, ev)
 
     return _broadcast
 
@@ -966,7 +967,7 @@ async def debug_earnings_news(req: DebugEarningsNewsRequest) -> DebugEarningsNew
     )
     news_json = EventEnvelopeJson.from_envelope(news_envelope)
     _event_store.append(news_json)
-    await hub.broadcast_json("events", news_json.model_dump())
+    await hub.broadcast_many(["events"], news_json.model_dump())
 
     decision_json, trade_json = run_commonbot_for_earnings(
         symbol=req.symbol,
@@ -977,14 +978,12 @@ async def debug_earnings_news(req: DebugEarningsNewsRequest) -> DebugEarningsNew
     )
 
     _event_store.append(decision_json)
-    await hub.broadcast_json("events", decision_json.model_dump())
-    await hub.broadcast_json(str(EventType.AI_COMMONBOT_DECISION), decision_json.model_dump())
+    await hub.broadcast_many(["events", str(EventType.AI_COMMONBOT_DECISION)], decision_json.model_dump())
 
     trade_event_id: UUID | None = None
     if trade_json is not None:
         _event_store.append(trade_json)
-        await hub.broadcast_json("events", trade_json.model_dump())
-        await hub.broadcast_json(str(EventType.TRADE_INTENT_SUBMITTED), trade_json.model_dump())
+        await hub.broadcast_many(["events", str(EventType.TRADE_INTENT_SUBMITTED)], trade_json.model_dump())
         trade_event_id = trade_json.event_id
 
     # Bot 真实下单：对 BUY/SELL 决策，用 bot 账户提交限价单进入撮合。
@@ -1084,8 +1083,7 @@ async def debug_execute_trade(req: DebugExecuteTradeRequest) -> DebugExecuteTrad
     )
 
     _event_store.append(event_json)
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(EventType.TRADE_EXECUTED), event_json.model_dump())
+    await hub.broadcast_many(["events", str(EventType.TRADE_EXECUTED)], event_json.model_dump())
 
     return DebugExecuteTradeResponse(event_id=event_json.event_id, correlation_id=correlation_id)
 
@@ -1414,10 +1412,11 @@ async def submit_player_limit_order(req: PlayerLimitOrderRequest) -> PlayerOrder
         # 骞挎挱鎴愪氦浜嬩欢
         for m in matches:
             ev = m.executed_event.model_dump()
-            await hub.broadcast_json("events", ev)
-            ev_type = ev.get("event_type")
-            if ev_type:
-                await hub.broadcast_json(str(ev_type), ev)
+            chs = ["events"]
+            et = ev.get("event_type")
+            if et:
+                chs.append(str(et))
+            await hub.broadcast_many(chs, ev)
 
         return PlayerOrderResponse(order_id=order_id)
     except Exception as exc:
@@ -1520,10 +1519,11 @@ async def submit_player_market_order(req: PlayerMarketOrderRequest) -> None:
         # 骞挎挱鎴愪氦浜嬩欢
         for m in matches:
             ev = m.executed_event.model_dump()
-            await hub.broadcast_json("events", ev)
-            ev_type = ev.get("event_type")
-            if ev_type:
-                await hub.broadcast_json(str(ev_type), ev)
+            chs = ["events"]
+            et = ev.get("event_type")
+            if et:
+                chs.append(str(et))
+            await hub.broadcast_many(chs, ev)
     except Exception as exc:
         _log.warning("Failed to submit market order for %s: %s", req.symbol, exc)
         raise HTTPException(status_code=400, detail=str(exc))
@@ -1804,8 +1804,7 @@ async def contract_agent_draft(req: ContractAgentDraftRequest) -> ContractAgentD
     
     ev_json = EventEnvelopeJson.from_envelope(env)
     _event_store.append(ev_json)
-    await hub.broadcast_json("events", ev_json.model_dump())
-    await hub.broadcast_json(str(EventType.AI_CONTRACT_DRAFTED), ev_json.model_dump())
+    await hub.broadcast_many(["events", str(EventType.AI_CONTRACT_DRAFTED)], ev_json.model_dump())
 
     return ContractAgentDraftResponse(
         draft_id=str(res.draft_id),
@@ -1939,8 +1938,8 @@ async def chat_intro_fee_quote(req: ChatIntroFeeQuoteRequest) -> ChatIntroFeeQuo
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(event_json.event_type), event_json.model_dump())
+    dumped = event_json.model_dump()
+    await hub.broadcast_many(["events", str(event_json.event_type)], dumped)
     return ChatIntroFeeQuoteResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
 
 
@@ -1963,9 +1962,8 @@ async def chat_open_pm(req: ChatOpenPmRequest) -> ChatOpenPmResponse:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     for ev in events:
-        await hub.broadcast_json("events", ev.model_dump())
-        await hub.broadcast_json(str(ev.event_type), ev.model_dump())
-        await hub.broadcast_json(f"chat.pm.{result.thread_id}", ev.model_dump())
+        dumped = ev.model_dump()
+        await hub.broadcast_many(["events", str(ev.event_type), f"chat.pm.{result.thread_id}"], dumped)
 
     return ChatOpenPmResponse(
         thread_id=result.thread_id,
@@ -2002,9 +2000,8 @@ async def chat_public_send(req: ChatSendMessageRequest) -> ChatSendMessageRespon
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(event_json.event_type), event_json.model_dump())
-    await hub.broadcast_json("chat.public.global", event_json.model_dump())
+    dumped = event_json.model_dump()
+    await hub.broadcast_many(["events", str(event_json.event_type), "chat.public.global"], dumped)
     return ChatSendMessageResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
 
 
@@ -2027,9 +2024,8 @@ async def chat_pm_send(req: ChatSendPmMessageRequest) -> ChatSendMessageResponse
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(event_json.event_type), event_json.model_dump())
-    await hub.broadcast_json(f"chat.pm.{req.thread_id}", event_json.model_dump())
+    dumped = event_json.model_dump()
+    await hub.broadcast_many(["events", str(event_json.event_type), f"chat.pm.{req.thread_id}"], dumped)
     return ChatSendMessageResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
 
 
@@ -2120,8 +2116,7 @@ class WealthPublicRefreshResponse(BaseModel):
 @router.post("/wealth/public/refresh")
 async def wealth_public_refresh() -> WealthPublicRefreshResponse:
     public_count, event_json = _chat_service.refresh_public_wealth_top10()
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(event_json.event_type), event_json.model_dump())
+    await hub.broadcast_many(["events", str(event_json.event_type)], event_json.model_dump())
     return WealthPublicRefreshResponse(
         public_count=int(public_count),
         event_id=event_json.event_id,
@@ -2583,8 +2578,7 @@ async def news_create_card(req: NewsCreateCardRequest) -> NewsCreateCardResponse
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(EventType.NEWS_CARD_CREATED), event_json.model_dump())
+    await hub.broadcast_many(["events", str(EventType.NEWS_CARD_CREATED)], event_json.model_dump())
 
     return NewsCreateCardResponse(
         card_id=card_id,
@@ -2624,8 +2618,7 @@ async def news_emit_variant(req: NewsEmitVariantRequest) -> NewsEmitVariantRespo
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(EventType.NEWS_VARIANT_EMITTED), event_json.model_dump())
+    await hub.broadcast_many(["events", str(EventType.NEWS_VARIANT_EMITTED)], event_json.model_dump())
 
     return NewsEmitVariantResponse(
         variant_id=variant_id,
@@ -2677,8 +2670,7 @@ async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVarian
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(EventType.NEWS_VARIANT_MUTATED), event_json.model_dump())
+    await hub.broadcast_many(["events", str(EventType.NEWS_VARIANT_MUTATED)], event_json.model_dump())
 
     return NewsMutateVariantResponse(
         new_variant_id=new_variant_id,
@@ -2842,8 +2834,7 @@ async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
             continue
 
     for ev in delivered_events:
-        await hub.broadcast_json("events", ev.model_dump())
-        await hub.broadcast_json(str(EventType.NEWS_DELIVERED), ev.model_dump())
+        await hub.broadcast_many(["events", str(EventType.NEWS_DELIVERED)], ev.model_dump())
 
     correlation_id = delivered_events[0].correlation_id if delivered_events else req.correlation_id
     return NewsPropagateResponse(delivered=len(delivered_events), correlation_id=correlation_id)
@@ -2863,8 +2854,7 @@ async def news_broadcast(req: NewsBroadcastRequest) -> NewsBroadcastResponse:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    await hub.broadcast_json("events", ev.model_dump())
-    await hub.broadcast_json(str(EventType.NEWS_BROADCASTED), ev.model_dump())
+    await hub.broadcast_many(["events", str(EventType.NEWS_BROADCASTED)], ev.model_dump())
     _commonbot_emergency_runner.maybe_react(broadcast_event=ev)
 
     return NewsBroadcastResponse(
@@ -2900,8 +2890,7 @@ async def news_suppress(req: NewsSuppressRequest) -> NewsSuppressResponse:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(EventType.NEWS_PROPAGATION_SUPPRESSED), event_json.model_dump())
+    await hub.broadcast_many(["events", str(EventType.NEWS_PROPAGATION_SUPPRESSED)], event_json.model_dump())
     return NewsSuppressResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
 
 
@@ -2990,11 +2979,9 @@ async def news_chain_start(req: NewsChainStartRequest) -> NewsChainStartResponse
     card_event = result.get("card_created_event")
     chain_event = result.get("chain_started_event")
     if card_event is not None:
-        await hub.broadcast_json("events", card_event.model_dump())
-        await hub.broadcast_json(str(EventType.NEWS_CARD_CREATED), card_event.model_dump())
+        await hub.broadcast_many(["events", str(EventType.NEWS_CARD_CREATED)], card_event.model_dump())
     if chain_event is not None:
-        await hub.broadcast_json("events", chain_event.model_dump())
-        await hub.broadcast_json(str(EventType.NEWS_CHAIN_STARTED), chain_event.model_dump())
+        await hub.broadcast_many(["events", str(EventType.NEWS_CHAIN_STARTED)], chain_event.model_dump())
 
     return NewsChainStartResponse(
         chain_id=str(result["chain_id"]),
@@ -3032,8 +3019,7 @@ async def news_ownership_grant(req: NewsOwnershipGrantRequest) -> NewsOwnershipE
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(EventType.NEWS_OWNERSHIP_GRANTED), event_json.model_dump())
+    await hub.broadcast_many(["events", str(EventType.NEWS_OWNERSHIP_GRANTED)], event_json.model_dump())
     return NewsOwnershipEventResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
 
 
@@ -3050,8 +3036,7 @@ async def news_ownership_transfer(req: NewsOwnershipTransferRequest) -> NewsOwne
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    await hub.broadcast_json("events", event_json.model_dump())
-    await hub.broadcast_json(str(EventType.NEWS_OWNERSHIP_TRANSFERRED), event_json.model_dump())
+    await hub.broadcast_many(["events", str(EventType.NEWS_OWNERSHIP_TRANSFERRED)], event_json.model_dump())
     return NewsOwnershipEventResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
 
 
@@ -3238,8 +3223,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
         actor_id=req.buyer_user_id,
         correlation_id=req.correlation_id,
     )
-    await hub.broadcast_json("events", card_event.model_dump())
-    await hub.broadcast_json(str(EventType.NEWS_CARD_CREATED), card_event.model_dump())
+    await hub.broadcast_many(["events", str(EventType.NEWS_CARD_CREATED)], card_event.model_dump())
 
     variant_id, variant_event = _news_service.emit_variant(
         card_id=card_id,
@@ -3250,8 +3234,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
         risk_roll=None,
         correlation_id=req.correlation_id,
     )
-    await hub.broadcast_json("events", variant_event.model_dump())
-    await hub.broadcast_json(str(EventType.NEWS_VARIANT_EMITTED), variant_event.model_dump())
+    await hub.broadcast_many(["events", str(EventType.NEWS_VARIANT_EMITTED)], variant_event.model_dump())
 
     try:
         ownership_event = _news_service.grant_ownership(
@@ -3260,8 +3243,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
             granter_id="system",
             correlation_id=req.correlation_id,
         )
-        await hub.broadcast_json("events", ownership_event.model_dump())
-        await hub.broadcast_json(str(EventType.NEWS_OWNERSHIP_GRANTED), ownership_event.model_dump())
+        await hub.broadcast_many(["events", str(EventType.NEWS_OWNERSHIP_GRANTED)], ownership_event.model_dump())
     except ValueError:
         pass
 
@@ -3274,8 +3256,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
             delivery_reason="PURCHASED",
             correlation_id=req.correlation_id,
         )
-        await hub.broadcast_json("events", delivered_event.model_dump())
-        await hub.broadcast_json(str(EventType.NEWS_DELIVERED), delivered_event.model_dump())
+        await hub.broadcast_many(["events", str(EventType.NEWS_DELIVERED)], delivered_event.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
