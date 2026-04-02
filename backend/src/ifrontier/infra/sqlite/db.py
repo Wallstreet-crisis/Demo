@@ -37,6 +37,8 @@ def get_connection() -> sqlite3.Connection:
         path = _get_db_path(room_id)
         conn = sqlite3.connect(path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=5000;")
         conn.execute("PRAGMA foreign_keys = ON;")
         conns[room_id] = conn
     return conn

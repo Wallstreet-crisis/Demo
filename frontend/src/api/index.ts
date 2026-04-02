@@ -84,6 +84,8 @@ import type {
   PlayerBootstrapRequest,
   PlayerBootstrapResponse,
   PlayerLimitOrderRequest,
+  RoomJoinRequest,
+  RoomJoinResponse,
   PlayerMarketOrderRequest,
   PlayerOrderResponse,
   SocialFollowRequest,
@@ -166,6 +168,7 @@ async function getWithBootstrapCache<T>(key: string, ttlMs: number, loader: () =
 export const Api = {
   health: () => api.get<HealthResponse>('/health'),
 
+  roomJoin: (req: RoomJoinRequest) => api.post<RoomJoinResponse>('/rooms/join', req, roomRequest),
   createRoom: (req: CreateRoomRequest) => api.post<CreateRoomResponse>('/rooms', req, roomRequest),
   activateRoom: (roomId: string) => api.post<{ok: boolean, room_id: string}>(`/rooms/${encodeURIComponent(roomId)}/activate`, undefined, roomRequest),
   closeRoom: (roomId: string) => api.post<void>(`/rooms/${encodeURIComponent(roomId)}/close`, undefined, roomRequest),

@@ -4,7 +4,10 @@ import asyncio
 import os
 from typing import Any, Awaitable, Callable, Dict, Optional
 
+from ifrontier.core.logger import get_logger
 from ifrontier.services.market_maker import MarketMaker, MarketMakerConfig
+
+_log = get_logger(__name__)
 
 
 class MarketMakerScheduler:
@@ -79,11 +82,7 @@ class MarketMakerScheduler:
                         for m in matches:
                             await self._broadcaster(m.executed_event.model_dump())
             except Exception as exc:
-                import traceback
-
-                traceback.print_exc()
-                print(f"[MarketMakerScheduler] Error: {exc}")
-                pass
+                _log.exception("MarketMaker tick error: %s", exc)
 
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=self._tick_interval_seconds)

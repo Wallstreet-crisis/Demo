@@ -8,7 +8,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
+from ifrontier.core.logger import get_logger
 from ifrontier.domain.events.envelope import EventActor, EventEnvelope, EventEnvelopeJson
+
+_log = get_logger(__name__)
 from ifrontier.domain.events.payloads import (
     NewsChainAbortedPayload,
     NewsChainStartedPayload,
@@ -296,7 +299,7 @@ class NewsTickEngine:
                             spawned_events.append(eev.model_dump(mode="json"))
                             
                     if verbose:
-                        print(f"[NewsTick:Spawn] Spawned {kind} for {target_symbol} to {len(lucky_ones)} users. Bias: {impact_direction}")
+                        _log.info("Spawned %s for %s to %d users. Bias: %s", kind, target_symbol, len(lucky_ones), impact_direction)
 
         # 2) 重大事件链投放 (每 600s 触发)
         if self._last_chain_at is None or (now - self._last_chain_at).total_seconds() >= 600:
@@ -419,7 +422,7 @@ class NewsTickEngine:
                 final_impact_map = {s: impact_map[s] for s in target_symbols}
 
                 if verbose:
-                    print(f"[NewsTick:Spawn] Starting system chain: {kind} ({theme}) for {target_symbols}")
+                    _log.info("Starting system chain: %s (%s) for %s", kind, theme, target_symbols)
                 res = self.start_chain(
                     kind=kind,
                     actor_id="system",

@@ -11,7 +11,10 @@ from ifrontier.infra.sqlite.contract_agent import (
     load_contract_agent_context,
     save_contract_agent_context,
 )
+from ifrontier.core.logger import get_logger
 from ifrontier.infra.llm.client import LlmClient, extract_first_message_text
+
+_log = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -452,7 +455,7 @@ class ContractAgent:
                 clean_text = clean_text[start_idx : end_idx + 1]
             obj = json.loads(clean_text)
         except Exception as exc:
-            print(f"[ContractAgent] Audit LLM failed: {exc}")
+            _log.warning("Audit LLM failed: %s", exc)
             return None
 
         if not isinstance(obj, dict):
@@ -485,7 +488,7 @@ class ContractAgent:
         context: Dict[str, Any],
         llm: LlmClient,
     ) -> ContractDraftResult | None:
-        print(f"[ContractAgent] Attempting LLM draft for {actor_id}...")
+        _log.debug("Attempting LLM draft for %s", actor_id)
         system = (
             "你是财务经理(Contract Agent)，仅输出合规JSON，禁止输出任何额外文字、注释、符号。",
             "契约为**结构化可执行合约(DSL)**：履约/触发/时间/计算逻辑由 terms.rules 规则对象驱动执行。",
@@ -526,7 +529,7 @@ class ContractAgent:
         try:
             resp = llm.chat_completions(system=system_str, user=user, temperature=0.2, max_tokens=1000)
             text = extract_first_message_text(resp)
-            print(f"[ContractAgent] LLM Raw Response: {text[:200]}...")
+            _log.debug("LLM Raw Response: %s...", text[:200])
             
             # v0.2: 使用更鲁棒的 JSON 提取方法
             clean_text = text.strip()
@@ -537,11 +540,11 @@ class ContractAgent:
             
             obj = json.loads(clean_text)
         except Exception as exc:
-            print(f"[ContractAgent] LLM error or parsing failed: {exc}")
+            _log.warning("LLM error or parsing failed: %s", exc)
             return None
 
         if not isinstance(obj, dict):
-            print("[ContractAgent] LLM returned non-dict object")
+            _log.warning("LLM returned non-dict object")
             return None
 
         template_id = str(obj.get("template_id") or "LLM")

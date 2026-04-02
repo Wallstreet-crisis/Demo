@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from ifrontier.core.logger import get_logger
 from ifrontier.infra.sqlite.bots import init_bot_accounts
+
+_log = get_logger(__name__)
 from ifrontier.infra.sqlite.chat import init_chat_schema
 from ifrontier.infra.sqlite.contract_agent import init_contract_agent_schema
 from ifrontier.infra.sqlite.contracts import init_contracts_schema
@@ -61,9 +64,9 @@ def init_schema() -> None:
         try:
             cur.execute("ALTER TABLE accounts ADD COLUMN caste_id TEXT")
             conn.commit()
-            print("[DB] Migrated accounts table: added caste_id column")
+            _log.info("Migrated accounts table: added caste_id column")
         except Exception as e:
-            print(f"[DB] Migration failed (caste_id): {e}")
+            _log.warning("Migration failed (caste_id): %s", e)
 
     # 订单簿（LIMIT 订单入簿，MARKET 订单由撮合引擎吃单实现）
     init_order_schema()

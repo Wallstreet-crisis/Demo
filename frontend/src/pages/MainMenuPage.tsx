@@ -4,9 +4,6 @@ import { Api } from '../api'
 import { useAppSession } from '../app/context'
 import SettingsModal from '../components/SettingsModal'
 
-const PENDING_ONBOARDING_KEY = 'if_pending_onboarding'
-const PENDING_ONBOARDING_PLAYER_KEY = 'if_pending_onboarding_player'
-const ROOM_ENTRY_CHECK_KEY = 'if_room_entry_check'
 
 export default function MainMenuPage() {
   const nav = useNavigate()
@@ -105,9 +102,6 @@ export default function MainMenuPage() {
         setRoomId(res.room_id)
         setGlobalPlayerId(inputPlayerId)
         setCasteId('' as any)
-        localStorage.setItem(ROOM_ENTRY_CHECK_KEY, '1')
-        localStorage.setItem(PENDING_ONBOARDING_KEY, '1')
-        localStorage.setItem(PENDING_ONBOARDING_PLAYER_KEY, inputPlayerId)
         nav('/onboarding')
       }
     } catch (e) {
@@ -128,8 +122,6 @@ export default function MainMenuPage() {
       .then(() => {
         setGlobalPlayerId(inputPlayerId)
         setCasteId('' as any)
-        localStorage.setItem(ROOM_ENTRY_CHECK_KEY, '1')
-        localStorage.setItem(PENDING_ONBOARDING_PLAYER_KEY, inputPlayerId)
         nav('/onboarding')
       })
       .catch((e) => {
@@ -174,8 +166,6 @@ export default function MainMenuPage() {
       .then(() => {
         setGlobalPlayerId(inputPlayerId)
         setCasteId('' as any)
-        localStorage.setItem(ROOM_ENTRY_CHECK_KEY, '1')
-        localStorage.setItem(PENDING_ONBOARDING_PLAYER_KEY, inputPlayerId)
         nav('/onboarding')
       })
       .catch((e) => {

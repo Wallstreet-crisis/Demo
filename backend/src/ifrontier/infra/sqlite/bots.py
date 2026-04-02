@@ -34,58 +34,57 @@ def default_bot_profiles() -> List[BotProfile]:
 
 
 def init_bot_accounts() -> None:
+    """幂等初始化 Bot 和做市商账户。
+
+    仅在账户**首次创建**时发放初始资金和持仓。
+    后续重启不再覆盖已有余额/持仓，避免无限充值。
+    """
     conn = get_connection()
     securities = list_securities()
     symbols = [s.symbol for s in securities]
 
     with conn:
-        # 确保做市商账号也存在（如果不在 profile 里）
-        # 做市商 mm:1 的初始化在 market_maker 服务中，但这里我们也给它充值
+        # ── 做市商 mm:1 ──
         row = conn.execute("SELECT 1 FROM accounts WHERE account_id = ?", ("mm:1",)).fetchone()
         if not row:
             create_account("mm:1", owner_type="market_maker", initial_cash=500_000_000.0)
+            if symbols:
+                for sym in symbols:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?)",
+                        ("mm:1", sym, 1_000_000.0),
+                    )
         else:
-            conn.execute(
-                "UPDATE accounts SET cash = ? WHERE account_id = ?",
-                (500_000_000.0, "mm:1")
-            )
+            # 已存在：仅补齐缺失标的的持仓，不覆盖已有值
+            if symbols:
+                for sym in symbols:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?)",
+                        ("mm:1", sym, 1_000_000.0),
+                    )
 
-        if symbols:
-            for sym in symbols:
-                conn.execute(
-                    "INSERT INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?) "
-                    "ON CONFLICT(account_id, symbol) DO UPDATE SET quantity = CASE "
-                    "WHEN quantity < excluded.quantity THEN excluded.quantity ELSE quantity END",
-                    ("mm:1", sym, 1_000_000.0),
-                )
-
+        # ── Bot 账户 ──
         for p in default_bot_profiles():
             row = conn.execute("SELECT 1 FROM accounts WHERE account_id = ?", (p.account_id,)).fetchone()
-            if not row:
+            is_new = row is None
+            if is_new:
                 create_account(p.account_id, owner_type=p.owner_type, initial_cash=p.initial_cash)
-            else:
-                conn.execute(
-                    "UPDATE accounts SET cash = ? WHERE account_id = ?",
-                    (p.initial_cash, p.account_id)
-                )
-            
+
             # 默认开启机器人的 AI 托管
             upsert_hosting_state(user_id=p.account_id, enabled=True, status="ON_IDLE")
 
-            # 强制重置持仓，确保机构有足够弹药，散户有足够筹码
-            if p.owner_type == "bot_institution" and symbols:
-                for sym in symbols:
-                    # 使用 REPLACE 确保库存被重置为巨额初值
-                    conn.execute(
-                        "INSERT OR REPLACE INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?)",
-                        (p.account_id, sym, 1_000_000.0)
-                    )
-            
-            elif p.owner_type == "bot_retail" and symbols:
-                import random
-                # 随机分配一些初始持仓
-                for sym in random.sample(symbols, min(len(symbols), 3)):
-                    conn.execute(
-                        "INSERT OR REPLACE INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?)",
-                        (p.account_id, sym, 5000.0) # 提升散户持筹
-                    )
+            # 仅首次创建时分配持仓
+            if is_new and symbols:
+                if p.owner_type == "bot_institution":
+                    for sym in symbols:
+                        conn.execute(
+                            "INSERT OR IGNORE INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?)",
+                            (p.account_id, sym, 1_000_000.0),
+                        )
+                elif p.owner_type == "bot_retail":
+                    import random
+                    for sym in random.sample(symbols, min(len(symbols), 3)):
+                        conn.execute(
+                            "INSERT OR IGNORE INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?)",
+                            (p.account_id, sym, 5000.0),
+                        )

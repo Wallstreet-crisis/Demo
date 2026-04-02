@@ -4,7 +4,10 @@ import asyncio
 import os
 from typing import Any, Awaitable, Callable, Dict, Optional
 
+from ifrontier.core.logger import get_logger
 from ifrontier.services.news_tick import NewsTickEngine
+
+_log = get_logger(__name__)
 
 
 class NewsTickScheduler:
@@ -46,7 +49,7 @@ class NewsTickScheduler:
     async def _run_loop(self) -> None:
         verbose = str(os.getenv("IF_SCHEDULER_VERBOSE") or "").strip().lower() in {"1", "true", "yes", "on"}
         if verbose:
-            print(f"[NewsTickScheduler] Starting loop (interval={self._tick_interval_seconds}s)")
+            _log.info("Starting loop (interval=%ss)", self._tick_interval_seconds)
         while not self._stop.is_set():
             if self._get_channel_size and self._channel_for_online_stats:
                 try:
@@ -66,10 +69,10 @@ class NewsTickScheduler:
                 )
                 if (result or {}).get("chains"):
                     if verbose:
-                        print(f"[NewsTickScheduler] Ticked {len(result['chains'])} active chains")
+                        _log.info("Ticked %d active chains", len(result['chains']))
             except Exception as e:
                 if verbose:
-                    print(f"[NewsTickScheduler] Error: {e}")
+                    _log.warning("Tick error: %s", e)
                 result = {"chains": []}
 
             # 广播 tick 产生的系统生成事件 (Spawned events)

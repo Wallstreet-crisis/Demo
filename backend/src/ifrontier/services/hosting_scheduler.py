@@ -4,10 +4,13 @@ import asyncio
 import os
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
+from ifrontier.core.logger import get_logger
 from ifrontier.infra.sqlite.hosting import list_enabled_hosting_users, upsert_hosting_state
 from ifrontier.services.user_capabilities import UserCapabilityFacade
 from ifrontier.services.user_hosting_agent import UserHostingAgent
 from ifrontier.core.ai_logger import log_ai_action
+
+_log = get_logger(__name__)
 
 class HostingScheduler:
     def __init__(
@@ -83,9 +86,9 @@ class HostingScheduler:
 
         verbose = str(os.getenv("IF_SCHEDULER_VERBOSE") or "").strip().lower() in {"1", "true", "yes", "on"}
         if verbose:
-            print(
-                f"[HostingScheduler] Tick: humans={humans}, missing={missing}, total_quota={total_quota}. "
-                f"Available: bots={len(bot_candidates)}, humans={len(human_candidates)}"
+            _log.info(
+                "Tick: humans=%d, missing=%d, total_quota=%d. Available: bots=%d, humans=%d",
+                humans, missing, total_quota, len(bot_candidates), len(human_candidates),
             )
 
         # 混合采样：优先保证机器人，剩余给人类托管
@@ -108,7 +111,7 @@ class HostingScheduler:
 
         for st in picked_sts:
             if verbose:
-                print(f"[HostingScheduler] Activating agent: {st.user_id}")
+                _log.info("Activating agent: %s", st.user_id)
             upsert_hosting_state(user_id=st.user_id, enabled=True, status="ON_ACTIVE")
 
             try:
@@ -121,6 +124,6 @@ class HostingScheduler:
                     await self._broadcaster(ev.model_dump())
             except Exception as exc:
                 if verbose:
-                    print(f"[HostingScheduler] Failed to tick agent {st.user_id}: {exc}")
+                    _log.warning("Failed to tick agent %s: %s", st.user_id, exc)
             finally:
                 upsert_hosting_state(user_id=st.user_id, enabled=True, status="ON_IDLE")

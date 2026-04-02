@@ -1,12 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Api, ApiError } from '../api'
 import { useAppSession } from '../app/context'
 import { CASTES, type CasteId } from '../app/constants'
-
-const PENDING_ONBOARDING_KEY = 'if_pending_onboarding'
-const PENDING_ONBOARDING_PLAYER_KEY = 'if_pending_onboarding_player'
-const ROOM_ENTRY_CHECK_KEY = 'if_room_entry_check'
 
 export default function OnboardingPage() {
   const nav = useNavigate()
@@ -18,41 +14,7 @@ export default function OnboardingPage() {
   const [syncProgress, setSyncProgress] = useState(0)
   const [resultCaste, setResultCaste] = useState<(typeof CASTES)[number] | null>(null)
   const [rollIndex, setRollIndex] = useState(0)
-  const pendingOnboarding = localStorage.getItem(PENDING_ONBOARDING_KEY) === '1'
-  const pendingPlayerId = localStorage.getItem(PENDING_ONBOARDING_PLAYER_KEY) || ''
-  const needsRoomEntryCheck = localStorage.getItem(ROOM_ENTRY_CHECK_KEY) === '1'
-
-  useEffect(() => {
-    if (!globalPlayerId || !needsRoomEntryCheck || isRolling || isSyncing || resultCaste || err) return
-
-    let canceled = false
-    const decideEntry = async () => {
-      const existing = await Api.playerAccount(globalPlayerId).catch(() => null)
-      if (canceled) return
-      if (existing?.caste_id) {
-        const found = CASTES.find(c => c.id === existing.caste_id)
-        localStorage.removeItem(ROOM_ENTRY_CHECK_KEY)
-        localStorage.removeItem(PENDING_ONBOARDING_KEY)
-        localStorage.removeItem(PENDING_ONBOARDING_PLAYER_KEY)
-        if (found) {
-          setResultCaste(found)
-          setGlobalCasteId(found.id as CasteId)
-        }
-        nav('/dashboard', { replace: true })
-        return
-      }
-
-      localStorage.setItem(PENDING_ONBOARDING_KEY, '1')
-      localStorage.setItem(PENDING_ONBOARDING_PLAYER_KEY, globalPlayerId)
-      localStorage.removeItem(ROOM_ENTRY_CHECK_KEY)
-      startLottery()
-    }
-
-    void decideEntry()
-    return () => {
-      canceled = true
-    }
-  }, [globalPlayerId, needsRoomEntryCheck, isRolling, isSyncing, resultCaste, err, nav, setGlobalCasteId])
+  const startedRef = useRef(false)
 
   // 如果没有传递 ID 过来的话，直接回退到菜单
   useEffect(() => {
@@ -60,6 +22,39 @@ export default function OnboardingPage() {
       nav('/menu', { replace: true })
     }
   }, [globalPlayerId, nav])
+
+  // 服务端权威判断：调用 /rooms/join 确定是否需要入局抽签
+  useEffect(() => {
+    if (!globalPlayerId || startedRef.current) return
+    startedRef.current = true
+
+    let canceled = false
+    const checkJoinStatus = async () => {
+      try {
+        const res = await Api.roomJoin({ player_id: globalPlayerId })
+        if (canceled) return
+
+        if (res.status === 'already_onboarded' && res.caste_id) {
+          const found = CASTES.find(c => c.id === res.caste_id)
+          if (found) {
+            setGlobalCasteId(found.id as CasteId)
+          }
+          nav('/dashboard', { replace: true })
+          return
+        }
+
+        // needs_onboarding → 开始抽签
+        runLottery()
+      } catch (e) {
+        if (canceled) return
+        if (e instanceof ApiError) setErr(`GATEWAY_ERROR_${e.status}: ${e.message}`)
+        else setErr(e instanceof Error ? e.message : String(e))
+      }
+    }
+
+    void checkJoinStatus()
+    return () => { canceled = true }
+  }, [globalPlayerId])
 
   useEffect(() => {
     let timer: number
@@ -87,8 +82,8 @@ export default function OnboardingPage() {
     return () => clearInterval(timer)
   }, [isSyncing])
 
-  const startLottery = async () => {
-    if (!globalPlayerId || isRolling || isSyncing) return
+  const runLottery = () => {
+    if (!globalPlayerId) return
 
     setErr('')
     setIsRolling(true)
@@ -97,22 +92,6 @@ export default function OnboardingPage() {
     // 模拟抽取过程
     setTimeout(async () => {
       try {
-        // 仅在不是“明确要求首次入局”的情况下，才允许直接复用已有阶级。
-        const shouldForceLottery = pendingOnboarding && pendingPlayerId === globalPlayerId
-        const existing = shouldForceLottery ? null : await Api.playerAccount(globalPlayerId).catch(() => null)
-
-        if (!shouldForceLottery && existing && existing.caste_id) {
-          const found = CASTES.find(c => c.id === existing.caste_id)
-          if (found) {
-            setIsRolling(false)
-            setResultCaste(found)
-            setGlobalCasteId(found.id as CasteId)
-            localStorage.removeItem(PENDING_ONBOARDING_KEY)
-            localStorage.removeItem(PENDING_ONBOARDING_PLAYER_KEY)
-            return
-          }
-        }
-
         setIsRolling(false)
         
         // 随机抽取阶级
@@ -151,8 +130,6 @@ export default function OnboardingPage() {
         // 等待进度条走完
         setTimeout(() => {
           setGlobalCasteId(selected.id as CasteId)
-          localStorage.removeItem(PENDING_ONBOARDING_KEY)
-          localStorage.removeItem(PENDING_ONBOARDING_PLAYER_KEY)
         }, 1500)
       } catch (e) {
         setIsRolling(false)
@@ -162,16 +139,6 @@ export default function OnboardingPage() {
       }
     }, 2000)
   }
-
-  // 组件挂载完成后，留出短暂的视觉延迟，自动开始抽签流程
-  useEffect(() => {
-    if (!needsRoomEntryCheck && globalPlayerId && !isRolling && !isSyncing && !resultCaste && !err) {
-      const t = setTimeout(() => {
-        startLottery()
-      }, 1000)
-      return () => clearTimeout(t)
-    }
-  }, [globalPlayerId, isRolling, isSyncing, resultCaste, err, needsRoomEntryCheck])
 
   function enterGame() {
     nav('/dashboard', { replace: true })

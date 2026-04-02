@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 from ifrontier.infra.sqlite.db import get_connection
@@ -149,9 +149,17 @@ def get_candles(*, symbol: str, interval_seconds: int = 60, limit: int = 200) ->
         raise ValueError("interval_seconds must be > 0")
 
     conn = get_connection()
+
+    # 仅加载覆盖 limit 个桶所需的时间范围，避免全表扫描
+    lookback_seconds = int(interval_seconds) * int(limit) * 2  # 2x 余量
+    cutoff = datetime.now(timezone.utc)
+    since = (cutoff - timedelta(seconds=lookback_seconds)).isoformat()
+
     rows = conn.execute(
-        "SELECT price, quantity, occurred_at FROM market_trades WHERE symbol = ? ORDER BY occurred_at ASC, trade_id ASC",
-        (symbol,),
+        "SELECT price, quantity, occurred_at FROM market_trades "
+        "WHERE symbol = ? AND occurred_at >= ? "
+        "ORDER BY occurred_at ASC, trade_id ASC",
+        (symbol, since),
     ).fetchall()
 
     def _bucket_start_iso(ts_iso: str) -> str:
@@ -174,7 +182,6 @@ def get_candles(*, symbol: str, interval_seconds: int = 60, limit: int = 200) ->
         prices = [p for p, _q in pts]
         qtys = [q for _p, q in pts]
         vol = float(sum(qtys))
-        # 即使成交量为 0（如创世定标交易），也要计算 VWAP 并允许产生 K 线
         vwap = float(sum(p * q for p, q in pts) / vol) if vol > 0 else float(prices[-1])
         out.append(
             Candle(
@@ -188,8 +195,6 @@ def get_candles(*, symbol: str, interval_seconds: int = 60, limit: int = 200) ->
                 trades=int(len(prices)),
             )
         )
-    
-    print(f"[Market:Candles] {symbol} generated {len(out)} candles (interval={interval_seconds}s)")
 
     if limit > 0:
         out = out[-int(limit) :]

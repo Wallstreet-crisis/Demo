@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 
-_DEFAULT_EPOCH_UTC = datetime.now(timezone.utc)
+def _default_epoch_utc() -> datetime:
+    """延迟生成默认纪元，确保每次调用拿到当前时间而非模块加载时的固定值。"""
+    return datetime.now(timezone.utc)
 
 
 @dataclass(frozen=True)
@@ -44,7 +46,7 @@ def load_game_time_config_from_env() -> GameTimeConfig:
                 epoch = epoch.replace(tzinfo=timezone.utc)
             epoch = epoch.astimezone(timezone.utc)
         except Exception:
-            epoch = _DEFAULT_EPOCH_UTC
+            epoch = _default_epoch_utc()
     elif enabled:
         from ifrontier.infra.sqlite.db import get_connection
         conn = get_connection()
@@ -58,7 +60,7 @@ def load_game_time_config_from_env() -> GameTimeConfig:
                 epoch = None
 
     if epoch is None:
-        epoch = _DEFAULT_EPOCH_UTC
+        epoch = _default_epoch_utc()
         
         # Persist if enabled
         if enabled:

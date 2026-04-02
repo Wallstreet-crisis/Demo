@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from typing import Dict, Set
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ifrontier.infra.sqlite.db import room_id_var
+from ifrontier.app.room_meta import room_exists
 
 router = APIRouter()
+
+# 允许的 channel 名称白名单（正则）
+_CHANNEL_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
+# 允许的 room_id 格式
+_ROOM_ID_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
 
 
 class WsHub:
@@ -65,6 +72,12 @@ hub = WsHub()
 
 @router.websocket("/ws/{room_id}/{channel}")
 async def ws_channel_room(ws: WebSocket, room_id: str, channel: str) -> None:
+    if not _ROOM_ID_RE.match(room_id) or not _CHANNEL_RE.match(channel):
+        await ws.close(code=4400, reason="Invalid room_id or channel format")
+        return
+    if room_id != "default" and not room_exists(room_id):
+        await ws.close(code=4404, reason="Room not found")
+        return
     await hub.join(room_id, channel, ws)
     try:
         while True:
@@ -75,6 +88,9 @@ async def ws_channel_room(ws: WebSocket, room_id: str, channel: str) -> None:
 
 @router.websocket("/ws/{channel}")
 async def ws_channel_default(ws: WebSocket, channel: str) -> None:
+    if not _CHANNEL_RE.match(channel):
+        await ws.close(code=4400, reason="Invalid channel format")
+        return
     await hub.join("default", channel, ws)
     try:
         while True:

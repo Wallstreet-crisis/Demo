@@ -87,6 +87,7 @@ export default function Layout() {
 
   const [systemMenuOpen, setSystemMenuOpen] = useState(false)
   const [disconnectConfirm, setDisconnectConfirm] = useState(false)
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected')
 
   const presenceWs = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
 
@@ -152,7 +153,7 @@ export default function Layout() {
     if (!playerId) return
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(playerId)) return
 
-    presenceWs.connect('presence', () => {})
+    presenceWs.connect('presence', () => {}, setWsStatus)
     return () => presenceWs.close()
   }, [sess.playerId, sess.roomId, presenceWs])
 
@@ -477,9 +478,15 @@ export default function Layout() {
         color: '#64748b',
         background: 'var(--header-bg)'
       }}>
-        <div style={{ flex: 1, display: 'flex', gap: '15px' }}>
-          <span>STATUS: ONLINE</span>
-          <span>LATENCY: 24ms</span>
+        <div style={{ flex: 1, display: 'flex', gap: '15px', alignItems: 'center' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{
+              display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%',
+              background: wsStatus === 'connected' ? 'var(--terminal-success)' : wsStatus === 'connecting' ? 'var(--terminal-warn)' : 'var(--terminal-error)',
+              boxShadow: wsStatus === 'connected' ? '0 0 4px var(--terminal-success)' : 'none',
+            }} />
+            {wsStatus === 'connected' ? 'ONLINE' : wsStatus === 'connecting' ? 'RECONNECTING' : 'OFFLINE'}
+          </span>
         </div>
         <div style={{ flex: 2, overflow: 'hidden' }}>
           <NewsTicker />

@@ -1,4 +1,5 @@
 export type WsMessageHandler = (payload: unknown) => void
+export type WsStatusHandler = (status: 'connecting' | 'connected' | 'disconnected') => void
 
 export type WsClientConfig = {
   baseUrl?: string
@@ -25,23 +26,53 @@ function getWsBaseUrl(baseUrl?: string): string {
 export class WsClient {
   private ws?: WebSocket
   private cfg?: WsClientConfig
+  private _channel?: string
+  private _handler?: WsMessageHandler
+  private _statusHandler?: WsStatusHandler
+  private _retryCount = 0
+  private _retryTimer?: number
+  private _keepaliveTimer?: number
+  private _intentionalClose = false
 
   constructor(opts?: WsClientConfig) {
     this.cfg = opts
+  }
+
+  private get _reconnectMs(): number {
+    return this.cfg?.reconnectIntervalMs ?? 3000
+  }
+
+  private get _maxRetries(): number {
+    return this.cfg?.maxRetries ?? 30
   }
 
   private get currentWsBaseUrl(): string {
     return getWsBaseUrl(this.cfg?.baseUrl)
   }
 
-  connect(channel: string, handler: WsMessageHandler): void {
-    this.close()
+  connect(channel: string, handler: WsMessageHandler, statusHandler?: WsStatusHandler): void {
+    this._intentionalClose = false
+    this._channel = channel
+    this._handler = handler
+    this._statusHandler = statusHandler
+    this._retryCount = 0
+    this._doConnect()
+  }
+
+  private _doConnect(): void {
+    this._cleanup()
+    if (!this._channel || !this._handler) return
+
+    this._statusHandler?.('connecting')
 
     const roomId = localStorage.getItem('if_room_id') || 'default'
-    const url = `${this.currentWsBaseUrl.replace(/\/$/, '')}/ws/${encodeURIComponent(roomId)}/${encodeURIComponent(channel)}`
-    this.ws = new WebSocket(url)
+    const url = `${this.currentWsBaseUrl.replace(/\/$/, '')}/ws/${encodeURIComponent(roomId)}/${encodeURIComponent(this._channel)}`
+    const ws = new WebSocket(url)
+    this.ws = ws
 
-    this.ws.onmessage = (ev) => {
+    const handler = this._handler
+
+    ws.onmessage = (ev) => {
       try {
         handler(JSON.parse(ev.data))
       } catch {
@@ -49,26 +80,69 @@ export class WsClient {
       }
     }
 
-    // server receive loop requires client to send something; keepalive every 15s
-    this.ws.onopen = () => {
-      const timer = window.setInterval(() => {
+    ws.onopen = () => {
+      this._retryCount = 0
+      this._statusHandler?.('connected')
+      this._keepaliveTimer = window.setInterval(() => {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-          window.clearInterval(timer)
+          if (this._keepaliveTimer) window.clearInterval(this._keepaliveTimer)
           return
         }
         this.ws.send('ping')
       }, 15000)
     }
+
+    ws.onclose = () => {
+      this._clearKeepalive()
+      if (this._intentionalClose) return
+      this._statusHandler?.('disconnected')
+      this._scheduleReconnect()
+    }
+
+    ws.onerror = () => {
+      // onclose will fire after onerror, reconnect is handled there
+    }
+  }
+
+  private _scheduleReconnect(): void {
+    if (this._intentionalClose) return
+    if (this._retryCount >= this._maxRetries) {
+      console.warn(`[WsClient] Max retries (${this._maxRetries}) reached, giving up.`)
+      return
+    }
+    // exponential backoff: base * 2^retry, capped at 30s
+    const delay = Math.min(30000, this._reconnectMs * Math.pow(1.5, this._retryCount))
+    this._retryCount++
+    this._retryTimer = window.setTimeout(() => {
+      this._doConnect()
+    }, delay)
+  }
+
+  private _clearKeepalive(): void {
+    if (this._keepaliveTimer) {
+      window.clearInterval(this._keepaliveTimer)
+      this._keepaliveTimer = undefined
+    }
+  }
+
+  private _cleanup(): void {
+    this._clearKeepalive()
+    if (this._retryTimer) {
+      window.clearTimeout(this._retryTimer)
+      this._retryTimer = undefined
+    }
+    if (this.ws) {
+      try { this.ws.close() } catch { /* ignore */ }
+      this.ws = undefined
+    }
   }
 
   close(): void {
-    if (this.ws) {
-      try {
-        this.ws.close()
-      } catch {
-        // ignore
-      }
-    }
-    this.ws = undefined
+    this._intentionalClose = true
+    this._cleanup()
+    this._channel = undefined
+    this._handler = undefined
+    this._statusHandler = undefined
+    this._retryCount = 0
   }
 }

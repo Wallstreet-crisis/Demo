@@ -10,6 +10,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
+from ifrontier.core.logger import get_logger
+
+_log = get_logger(__name__)
+
 from fastapi.concurrency import run_in_threadpool
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, RootModel
@@ -185,7 +189,7 @@ async def debug_bots_reset_balances() -> Dict[str, Any]:
         init_bot_accounts()
         return {"ok": True, "message": "Bot balances and positions reset to aggressive levels."}
     except Exception as exc:
-        print(f"[API:Debug] Failed to reset bot balances: {exc}")
+        _log.warning("Failed to reset bot balances: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
 @router.get("/health")
@@ -1417,7 +1421,7 @@ async def submit_player_limit_order(req: PlayerLimitOrderRequest) -> PlayerOrder
 
         return PlayerOrderResponse(order_id=order_id)
     except Exception as exc:
-        print(f"[API:Order] Failed to submit limit order: {exc}")
+        _log.warning("Failed to submit limit order: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc))
 
 
@@ -1521,7 +1525,7 @@ async def submit_player_market_order(req: PlayerMarketOrderRequest) -> None:
             if ev_type:
                 await hub.broadcast_json(str(ev_type), ev)
     except Exception as exc:
-        print(f"[API:Order] Failed to submit market order for {req.symbol}: {exc}")
+        _log.warning("Failed to submit market order for %s: %s", req.symbol, exc)
         raise HTTPException(status_code=400, detail=str(exc))
 
 
@@ -1581,7 +1585,7 @@ async def _warm_player_bootstrap_data(*, player_id: str, account_id: str, prefer
 
         await run_in_threadpool(_run_warmup)
     except Exception as exc:
-        print(f"[API:Bootstrap] warmup skipped for {player_id}: {exc}")
+        _log.debug("Bootstrap warmup skipped for %s: %s", player_id, exc)
 
 
 @router.post("/players/bootstrap")
@@ -1686,6 +1690,41 @@ async def get_player_account(player_id: str) -> PlayerAccountResponse:
         positions=snap.positions,
         caste_id=snap.caste_id
     )
+
+
+# ── 房间加入端点：服务端权威判断玩家入局状态 ──
+
+class RoomJoinRequest(BaseModel):
+    player_id: str
+
+class RoomJoinResponse(BaseModel):
+    status: str          # "needs_onboarding" | "already_onboarded"
+    caste_id: str | None = None
+    cash: float = 0.0
+    positions: Dict[str, float] = {}
+
+
+@router.post("/rooms/join")
+async def room_join(req: RoomJoinRequest) -> RoomJoinResponse:
+    """服务端权威判断玩家是否需要入局抽签。
+
+    - 如果该房间 DB 中已存在该玩家的账户且有 caste_id → already_onboarded
+    - 否则 → needs_onboarding
+    """
+    account_id = f"user:{str(req.player_id).lower()}"
+    try:
+        snap = get_snapshot(account_id)
+        if snap.caste_id:
+            return RoomJoinResponse(
+                status="already_onboarded",
+                caste_id=snap.caste_id,
+                cash=snap.cash,
+                positions=dict(snap.positions or {}),
+            )
+    except ValueError:
+        pass
+
+    return RoomJoinResponse(status="needs_onboarding")
 
 
 class ContractParty(BaseModel):
@@ -3130,7 +3169,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
             if not sec_symbols:
                 sec_symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
             
-            print(f"[API:Purchase] Starting chain for {req.kind}, t0_at={t0_at}, symbols={req_symbols or sec_symbols}")
+            _log.info("Starting chain for %s, t0_at=%s, symbols=%s", req.kind, t0_at, req_symbols or sec_symbols)
             # v0.1: 瀵逛簬娴嬭瘯闃舵锛屽皢榛樿鍊掕鏃朵粠 60s 缂╃煭鑷?15s锛屾彁楂樺弽棣堥€熷害
             default_delay = 15 if str(req.kind) == "WORLD_EVENT" else 60
             result = _news_tick_engine.start_chain(
@@ -3146,7 +3185,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
                 correlation_id=req.correlation_id,
             )
         except Exception as exc:
-            print(f"[API:Purchase] Failed to start chain: {exc}")
+            _log.warning("Failed to start chain: %s", exc)
             raise HTTPException(status_code=400, detail=f"failed to start news chain: {str(exc)}")
 
         major_card_id = str(result["major_card_id"])

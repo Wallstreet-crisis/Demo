@@ -8,7 +8,10 @@ from typing import Any, Dict, Optional
 from urllib import request
 
 from ifrontier.core.ai_logger import log_llm_metric
+from ifrontier.core.logger import get_logger
 from ifrontier.services.app_settings import get_runtime_llm_config, get_runtime_llm_profile
+
+_log = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -73,7 +76,7 @@ class LlmClient:
             with request.urlopen(req, timeout=self._cfg.timeout_seconds) as resp:
                 raw = resp.read().decode("utf-8")
                 if verbose:
-                    print(f"[LLM] ping {self._cfg.provider} status: {resp.status}")
+                    _log.debug("ping %s status: %s", self._cfg.provider, resp.status)
         except Exception as exc:
             if hasattr(exc, "read"):
                 try:
@@ -111,7 +114,7 @@ class LlmClient:
         started_at = time.perf_counter()
         prompt_chars = len(str(system or "")) + len(str(user or ""))
         if verbose:
-            print(f"[LLM] Calling provider={self._cfg.provider} model={self._cfg.model}")
+            _log.debug("Calling provider=%s model=%s", self._cfg.provider, self._cfg.model)
         body = {
             "model": self._cfg.model,
             "temperature": float(temperature),
@@ -134,7 +137,7 @@ class LlmClient:
             with request.urlopen(req, timeout=self._cfg.timeout_seconds) as resp:
                 raw = resp.read().decode("utf-8")
                 if verbose:
-                    print(f"[LLM] response status: {resp.status}")
+                    _log.debug("response status: %s", resp.status)
         except Exception as exc:
             log_llm_metric(
                 task=self._task,

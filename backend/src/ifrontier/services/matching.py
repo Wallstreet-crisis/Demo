@@ -14,8 +14,11 @@ from datetime import datetime, timezone
 from typing import List
 from uuid import UUID, uuid4
 
+from ifrontier.core.logger import get_logger
 from ifrontier.domain.events.envelope import EventEnvelopeJson
 from ifrontier.domain.events.types import EventType
+
+_log = get_logger(__name__)
 from ifrontier.infra.sqlite.event_store import SqliteEventStore
 from ifrontier.infra.sqlite.ledger import apply_trade_executed
 from ifrontier.infra.sqlite.market import record_trade
@@ -101,7 +104,7 @@ def submit_limit_order(
         if isinstance(event_dict.get("event_id"), UUID):
             event_dict["event_id"] = str(event_dict["event_id"])
 
-        print(f"[MatchingEngine] TRADE_EXECUTED: {symbol} {trade_qty} @ {trade_price} ({payload['buy_account_id']} <- {payload['sell_account_id']})")
+        _log.debug("TRADE_EXECUTED: %s %s @ %s (%s <- %s)", symbol, trade_qty, trade_price, payload['buy_account_id'], payload['sell_account_id'])
 
         # 账本记账
         apply_trade_executed(

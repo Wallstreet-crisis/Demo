@@ -93,6 +93,17 @@ export type PlayerBootstrapRequest = {
 
 export type PlayerBootstrapResponse = PlayerAccountResponse
 
+export type RoomJoinRequest = {
+  player_id: string
+}
+
+export type RoomJoinResponse = {
+  status: 'needs_onboarding' | 'already_onboarded'
+  caste_id: string | null
+  cash: number
+  positions: Record<string, number>
+}
+
 export type AccountValuationResponse = {
   account_id: string
   cash: number

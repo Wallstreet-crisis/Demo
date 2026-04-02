@@ -3,8 +3,11 @@ from __future__ import annotations
 import asyncio
 from typing import Awaitable, Callable, List, Optional
 
+from ifrontier.core.logger import get_logger
 from ifrontier.infra.sqlite.contracts import list_contracts_with_rules
 from ifrontier.services.contracts import ContractService
+
+_log = get_logger(__name__)
 
 
 class ContractRuleScheduler:
@@ -84,7 +87,7 @@ class ContractRuleScheduler:
                     actor_id="system:tick",
                 )
             except Exception as exc:
-                print(f"[ContractRuleScheduler] run_rules failed: {contract_id}: {exc}")
+                _log.warning("run_rules failed: %s: %s", contract_id, exc)
                 return
 
     def _fetch_active_contracts_with_rules(self, *, limit: int) -> List[str]:

@@ -178,4 +178,7 @@ class RoomManager:
     def is_room_active(self, room_id: str) -> bool:
         return room_id in self._rooms
 
+    def active_room_count(self) -> int:
+        return len(self._rooms)
+
 room_manager = RoomManager()

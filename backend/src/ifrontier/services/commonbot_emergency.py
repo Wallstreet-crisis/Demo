@@ -5,9 +5,12 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
+from ifrontier.core.logger import get_logger
 from ifrontier.domain.events.envelope import EventEnvelopeJson
 from ifrontier.domain.events.types import EventType
 from ifrontier.infra.sqlite.event_store import SqliteEventStore
+
+_log = get_logger(__name__)
 from ifrontier.services.commonbot import run_commonbot_for_earnings
 from ifrontier.services.commonbot_context import (
     CommonBotMarketTrends,
@@ -76,7 +79,7 @@ class CommonBotEmergencyRunner:
         broadcast_event: EventEnvelopeJson,
         force: bool = False,
     ) -> List[EventEnvelopeJson]:
-        print(f"[CommonBotEmergency:maybe_react] Triggered by {broadcast_event.event_type}")
+        _log.debug("maybe_react triggered by %s", broadcast_event.event_type)
         if not self._is_news_broadcasted(broadcast_event.event_type):
             return []
 
@@ -101,7 +104,7 @@ class CommonBotEmergencyRunner:
         if not symbols:
             # v0.1: 对于 WORLD_EVENT 等可能影响全局的新闻，如果没定义符号，则赋予默认关键证券
             symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
-            print(f"[CommonBotEmergency:maybe_react] News {variant_id} has no symbols, using defaults: {symbols}")
+            _log.debug("News %s has no symbols, using defaults: %s", variant_id, symbols)
 
         signal = self._intel.build_signal(
             variant_id=variant_id,
@@ -367,7 +370,7 @@ class CommonBotEmergencyRunner:
         if not target_cohort or not variant_id:
             return []
 
-        print(f"[CommonBotEmergency:react_to_delivery] Bot {to_player_id} reacting to news {variant_id}")
+        _log.debug("react_to_delivery: Bot %s reacting to news %s", to_player_id, variant_id)
         
         ctx_news = self._load_variant_context(variant_id)
         variant_text = str(ctx_news.get("text") or "")
@@ -495,7 +498,7 @@ class CommonBotEmergencyRunner:
             last_price = float(last_price_val)
 
         if last_price <= 0:
-            print(f"[CommonBotEmergency:{log_prefix}] Skipping trade for {symbol}: invalid price {last_price}")
+            _log.debug("%s: Skipping trade for %s: invalid price %s", log_prefix, symbol, last_price)
             return
 
         size = float(trade_payload.get("size") or 1.0)
@@ -508,10 +511,7 @@ class CommonBotEmergencyRunner:
 
         try:
             if use_market_order:
-                print(
-                    f"[CommonBotEmergency:{log_prefix}] {account_id} submitting MARKET {side} {symbol} qty={size:.2f} "
-                    f"(urgency={urgency:.2f}, conflict={conflict:.2f})"
-                )
+                _log.debug("%s: %s submitting MARKET %s %s qty=%.2f (urgency=%.2f, conflict=%.2f)", log_prefix, account_id, side, symbol, size, urgency, conflict)
                 matches = submit_market_order(
                     account_id=account_id,
                     symbol=symbol,
@@ -523,10 +523,7 @@ class CommonBotEmergencyRunner:
                 offset *= max(0.5, 1.0 - 0.45 * conflict)
                 order_price = last_price * (1.0 + offset if side == "BUY" else 1.0 - offset)
 
-                print(
-                    f"[CommonBotEmergency:{log_prefix}] {account_id} submitting LIMIT {side} {symbol} px={order_price:.2f} qty={size:.2f} "
-                    f"(offset={offset:.2%}, conf={confidence:.2f})"
-                )
+                _log.debug("%s: %s submitting LIMIT %s %s px=%.2f qty=%.2f (offset=%.4f, conf=%.2f)", log_prefix, account_id, side, symbol, order_price, size, offset, confidence)
                 _order_id, matches = submit_limit_order(
                     account_id=account_id,
                     symbol=symbol,
@@ -542,7 +539,7 @@ class CommonBotEmergencyRunner:
                 if ev_type:
                     self._broadcast_event_sync(str(ev_type), ev)
         except Exception as exc:
-            print(f"[CommonBotEmergency:{log_prefix}] Order failed for {account_id}: {exc}")
+            _log.warning("%s: Order failed for %s: %s", log_prefix, account_id, exc)
 
     @staticmethod
     def _broadcast_event_sync(channel: str, payload: Dict[str, Any]) -> None:

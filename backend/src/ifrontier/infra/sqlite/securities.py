@@ -5,7 +5,10 @@ import os
 from dataclasses import dataclass
 from typing import List, Optional
 
+from ifrontier.core.logger import get_logger
 from ifrontier.infra.sqlite.db import get_connection
+
+_log = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -61,7 +64,7 @@ def init_securities_schema() -> None:
             row = conn.execute("SELECT 1 FROM market_trades WHERE symbol = ? LIMIT 1", (sym,)).fetchone()
             if row is None:
                 # 如果没有成交记录，记录一笔创世交易用于定标
-                print(f"[Securities:Init] Recording genesis trade for {sym} at {price}")
+                _log.info("Recording genesis trade for %s at %s", sym, price)
                 record_trade(
                     symbol=sym,
                     price=float(price),
