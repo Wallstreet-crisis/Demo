@@ -190,9 +190,9 @@ export const Api = {
   marketSession: () => getWithBootstrapCache<MarketSessionResponse>('marketSession', 8000, () => api.get<MarketSessionResponse>('/market/session', undefined, roomRequest)),
   marketSummary: () => getWithBootstrapCache<MarketSummaryResponse>('marketSummary', 8000, () => api.get<MarketSummaryResponse>('/market/summary', undefined, roomRequest)),
 
-  listPlayers: (limit = 100) => api.get<PlayerListResponse>('/players', { limit }, roomRequest),
+  listPlayers: (limit = 100) => getWithBootstrapCache<PlayerListResponse>(`listPlayers:${limit}`, 8000, () => api.get<PlayerListResponse>('/players', { limit }, roomRequest)),
   listContracts: (actor_id?: string, limit = 50, status?: string) =>
-    api.get<ContractListResponse>('/contracts/list', { actor_id, limit, status }, roomRequest),
+    getWithBootstrapCache<ContractListResponse>(`listContracts:${actor_id || 'all'}:${limit}:${status || 'all'}`, 8000, () => api.get<ContractListResponse>('/contracts/list', { actor_id, limit, status }, roomRequest)),
 
   submitLimitOrder: (req: PlayerLimitOrderRequest) => api.post<PlayerOrderResponse>('/orders/limit', req, roomRequest),
   submitMarketOrder: async (req: PlayerMarketOrderRequest) => {
@@ -226,7 +226,7 @@ export const Api = {
     api.get<ChatListThreadsResponse>(`/chat/threads/${encodeURIComponent(user_id)}`, { limit }, roomRequest),
 
   wealthPublicRefresh: () => api.post<WealthPublicRefreshResponse>('/wealth/public/refresh', undefined, roomRequest),
-  wealthPublicGet: (user_id: string) => api.get<WealthPublicResponse>(`/wealth/public/${encodeURIComponent(user_id)}`, undefined, roomRequest),
+  wealthPublicGet: (user_id: string) => getWithBootstrapCache<WealthPublicResponse>(`wealthPublic:${String(user_id).toLowerCase()}`, 5000, () => api.get<WealthPublicResponse>(`/wealth/public/${encodeURIComponent(user_id)}`, undefined, roomRequest)),
 
   contractCreate: (req: ContractCreateRequest) => api.post<ContractCreateResponse>('/contracts/create', req, roomRequest),
   contractBatchCreate: (req: ContractBatchCreateRequest) => api.post<ContractBatchCreateResponse>('/contracts/batch_create', req, roomRequest),
@@ -255,8 +255,8 @@ export const Api = {
   newsPropagate: (req: NewsPropagateRequest) => api.post<NewsPropagateResponse>('/news/propagate', req, roomRequest),
   newsPropagateQuote: (req: NewsPropagateQuoteRequest) =>
     api.post<NewsPropagateQuoteResponse>('/news/propagate/quote', req, roomRequest),
-  newsInbox: (player_id: string, limit = 50) => api.get<NewsInboxResponse>(`/news/inbox/${encodeURIComponent(player_id)}`, { limit }, roomRequest),
-  newsPublicFeed: (limit = 20) => api.get<NewsFeedResponse>('/news/public/feed', { limit }, roomRequest),
+  newsInbox: (player_id: string, limit = 50) => getWithBootstrapCache<NewsInboxResponse>(`newsInbox:${String(player_id).toLowerCase()}:${limit}`, 5000, () => api.get<NewsInboxResponse>(`/news/inbox/${encodeURIComponent(player_id)}`, { limit }, roomRequest)),
+  newsPublicFeed: (limit = 20) => getWithBootstrapCache<NewsFeedResponse>(`newsPublicFeed:${limit}`, 5000, () => api.get<NewsFeedResponse>('/news/public/feed', { limit }, roomRequest)),
   newsBroadcast: (req: NewsBroadcastRequest) => api.post<NewsBroadcastResponse>('/news/broadcast', req, roomRequest),
   newsChainStart: (req: NewsChainStartRequest) => api.post<NewsChainStartResponse>('/news/chains/start', req, roomRequest),
   newsTick: (req: NewsTickRequest) => api.post<NewsTickResponse>('/news/tick', req, roomRequest),
@@ -265,12 +265,12 @@ export const Api = {
   newsOwnershipTransfer: (req: NewsOwnershipTransferRequest) => api.post<NewsOwnershipEventResponse>('/news/ownership/transfer', req, roomRequest),
   newsOwnershipList: (user_id: string, limit = 200) =>
     api.get<NewsOwnedCardsResponse>(`/news/ownership/${encodeURIComponent(user_id)}`, { limit }, roomRequest),
-  newsStoreCatalog: () => api.get<NewsStoreCatalogResponse>('/news/store/catalog', undefined, roomRequest),
+  newsStoreCatalog: () => getWithBootstrapCache<NewsStoreCatalogResponse>('newsStoreCatalog', 10000, () => api.get<NewsStoreCatalogResponse>('/news/store/catalog', undefined, roomRequest)),
   newsStorePurchase: (req: NewsStorePurchaseRequest) => api.post<NewsStorePurchaseResponse>('/news/store/purchase', req, roomRequest),
 
   hostingEnable: (user_id: string) => api.post<HostingEnableResponse>(`/hosting/${encodeURIComponent(user_id)}/enable`, undefined, roomRequest),
   hostingDisable: (user_id: string) => api.post<HostingDisableResponse>(`/hosting/${encodeURIComponent(user_id)}/disable`, undefined, roomRequest),
-  hostingStatus: (user_id: string) => api.get<HostingStatusResponse>(`/hosting/${encodeURIComponent(user_id)}/status`, undefined, roomRequest),
+  hostingStatus: (user_id: string) => getWithBootstrapCache<HostingStatusResponse>(`hostingStatus:${String(user_id).toLowerCase()}`, 5000, () => api.get<HostingStatusResponse>(`/hosting/${encodeURIComponent(user_id)}/status`, undefined, roomRequest)),
   hostingDebugTickOnce: () => api.post<HostingDebugTickResponse>('/hosting/debug/tick_once', undefined, roomRequest),
 
   settingsGetPreferences: (actor_id: string) => api.get<AppPreferencesResponse>(`/settings/preferences/${encodeURIComponent(actor_id)}`, undefined, roomRequest),

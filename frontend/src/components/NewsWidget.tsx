@@ -29,7 +29,7 @@ export default function NewsWidget({ onShowNews, isFocused }: { onShowNews?: (it
   const refreshInbox = async () => {
     if (!playerId) return
     try {
-      const r = await Api.newsInbox(`user:${playerId}`, 20)
+      const r = await Api.newsInbox(`user:${playerId}`, 50)
       setInbox(r)
     } catch (e) {
       console.error('Failed to refresh inbox', e)

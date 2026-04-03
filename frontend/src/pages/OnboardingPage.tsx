@@ -116,14 +116,23 @@ export default function OnboardingPage() {
         
         // 并行预加载首屏数据，填入 BootstrapCache 从而加快后续页面展现速度
         const prefetchTasks = [
+          // 市场数据
           Api.marketSymbols().catch(e => console.error("Prefetch symbols fail", e)),
           Api.marketSession().catch(e => console.error("Prefetch session fail", e)),
           Api.marketSummary().catch(e => console.error("Prefetch summary fail", e)),
+          // 玩家数据
           Api.playerAccount(globalPlayerId).catch(e => console.error("Prefetch account fail", e)),
           Api.accountValuation(`user:${globalPlayerId}`).catch(e => console.error("Prefetch val fail", e)),
-          // 预加载默认股票的 K 线数据 (参数与 MarketWidget 一致)
+          // 默认股票 K 线 (参数与 MarketWidget 一致)
           Api.marketSeries('WST', 200).catch(e => console.error("Prefetch series fail", e)),
           Api.marketCandles('WST', 60, 200).catch(e => console.error("Prefetch candles fail", e)),
+          Api.marketQuote('WST').catch(e => console.error("Prefetch quote fail", e)),
+          // 新闻数据
+          Api.newsInbox(`user:${globalPlayerId}`, 50).catch(e => console.error("Prefetch news inbox fail", e)),
+          Api.newsPublicFeed(10).catch(e => console.error("Prefetch news feed fail", e)),
+          Api.newsStoreCatalog().catch(e => console.error("Prefetch news catalog fail", e)),
+          // AI 状态
+          Api.hostingStatus(`user:${globalPlayerId}`).catch(e => console.error("Prefetch hosting fail", e)),
         ]
         
         Promise.all(prefetchTasks).finally(() => {

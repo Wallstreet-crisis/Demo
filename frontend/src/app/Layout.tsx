@@ -38,8 +38,8 @@ function NewsTicker() {
     if (!playerId) return
     const fetchNews = async () => {
       try {
-        const res = await Api.newsInbox(`user:${playerId}`, 5)
-        setNews(res.items.map(it => it.text))
+        const res = await Api.newsInbox(`user:${playerId}`, 50)
+        setNews(res.items.slice(0, 5).map(it => it.text))
       } catch (e) {
         console.error('Ticker fetch failed', e)
       }
