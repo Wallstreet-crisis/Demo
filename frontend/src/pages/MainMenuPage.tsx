@@ -9,7 +9,7 @@ export default function MainMenuPage() {
   const nav = useNavigate()
   const { setPlayerId: setGlobalPlayerId, setCasteId, setRoomId } = useAppSession()
   const [activeView, setActiveView] = useState<'MAIN' | 'LOCAL' | 'NETWORK'>('MAIN')
-  const [networkIp, setNetworkIp] = useState('127.0.0.1:8010')
+  const [networkIp, setNetworkIp] = useState('127.0.0.1:8000')
   const [inputPlayerId, setInputPlayerId] = useState('')
   const [localRooms, setLocalRooms] = useState<any[]>([])
   const [remoteRooms, setRemoteRooms] = useState<any[]>([])

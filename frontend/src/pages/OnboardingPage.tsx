@@ -53,7 +53,7 @@ export default function OnboardingPage() {
     }
 
     void checkJoinStatus()
-    return () => { canceled = true }
+    return () => { canceled = true; startedRef.current = false }
   }, [globalPlayerId])
 
   useEffect(() => {

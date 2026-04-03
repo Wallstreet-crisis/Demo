@@ -52,7 +52,7 @@ async function readJsonSafe(res: Response): Promise<unknown> {
     const url = res.url || '(unknown url)'
     // 增加诊断建议
     const advice = url.includes('localhost:5173/api') 
-      ? '检测到请求发往了 Vite 开发服务器但未被转发。请确保后端已启动在 8010 端口，并重启 Vite 以加载最新 proxy 配置。'
+      ? '检测到请求发往了 Vite 开发服务器但未被转发。请确保后端已启动在 8000 端口，并重启 Vite 以加载最新 proxy 配置。'
       : '请检查 VITE_API_BASE_URL 配置是否正确。'
     
     throw new ApiError(
