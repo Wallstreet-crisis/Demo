@@ -33,6 +33,8 @@ export class WsClient {
   private _retryTimer?: number
   private _keepaliveTimer?: number
   private _intentionalClose = false
+  // 连接代际计数器，用于丢弃过期重连
+  private _connectGeneration = 0
   // 微任务批处理：高频消息合并为一次回调，减少 React 渲染次数
   private _msgQueue: unknown[] = []
   private _flushScheduled = false
@@ -54,17 +56,23 @@ export class WsClient {
   }
 
   connect(channel: string, handler: WsMessageHandler, statusHandler?: WsStatusHandler): void {
+    // 增加代际，丢弃任何旧连接的重连尝试
+    this._connectGeneration++
+    const myGen = this._connectGeneration
+    
     this._intentionalClose = false
     this._channel = channel
     this._handler = handler
     this._statusHandler = statusHandler
     this._retryCount = 0
-    this._doConnect()
+    this._doConnect(myGen)
   }
 
-  private _doConnect(): void {
+  private _doConnect(expectedGen: number): void {
     this._cleanup()
     if (!this._channel || !this._handler) return
+    // 如果代际已过期，丢弃此次连接
+    if (this._connectGeneration !== expectedGen) return
 
     this._statusHandler?.('connecting')
 
@@ -112,8 +120,10 @@ export class WsClient {
     ws.onclose = () => {
       this._clearKeepalive()
       if (this._intentionalClose) return
+      // 如果代际已过期，不再重连
+      if (this._connectGeneration !== expectedGen) return
       this._statusHandler?.('disconnected')
-      this._scheduleReconnect()
+      this._scheduleReconnect(expectedGen)
     }
 
     ws.onerror = () => {
@@ -121,8 +131,9 @@ export class WsClient {
     }
   }
 
-  private _scheduleReconnect(): void {
+  private _scheduleReconnect(expectedGen: number): void {
     if (this._intentionalClose) return
+    if (this._connectGeneration !== expectedGen) return
     if (this._retryCount >= this._maxRetries) {
       console.warn(`[WsClient] Max retries (${this._maxRetries}) reached, giving up.`)
       return
@@ -131,7 +142,9 @@ export class WsClient {
     const delay = Math.min(30000, this._reconnectMs * Math.pow(1.5, this._retryCount))
     this._retryCount++
     this._retryTimer = window.setTimeout(() => {
-      this._doConnect()
+      // 再次检查代际，防止重连前已切换频道
+      if (this._connectGeneration !== expectedGen) return
+      this._doConnect(expectedGen)
     }, delay)
   }
 

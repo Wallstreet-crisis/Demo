@@ -62,7 +62,7 @@ class ContractRuleScheduler:
                         pass
                     continue
             try:
-                contract_ids = self._fetch_active_contracts_with_rules(limit=self._batch_size)
+                contract_ids = await asyncio.to_thread(self._fetch_active_contracts_with_rules, limit=self._batch_size)
             except Exception:
                 contract_ids = []
 

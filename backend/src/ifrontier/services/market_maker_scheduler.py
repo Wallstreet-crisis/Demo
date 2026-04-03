@@ -70,9 +70,9 @@ class MarketMakerScheduler:
                 session = get_market_session(cfg=gt_cfg)
 
                 if session.phase == MarketPhase.TRADING:
-                    # 使用 SQLite 统计 INCUBATING 状态的新闻链数量
+                    # 使用 SQLite 统计 INCUBATING 状态的新闻链数量（在线程池中执行）
                     from ifrontier.infra.sqlite.news_chain import count_chains_by_status
-                    active_chains_count = count_chains_by_status("INCUBATING")
+                    active_chains_count = await asyncio.to_thread(count_chains_by_status, "INCUBATING")
 
                     # 在线程池中运行同步的 tick_once
                     matches = await asyncio.to_thread(self._mm.tick_once, active_chains_count=active_chains_count)

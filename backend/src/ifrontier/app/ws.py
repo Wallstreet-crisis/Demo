@@ -44,8 +44,13 @@ class WsHub:
 
     async def _sweep_loop(self) -> None:
         while True:
-            await asyncio.sleep(30)
-            await self._sweep_dead()
+            try:
+                await asyncio.sleep(30)
+                await self._sweep_dead()
+            except Exception as exc:
+                _log.warning("Sweep loop error: %s", exc)
+                # 短暂休息后继续
+                await asyncio.sleep(5)
 
     async def _sweep_dead(self) -> None:
         async with self._lock:
@@ -92,12 +97,14 @@ class WsHub:
             return
 
         dead: List[WebSocket] = []
+        dead_lock = asyncio.Lock()
 
         async def _send(ws: WebSocket) -> None:
             try:
                 await asyncio.wait_for(ws.send_text(data), timeout=_SEND_TIMEOUT)
             except Exception:
-                dead.append(ws)
+                async with dead_lock:
+                    dead.append(ws)
 
         await asyncio.gather(*(_send(ws) for ws in targets))
 
@@ -132,12 +139,14 @@ class WsHub:
             return
 
         dead: List[WebSocket] = []
+        dead_lock = asyncio.Lock()
 
         async def _send(ws: WebSocket) -> None:
             try:
                 await asyncio.wait_for(ws.send_text(data), timeout=_SEND_TIMEOUT)
             except Exception:
-                dead.append(ws)
+                async with dead_lock:
+                    dead.append(ws)
 
         await asyncio.gather(*(_send(ws) for ws in all_targets))
 
@@ -184,8 +193,19 @@ async def ws_channel_room(ws: WebSocket, room_id: str, channel: str) -> None:
     await hub.join(room_id, channel, ws)
     try:
         while True:
-            await ws.receive_text()
+            try:
+                await asyncio.wait_for(ws.receive_text(), timeout=60.0)
+            except asyncio.TimeoutError:
+                # 60 秒无消息，发送 ping 检测连接
+                try:
+                    await ws.send_text('{"type":"ping"}')
+                except Exception:
+                    break
+            except Exception:
+                break
     except WebSocketDisconnect:
+        pass
+    finally:
         await hub.leave(room_id, channel, ws)
 
 
@@ -197,6 +217,16 @@ async def ws_channel_default(ws: WebSocket, channel: str) -> None:
     await hub.join("default", channel, ws)
     try:
         while True:
-            await ws.receive_text()
+            try:
+                await asyncio.wait_for(ws.receive_text(), timeout=60.0)
+            except asyncio.TimeoutError:
+                try:
+                    await ws.send_text('{"type":"ping"}')
+                except Exception:
+                    break
+            except Exception:
+                break
     except WebSocketDisconnect:
+        pass
+    finally:
         await hub.leave("default", channel, ws)

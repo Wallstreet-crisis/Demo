@@ -54,6 +54,18 @@ from ifrontier.services.app_settings import (
     save_user_preferences,
 )
 
+from ifrontier.app.ws import hub
+
+def _make_broadcaster_for_events():
+    async def _broadcast(ev: dict) -> None:
+        ev_type = ev.get("event_type")
+        channels = ["events"]
+        if ev_type:
+            channels.append(str(ev_type))
+        await hub.broadcast_many(channels, ev)
+
+    return _broadcast
+
 router = APIRouter()
 
 _event_store = SqliteEventStore()
@@ -61,12 +73,14 @@ _contract_service = ContractService(_event_store)
 _contract_agent = ContractAgent()
 _chat_service = ChatService(event_store=_event_store)
 _news_service = NewsService(_event_store)
-_news_tick_engine = NewsTickEngine(_event_store, _news_service)
+_news_tick_engine = NewsTickEngine(_event_store, _news_service, broadcaster=_make_broadcaster_for_events())
 _commonbot_emergency_runner = CommonBotEmergencyRunner(
     news=_news_service,
     event_store=_event_store,
-    market_data_provider=lambda symbols: get_market_trends(symbols=symbols)
+    market_data_provider=lambda symbols: get_market_trends(symbols=symbols),
+    broadcaster=_make_broadcaster_for_events(),
 )
+_hosting_scheduler = None
 
 def _news_debug_enabled() -> bool:
     """检查是否开启新闻调试。"""

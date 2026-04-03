@@ -53,6 +53,18 @@ class UserCapabilityFacade:
     def get_recent_public_messages(self, *, limit: int = 10):
         return self.chat_service.list_public_messages(limit=int(limit), before=None)
 
+    def get_recent_private_messages(self, *, limit: int = 10):
+        """获取用户所有线程中的最新私聊消息（跨线程聚合）。"""
+        threads = self.chat_service.list_threads(user_id=self.user_id, limit=50)
+        all_msgs = []
+        for t in threads:
+            thread_id = t.thread_id
+            msgs = self.chat_service.list_pm_messages(thread_id=thread_id, limit=limit, before=None)
+            all_msgs.extend(msgs)
+        # 按时间倒序排序并限制数量
+        all_msgs.sort(key=lambda m: getattr(m, 'created_at', '') or '', reverse=True)
+        return all_msgs[:limit]
+
     # --- Chat ---
 
     def send_public_message(

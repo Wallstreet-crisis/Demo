@@ -26,10 +26,11 @@ class RoomEngine:
     def _make_broadcaster(self):
         room_id_captured = self.room_id
         async def _broadcast(ev: dict) -> None:
-            await hub.broadcast_json("events", ev, room_id=room_id_captured)
+            chs = ["events"]
             ev_type = ev.get("event_type")
             if ev_type:
-                await hub.broadcast_json(str(ev_type), ev, room_id=room_id_captured)
+                chs.append(str(ev_type))
+            await hub.broadcast_many(chs, ev, room_id=room_id_captured)
         return _broadcast
 
     def _get_room_channel_size(self):

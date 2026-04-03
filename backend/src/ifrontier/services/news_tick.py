@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import random as py_random
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 from uuid import UUID, uuid4
 
 from ifrontier.core.logger import get_logger
@@ -42,14 +43,17 @@ class NewsTickEngine:
         self,
         event_store: SqliteEventStore,
         news_service: NewsService,
+        broadcaster: Callable[[Dict[str, Any]], Awaitable[None]] | None = None,
     ) -> None:
         from ifrontier.services.market_analytics import get_market_trends
         self._event_store = event_store
         self._news = news_service
+        self._broadcaster = broadcaster
         self._commonbot_emergency_runner = CommonBotEmergencyRunner(
             news=self._news,
             event_store=self._event_store,
-            market_data_provider=get_market_trends
+            market_data_provider=get_market_trends,
+            broadcaster=broadcaster,
         )
         # 初始化为过去的某个时间，确保启动后立即触发首轮投放
         past = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -209,7 +213,7 @@ class NewsTickEngine:
         # 0) 定期生成新的系统新闻
         spawn_events = await self._periodic_spawn(now=now)
 
-        chains = self._list_active_chains(now=now, limit=limit)
+        chains = await self._list_active_chains(now=now, limit=limit)
 
         results: List[Dict[str, Any]] = []
         for c in chains:
@@ -231,7 +235,7 @@ class NewsTickEngine:
             self._last_small_news_at = now
             kind = py_random.choices(["RUMOR", "LEAK", "ANALYST_REPORT"], weights=[0.34, 0.28, 0.38], k=1)[0]
             from ifrontier.infra.sqlite.securities import list_securities
-            secs = [s.symbol for s in list_securities(status="TRADABLE")]
+            secs = await asyncio.to_thread(lambda: [s.symbol for s in list_securities(status="TRADABLE")])
             if secs:
                 target_symbol = py_random.choice(secs)
                 text = self._news.get_preset_template(kind=kind, symbols=[target_symbol])
@@ -308,7 +312,7 @@ class NewsTickEngine:
             from ifrontier.infra.sqlite.securities import list_securities
             from ifrontier.domain.assets.profile import get_profile
             
-            all_secs = list_securities(status="TRADABLE")
+            all_secs = await asyncio.to_thread(list_securities, status="TRADABLE")
             if all_secs:
                 # 核心联动逻辑：
                 # 1. WAR (战争) -> MILITARY/ENERGY (UP), FINANCE/CONSUMER/LOGISTICS (DOWN)
@@ -335,83 +339,69 @@ class NewsTickEngine:
                 target_symbols = []
                 impact_map = {} # symbol -> direction
                 
-                if theme == "WAR":
-                    for s in all_secs:
+                # 将同步 get_profile 调用包裹在线程池中执行
+                def _select_symbols_by_theme(securities, selected_theme):
+                    _target_symbols = []
+                    _impact_map = {}
+                    for s in securities:
                         prof = get_profile(s.symbol)
                         if prof:
-                            if prof.sector in ["MILITARY", "ENERGY"]:
-                                impact_map[s.symbol] = "UP"
-                                target_symbols.append(s.symbol)
-                            elif prof.sector in ["FINANCE", "CONSUMER", "LOGISTICS"]:
-                                impact_map[s.symbol] = "DOWN"
-                                target_symbols.append(s.symbol)
-                elif theme == "PEACE_DIVIDEND":
-                    for s in all_secs:
-                        prof = get_profile(s.symbol)
-                        if prof:
-                            if prof.sector in ["FINANCE", "CONSUMER", "LOGISTICS"]:
-                                impact_map[s.symbol] = "UP"
-                                target_symbols.append(s.symbol)
-                            elif prof.sector in ["MILITARY", "ENERGY"]:
-                                impact_map[s.symbol] = "DOWN"
-                                target_symbols.append(s.symbol)
-                elif theme == "TRADE_PACT":
-                    for s in all_secs:
-                        prof = get_profile(s.symbol)
-                        if prof:
-                            if prof.sector in ["LOGISTICS", "TECH", "CONSUMER"]:
-                                impact_map[s.symbol] = "UP"
-                                target_symbols.append(s.symbol)
-                            elif prof.sector == "ENERGY":
-                                impact_map[s.symbol] = "DOWN"
-                                target_symbols.append(s.symbol)
-                elif theme == "INFRA_RECOVERY":
-                    for s in all_secs:
-                        prof = get_profile(s.symbol)
-                        if prof:
-                            if prof.sector in ["ENERGY", "LOGISTICS", "FINANCE"]:
-                                impact_map[s.symbol] = "UP"
-                                target_symbols.append(s.symbol)
-                            elif prof.sector == "MILITARY":
-                                impact_map[s.symbol] = "STABLE"
-                                target_symbols.append(s.symbol)
-                elif theme == "TECH_BREAKTHROUGH":
-                    for s in all_secs:
-                        prof = get_profile(s.symbol)
-                        if prof:
-                            if prof.sector in ["TECH", "HEALTHCARE", "ENERGY"]:
-                                impact_map[s.symbol] = "UP"
-                                target_symbols.append(s.symbol)
-                elif theme == "FINANCIAL_CRISIS":
-                    for s in all_secs:
-                        prof = get_profile(s.symbol)
-                        if prof:
-                            if prof.sector == "FINANCE":
-                                impact_map[s.symbol] = "DOWN"
-                                target_symbols.append(s.symbol)
-                            elif prof.sector in ["CONSUMER", "TECH"]:
-                                impact_map[s.symbol] = "DOWN"
-                                target_symbols.append(s.symbol)
-                elif theme == "ENERGY_SHORTAGE":
-                    for s in all_secs:
-                        prof = get_profile(s.symbol)
-                        if prof:
-                            if prof.sector == "ENERGY":
-                                impact_map[s.symbol] = "UP"
-                                target_symbols.append(s.symbol)
-                            elif prof.sector in ["LOGISTICS", "TECH", "CONSUMER"]:
-                                impact_map[s.symbol] = "DOWN"
-                                target_symbols.append(s.symbol)
-                elif theme == "BIO_HAZARD":
-                    for s in all_secs:
-                        prof = get_profile(s.symbol)
-                        if prof:
-                            if prof.sector == "HEALTHCARE":
-                                impact_map[s.symbol] = "UP"
-                                target_symbols.append(s.symbol)
-                            elif prof.sector in ["CONSUMER", "LOGISTICS"]:
-                                impact_map[s.symbol] = "DOWN"
-                                target_symbols.append(s.symbol)
+                            if selected_theme == "WAR":
+                                if prof.sector in ["MILITARY", "ENERGY"]:
+                                    _impact_map[s.symbol] = "UP"
+                                    _target_symbols.append(s.symbol)
+                                elif prof.sector in ["FINANCE", "CONSUMER", "LOGISTICS"]:
+                                    _impact_map[s.symbol] = "DOWN"
+                                    _target_symbols.append(s.symbol)
+                            elif selected_theme == "PEACE_DIVIDEND":
+                                if prof.sector in ["FINANCE", "CONSUMER", "LOGISTICS"]:
+                                    _impact_map[s.symbol] = "UP"
+                                    _target_symbols.append(s.symbol)
+                                elif prof.sector in ["MILITARY", "ENERGY"]:
+                                    _impact_map[s.symbol] = "DOWN"
+                                    _target_symbols.append(s.symbol)
+                            elif selected_theme == "TRADE_PACT":
+                                if prof.sector in ["LOGISTICS", "TECH", "CONSUMER"]:
+                                    _impact_map[s.symbol] = "UP"
+                                    _target_symbols.append(s.symbol)
+                                elif prof.sector == "ENERGY":
+                                    _impact_map[s.symbol] = "DOWN"
+                                    _target_symbols.append(s.symbol)
+                            elif selected_theme == "INFRA_RECOVERY":
+                                if prof.sector in ["ENERGY", "LOGISTICS", "FINANCE"]:
+                                    _impact_map[s.symbol] = "UP"
+                                    _target_symbols.append(s.symbol)
+                                elif prof.sector == "MILITARY":
+                                    _impact_map[s.symbol] = "STABLE"
+                                    _target_symbols.append(s.symbol)
+                            elif selected_theme == "TECH_BREAKTHROUGH":
+                                if prof.sector in ["TECH", "HEALTHCARE", "ENERGY"]:
+                                    _impact_map[s.symbol] = "UP"
+                                    _target_symbols.append(s.symbol)
+                            elif selected_theme == "FINANCIAL_CRISIS":
+                                if prof.sector == "FINANCE":
+                                    _impact_map[s.symbol] = "DOWN"
+                                    _target_symbols.append(s.symbol)
+                                elif prof.sector in ["CONSUMER", "TECH"]:
+                                    _impact_map[s.symbol] = "DOWN"
+                                    _target_symbols.append(s.symbol)
+                            elif selected_theme == "ENERGY_SHORTAGE":
+                                if prof.sector == "ENERGY":
+                                    _impact_map[s.symbol] = "UP"
+                                    _target_symbols.append(s.symbol)
+                                elif prof.sector in ["LOGISTICS", "TECH", "CONSUMER"]:
+                                    _impact_map[s.symbol] = "DOWN"
+                                    _target_symbols.append(s.symbol)
+                            elif selected_theme == "BIO_HAZARD":
+                                if prof.sector == "HEALTHCARE":
+                                    _impact_map[s.symbol] = "UP"
+                                    _target_symbols.append(s.symbol)
+                                elif prof.sector in ["CONSUMER", "LOGISTICS"]:
+                                    _impact_map[s.symbol] = "DOWN"
+                                    _target_symbols.append(s.symbol)
+                    return _target_symbols, _impact_map
+                
+                target_symbols, impact_map = await asyncio.to_thread(_select_symbols_by_theme, all_secs, theme)
                 
                 if not target_symbols:
                     target_symbols = [py_random.choice(all_secs).symbol]
@@ -466,7 +456,7 @@ class NewsTickEngine:
         # 1) Emit omen(s) up to now, but do not advance beyond T0
         if now >= next_omen_at and now < t0_at:
             signal_class = rnd.choice(["DIPLOMACY", "MOBILIZATION", "LOGISTICS"])
-            suppressed, suppression_left = self._consume_suppression_budget(
+            suppressed, suppression_left = await self._consume_suppression_budget(
                 chain_id=chain_id,
                 signal_class=signal_class,
                 requested=int(grant_count),
@@ -490,7 +480,8 @@ class NewsTickEngine:
             if chain_impact_map:
                 omen_truth["impact_map"] = chain_impact_map
 
-            omen_card_id, omen_card_event = self._news.create_card(
+            omen_card_id, omen_card_event = await asyncio.to_thread(
+                self._news.create_card,
                 kind="OMEN",
                 image_anchor_id=None,
                 image_uri=None,
@@ -502,7 +493,8 @@ class NewsTickEngine:
             )
 
             omen_text = self._news.get_preset_template(kind="OMEN", symbols=symbols)
-            omen_variant_id, omen_variant_event = self._news.emit_variant(
+            omen_variant_id, omen_variant_event = await asyncio.to_thread(
+                self._news.emit_variant,
                 card_id=omen_card_id,
                 author_id="system",
                 text=omen_text,
@@ -514,11 +506,12 @@ class NewsTickEngine:
 
             delivered_to: List[str] = []
             if effective_grant_count > 0:
-                users = self._news.list_users(limit=5000)
+                users = await asyncio.to_thread(self._news.list_users, limit=5000)
                 rnd.shuffle(users)
                 for u in users[: min(effective_grant_count, len(users))]:
                     to_player_id = str(u)
-                    _deliv_id, deliv_ev = self._news.deliver_variant(
+                    _deliv_id, deliv_ev = await asyncio.to_thread(
+                        self._news.deliver_variant,
                         variant_id=omen_variant_id,
                         to_player_id=to_player_id,
                         from_actor_id="system",
@@ -532,7 +525,11 @@ class NewsTickEngine:
                     await self._commonbot_emergency_runner.react_to_delivery(delivery_event=deliv_ev)
 
             next_omen_at2 = now + timedelta(seconds=omen_interval_seconds)
-            news_chain_db.update_next_omen(chain_id=chain_id, next_omen_at=next_omen_at2.isoformat())
+            await asyncio.to_thread(
+                news_chain_db.update_next_omen,
+                chain_id=chain_id,
+                next_omen_at=next_omen_at2.isoformat()
+            )
 
             out["actions"].append(
                 {
@@ -559,7 +556,8 @@ class NewsTickEngine:
             else:
                 final_text = f"计划中的 {kind} 事件由于未知干扰已流产。"
 
-            final_variant_id, final_variant_event = self._news.emit_variant(
+            final_variant_id, final_variant_event = await asyncio.to_thread(
+                self._news.emit_variant,
                 card_id=major_card_id,
                 author_id="system",
                 text=final_text,
@@ -570,7 +568,7 @@ class NewsTickEngine:
             )
 
             # 更新链状态
-            news_chain_db.resolve_chain(chain_id=chain_id, phase=outcome)
+            await asyncio.to_thread(news_chain_db.resolve_chain, chain_id=chain_id, phase=outcome)
 
             # 记录 truth_revealed 与 chain_aborted 事件
             final_truth = {
@@ -624,7 +622,8 @@ class NewsTickEngine:
             emergency_events: List[EventEnvelopeJson] = []
             # v0：重大事件在 T0 强制全局广播（内容一致）
             if kind in {"MAJOR_EVENT", "EARNINGS", "DISCLOSURE", "WORLD_EVENT"}:
-                broadcasted, broadcast_event = self._news.broadcast_variant(
+                broadcasted, broadcast_event = await asyncio.to_thread(
+                    self._news.broadcast_variant,
                     variant_id=final_variant_id,
                     channel="GLOBAL_MANDATORY",
                     visibility_level="NORMAL",
@@ -656,12 +655,16 @@ class NewsTickEngine:
 
         return out
 
-    def _list_active_chains(self, *, now: datetime, limit: int = 50) -> List[Dict[str, Any]]:
+    async def _list_active_chains(self, *, now: datetime, limit: int = 50) -> List[Dict[str, Any]]:
         if now.tzinfo is None:
             now = now.replace(tzinfo=timezone.utc)
         now = now.astimezone(timezone.utc)
 
-        return news_chain_db.list_due_chains(now=now.isoformat(), limit=limit)
+        return await asyncio.to_thread(
+            news_chain_db.list_due_chains,
+            now=now.isoformat(),
+            limit=limit
+        )
 
     @staticmethod
     def _create_chain_tx(tx, params: Dict[str, Any]) -> None:
@@ -687,11 +690,15 @@ class NewsTickEngine:
             **{**params, "extra_json": extra_json},
         )
 
-    def _consume_suppression_budget(self, *, chain_id: str, signal_class: str, requested: int) -> tuple[int, float]:
+    async def _consume_suppression_budget(self, *, chain_id: str, signal_class: str, requested: int) -> tuple[int, float]:
         if requested <= 0:
             return 0, 0.0
 
-        return news_chain_db.consume_suppression_budget(chain_id=chain_id, requested=int(requested))
+        return await asyncio.to_thread(
+            news_chain_db.consume_suppression_budget,
+            chain_id=chain_id,
+            requested=int(requested)
+        )
 
     @staticmethod
     def _update_next_omen_tx(tx, params: Dict[str, Any]) -> None:

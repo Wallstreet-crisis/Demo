@@ -6,6 +6,9 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 from ifrontier.services.commonbot_emergency import CommonBotEmergencyRunner
 from ifrontier.services.game_time import load_game_time_config_from_env
 from ifrontier.services.market_session import MarketPhase, get_market_session
+from ifrontier.core.logger import get_logger
+
+_log = get_logger(__name__)
 
 
 class MarketSessionScheduler:
@@ -68,9 +71,9 @@ class MarketSessionScheduler:
                             await self._broadcaster(ev.model_dump())
 
                 self._last_phase = cur_phase
-            except Exception:
+            except Exception as exc:
                 # 必须异常隔离：任何一次检测失败不影响调度循环
-                pass
+                _log.warning("MarketSession tick error: %s", exc, exc_info=True)
 
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=self._tick_interval_seconds)

@@ -53,9 +53,9 @@ class HostingScheduler:
         while not self._stop.is_set():
             try:
                 await self.tick_once()
-            except Exception:
+            except Exception as exc:
                 # 必须异常隔离：任何一次 tick 失败不影响调度循环
-                pass
+                _log.warning("Hosting tick error: %s", exc, exc_info=True)
 
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=self._tick_interval_seconds)
@@ -70,7 +70,7 @@ class HostingScheduler:
         
         # 允许一定比例或固定数量的 AI 始终在线，不受人类数量干扰（除非人类真的非常多）
         # 目标：保持世界活跃，陪玩 bot 和 玩家托管应该平衡分配 quota
-        enabled = list_enabled_hosting_users(limit=200)
+        enabled = await asyncio.to_thread(list_enabled_hosting_users, limit=200)
         if not enabled:
             return
 
@@ -112,7 +112,7 @@ class HostingScheduler:
         for st in picked_sts:
             if verbose:
                 _log.info("Activating agent: %s", st.user_id)
-            upsert_hosting_state(user_id=st.user_id, enabled=True, status="ON_ACTIVE")
+            await asyncio.to_thread(upsert_hosting_state, user_id=st.user_id, enabled=True, status="ON_ACTIVE")
 
             try:
                 facade = self._make_facade(st.user_id)
@@ -126,4 +126,4 @@ class HostingScheduler:
                 if verbose:
                     _log.warning("Failed to tick agent %s: %s", st.user_id, exc)
             finally:
-                upsert_hosting_state(user_id=st.user_id, enabled=True, status="ON_IDLE")
+                await asyncio.to_thread(upsert_hosting_state, user_id=st.user_id, enabled=True, status="ON_IDLE")

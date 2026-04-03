@@ -25,7 +25,6 @@ from ifrontier.infra.sqlite.market import get_price_series
 from ifrontier.services.news import NewsService
 from ifrontier.services.matching import submit_limit_order, submit_market_order
 from ifrontier.services.news_intelligence import NewsIntelligenceEngine
-from ifrontier.app.ws import hub
 
 
 @dataclass(frozen=True)
@@ -58,6 +57,7 @@ class CommonBotEmergencyRunner:
         event_store: SqliteEventStore,
         cohorts: List[CommonBotCohortConfig] | None = None,
         market_data_provider: Callable[[List[str]], CommonBotMarketTrends] | None = None,
+        broadcaster: Callable[[Dict[str, Any]], Awaitable[None]] | None = None,
     ) -> None:
         self._news = news
         self._event_store = event_store
@@ -72,6 +72,7 @@ class CommonBotEmergencyRunner:
         self._market_data_provider = market_data_provider
         self._pending_market_open: _PendingMarketOpenReaction | None = None
         self._intel = NewsIntelligenceEngine()
+        self._broadcaster = broadcaster
 
     def maybe_react(
         self,
@@ -410,7 +411,8 @@ class CommonBotEmergencyRunner:
         except Exception:
             recent_news_items = []
 
-        ctx = self._build_shared_context(
+        ctx = await asyncio.to_thread(
+            self._build_shared_context,
             cohort=target_cohort, 
             variant_id=variant_id, 
             news_text=variant_text, 
@@ -456,7 +458,8 @@ class CommonBotEmergencyRunner:
             if session.phase == MarketPhase.TRADING and trade_json is not None:
                 self._event_store.append(trade_json)
                 emitted.append(trade_json)
-                self._submit_trade_from_intent(
+                await asyncio.to_thread(
+                    self._submit_trade_from_intent,
                     account_id=target_cohort.account_id,
                     symbol=symbol,
                     trade_payload=trade_json.payload,
@@ -534,18 +537,32 @@ class CommonBotEmergencyRunner:
 
             for m in matches:
                 ev = m.executed_event.model_dump()
-                self._broadcast_event_sync("events", ev)
-                ev_type = ev.get("event_type")
-                if ev_type:
-                    self._broadcast_event_sync(str(ev_type), ev)
+                task = asyncio.create_task(self._broadcast_event(ev))
+                task.add_done_callback(lambda t: t.exception() if t.done() and t.exception() else None)
         except Exception as exc:
             _log.warning("%s: Order failed for %s: %s", log_prefix, account_id, exc)
 
+    async def _broadcast_event(self, ev: Dict[str, Any]) -> None:
+        """使用 broadcaster 回调或回退到 hub 直接广播。"""
+        if self._broadcaster:
+            await self._broadcaster(ev)
+            return
+        # 回退：直接调用 hub（保持向后兼容）
+        from ifrontier.app.ws import hub
+        chs = ["events"]
+        ev_type = ev.get("event_type")
+        if ev_type:
+            chs.append(str(ev_type))
+        await hub.broadcast_many(chs, ev)
+
     @staticmethod
     def _broadcast_event_sync(channel: str, payload: Dict[str, Any]) -> None:
+        """同步兼容方法，仅在不使用 broadcaster 时使用。"""
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            asyncio.run(hub.broadcast_json(channel, payload))
+            from ifrontier.app.ws import hub
+            asyncio.run(hub.broadcast_many([channel], payload))
             return
-        loop.create_task(hub.broadcast_json(channel, payload))
+        from ifrontier.app.ws import hub
+        loop.create_task(hub.broadcast_many([channel], payload))
