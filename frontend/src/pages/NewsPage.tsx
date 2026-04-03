@@ -187,7 +187,7 @@ export default function NewsPage() {
   useEffect(() => {
     ws.connect('events', (payload) => {
       const t = getEventType(payload)
-      if (typeof t === 'string' && t.startsWith('NEWS_')) {
+      if (typeof t === 'string' && t.startsWith('news.')) {
         scheduleRefreshInbox()
       }
     })

@@ -42,7 +42,7 @@ export default function AccountWidget({ isFocused }: { isFocused?: boolean }) {
     if (!playerId) return
     ws.connect('events', (data: unknown) => {
       const ev = data as { event_type?: string; payload?: { buy_account_id?: string; sell_account_id?: string } }
-      if (ev?.event_type === 'TRADE_EXECUTED') {
+      if (ev?.event_type === 'trade.executed') {
         const myAcc = `user:${playerId}`
         if (ev.payload?.buy_account_id === myAcc || ev.payload?.sell_account_id === myAcc) {
           // 如果成交涉及当前玩家，立即刷新资产

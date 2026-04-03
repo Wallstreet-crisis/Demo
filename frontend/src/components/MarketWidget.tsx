@@ -62,7 +62,7 @@ export default function MarketWidget({ isFocused }: { isFocused?: boolean }) {
     const ws = new WsClient();
     ws.connect('events', (data: unknown) => {
       const ev = data as TradeExecutedEvent;
-      if (ev?.event_type === 'TRADE_EXECUTED' && ev?.payload?.symbol === symbol) {
+      if (ev?.event_type === 'trade.executed' && ev?.payload?.symbol === symbol) {
         refresh();
       }
     });

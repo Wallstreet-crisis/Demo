@@ -90,7 +90,7 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
     const channel = activeThread === 'global' ? 'chat.public.global' : `chat.pm.${activeThread.thread_id}`
     ws.connect(channel, (payload) => {
       const ev = payload as ChatWsEvent;
-      if (ev?.event_type === 'CHAT_MESSAGE_SENT' && ev.payload) {
+      if (ev?.event_type === 'chat.message.sent' && ev.payload) {
         const p = ev.payload
         const msgId = String(p.message_id || '')
         if (!msgId || seenIdsRef.current.has(msgId)) return

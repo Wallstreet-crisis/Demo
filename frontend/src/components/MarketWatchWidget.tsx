@@ -43,7 +43,7 @@ export default function MarketWatchWidget({ isFocused }: { isFocused?: boolean }
   useEffect(() => {
     ws.connect('events', (data: unknown) => {
       const ev = data as { event_type?: string }
-      if (ev?.event_type === 'TRADE_EXECUTED') {
+      if (ev?.event_type === 'trade.executed') {
         // 当有任何成交发生时，刷新报价
         if (symbols.length > 0) {
           refreshQuotes(symbols)

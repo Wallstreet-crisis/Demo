@@ -87,7 +87,7 @@ export default function ChatPage() {
   }, [])
 
   const appendWsMsg = useCallback((ev: ChatWsEvent, seenRef: React.MutableRefObject<Set<string>>, setter: Dispatch<SetStateAction<ChatListMessagesResponse | null>>) => {
-    if (ev?.event_type !== 'CHAT_MESSAGE_SENT' || !ev.payload) return
+    if (ev?.event_type !== 'chat.message.sent' || !ev.payload) return
     const p = ev.payload
     const msgId = String(p.message_id || '')
     if (!msgId || seenRef.current.has(msgId)) return

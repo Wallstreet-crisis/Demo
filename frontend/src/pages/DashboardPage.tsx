@@ -110,7 +110,7 @@ export default function DashboardPage() {
     const ws = new WsClient()
     ws.connect('events', (data: unknown) => {
       const ev = data as { event_type: string; payload: NewsFeedItem };
-      if (ev?.event_type === 'NEWS_VARIANT_EMITTED' || ev?.event_type === 'NEWS_BROADCASTED') {
+      if (ev?.event_type === 'news.variant_emitted' || ev?.event_type === 'news.broadcasted') {
         const item = ev.payload;
         // If it's a major event or has an image, show popup
         if (item && (item.kind === 'MAJOR_EVENT' || item.kind === 'WORLD_EVENT' || item.image_uri)) {

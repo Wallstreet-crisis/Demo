@@ -41,7 +41,7 @@ export default function NewsWidget({ onShowNews, isFocused }: { onShowNews?: (it
     
     ws.connect('events', (payload: unknown) => {
       const t = getEventType(payload)
-      if (typeof t === 'string' && t.startsWith('NEWS_')) {
+      if (typeof t === 'string' && t.startsWith('news.')) {
         if (refreshTimerRef.current === null) {
           refreshTimerRef.current = window.setTimeout(() => {
             refreshTimerRef.current = null

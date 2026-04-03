@@ -121,6 +121,9 @@ export default function OnboardingPage() {
           Api.marketSummary().catch(e => console.error("Prefetch summary fail", e)),
           Api.playerAccount(globalPlayerId).catch(e => console.error("Prefetch account fail", e)),
           Api.accountValuation(`user:${globalPlayerId}`).catch(e => console.error("Prefetch val fail", e)),
+          // 预加载默认股票的 K 线数据 (参数与 MarketWidget 一致)
+          Api.marketSeries('WST', 200).catch(e => console.error("Prefetch series fail", e)),
+          Api.marketCandles('WST', 60, 200).catch(e => console.error("Prefetch candles fail", e)),
         ]
         
         Promise.all(prefetchTasks).finally(() => {

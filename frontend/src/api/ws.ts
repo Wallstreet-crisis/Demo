@@ -17,10 +17,11 @@ function getWsBaseUrl(baseUrl?: string): string {
   const envUrl = import.meta.env.VITE_API_BASE_URL ?? '/api'
   if (envUrl.startsWith('http')) return envUrl.replace(/^http/i, 'ws')
   if (envUrl.startsWith('ws')) return envUrl
-  
-  // fallback: same-origin
+
+  // WebSocket 走 Vite proxy 的 /ws 路径，不走 /api 路径
+  // 所以直接返回 same-origin 的基础 URL，不带 /api 前缀
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${proto}//${window.location.host}${envUrl.startsWith('/') ? envUrl : '/' + envUrl}`
+  return `${proto}//${window.location.host}`
 }
 
 export class WsClient {

@@ -31,7 +31,7 @@ export default function NewsBroadcastWidget({ isFocused, onShowNews }: { isFocus
     
     ws.connect('events', (payload: unknown) => {
       const ev = payload as { event_type?: string }
-      if (ev?.event_type?.startsWith('NEWS_')) {
+      if (ev?.event_type?.startsWith('news.')) {
         refreshFeed()
       }
     })

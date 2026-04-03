@@ -181,12 +181,12 @@ export const Api = {
 
   marketQuote: (symbol: string) => getWithBootstrapCache<MarketQuoteResponse>(`marketQuote:${String(symbol).toUpperCase()}`, 6000, () => api.get<MarketQuoteResponse>(`/market/quote/${encodeURIComponent(symbol)}`, undefined, roomRequest)),
   marketSeries: (symbol: string, limit = 200) =>
-    api.get<MarketSeriesResponse>(`/market/series/${encodeURIComponent(symbol)}`, { limit }, roomRequest),
+    getWithBootstrapCache<MarketSeriesResponse>(`marketSeries:${String(symbol).toUpperCase()}:${limit}`, 6000, () => api.get<MarketSeriesResponse>(`/market/series/${encodeURIComponent(symbol)}`, { limit }, roomRequest)),
   marketCandles: (symbol: string, interval_seconds = 60, limit = 200) =>
-    api.get<MarketCandlesResponse>(`/market/candles/${encodeURIComponent(symbol)}`, {
+    getWithBootstrapCache<MarketCandlesResponse>(`marketCandles:${String(symbol).toUpperCase()}:${interval_seconds}:${limit}`, 6000, () => api.get<MarketCandlesResponse>(`/market/candles/${encodeURIComponent(symbol)}`, {
       interval_seconds,
       limit,
-    }, roomRequest),
+    }, roomRequest)),
   marketSession: () => getWithBootstrapCache<MarketSessionResponse>('marketSession', 8000, () => api.get<MarketSessionResponse>('/market/session', undefined, roomRequest)),
   marketSummary: () => getWithBootstrapCache<MarketSummaryResponse>('marketSummary', 8000, () => api.get<MarketSummaryResponse>('/market/summary', undefined, roomRequest)),
 
