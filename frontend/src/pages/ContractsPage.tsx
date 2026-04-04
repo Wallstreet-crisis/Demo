@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Api, ApiError, type ContractAgentDraftResponse, type ContractResponse, type ContractParty, type ContractBriefResponse } from '../api'
 import { useAppSession } from '../app/context'
 import { useNotification } from '../app/NotificationContext'
@@ -15,6 +16,7 @@ async function copyToClipboard(text: string, notify: (type: 'success' | 'error' 
 export default function ContractsPage() {
   const { playerId } = useAppSession()
   const { notify } = useNotification()
+  const location = useLocation()
   const [loading, setLoading] = useState(false)
 
   // Contract Management (by ID)
@@ -27,6 +29,15 @@ export default function ContractsPage() {
   const [draft, setDraft] = useState<ContractAgentDraftResponse | null>(null)
   const [isEditingDraft, setIsEditingDraft] = useState(false)
   const [editedDraftJson, setEditedDraftJson] = useState('')
+
+  // 处理从新闻页面传来的预填内容
+  useEffect(() => {
+    const state = location.state as { prefillDraft?: string } | null
+    if (state?.prefillDraft) {
+      setNaturalLanguage(state.prefillDraft)
+      notify('info', '已预填新闻相关内容，可直接点击"生成草案"')
+    }
+  }, [location.state, notify])
 
   // Mentions state
   const [showMentionList, setShowMentionList] = useState(false)

@@ -7,7 +7,6 @@ import NewsWidget from '../components/NewsWidget'
 import ChatWidget from '../components/ChatWidget'
 import AccountWidget from '../components/AccountWidget'
 import ContractsWidget from '../components/ContractsWidget'
-import PropagandaWidget from '../components/PropagandaWidget'
 import NewsBroadcastWidget from '../components/NewsBroadcastWidget'
 import { Api, WsClient, type NewsFeedItem } from '../api'
 import { useAppSession } from '../app/context'
@@ -387,14 +386,11 @@ export default function DashboardPage() {
         <div style={{ flex: 1.2 }}>{renderWidget('contracts', ContractsWidget)}</div>
       </div>
 
-      {/* Column 3: Right - Propaganda & Comms */}
-      <div style={isTabletLayout ? { gridColumn: 'span 1' } : { gridColumn: '3', gridRow: '1 / span 5' }}>
-        {renderWidget('propaganda', PropagandaWidget)}
-      </div>
-      <div style={isTabletLayout ? { gridColumn: 'span 1' } : { gridColumn: '3', gridRow: '6 / span 3' }}>
+      {/* Column 3: Right - Comms & Feed */}
+      <div style={isTabletLayout ? { gridColumn: 'span 1' } : { gridColumn: '3', gridRow: '1 / span 4' }}>
         {renderWidget('news', NewsWidget, { onShowNews: setActivePopupNews })}
       </div>
-      <div style={isTabletLayout ? { gridColumn: 'span 1' } : { gridColumn: '3', gridRow: '9 / span 4' }}>
+      <div style={isTabletLayout ? { gridColumn: 'span 1' } : { gridColumn: '3', gridRow: '5 / span 8' }}>
         {renderWidget('chat', ChatWidget)}
       </div>
     </div>

@@ -20,6 +20,7 @@ describe('Contract and News API', () => {
     }
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'application/json' },
       text: async () => JSON.stringify(mockResponse),
     })
 
@@ -44,6 +45,7 @@ describe('Contract and News API', () => {
   it('contractSign should call correct endpoint', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'application/json' },
       text: async () => JSON.stringify({ status: 'SIGNED' }),
     })
 
@@ -68,6 +70,7 @@ describe('Contract and News API', () => {
     }
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'application/json' },
       text: async () => JSON.stringify({ delivered: 42 }),
     })
 
@@ -91,6 +94,7 @@ describe('Contract and News API', () => {
     }
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'application/json' },
       text: async () => JSON.stringify(mockContract),
     })
 
@@ -106,6 +110,7 @@ describe('Contract and News API', () => {
   it('hostingStatus should call correct endpoint', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'application/json' },
       text: async () => JSON.stringify({ enabled: true, status: 'WORKING' }),
     })
 
@@ -129,6 +134,7 @@ describe('Contract and News API', () => {
     }
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'application/json' },
       text: async () => JSON.stringify({ variant_id: 'v:999', kind: 'OFFICIAL' }),
     })
 

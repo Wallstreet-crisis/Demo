@@ -14,6 +14,7 @@ describe('ApiClient', () => {
   it('marketQuote should call correct endpoint', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'application/json' },
       text: async () => JSON.stringify({ symbol: 'AAPL', last_price: 150 }),
     })
 
@@ -29,6 +30,7 @@ describe('ApiClient', () => {
   it('playerAccount should call correct endpoint', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'application/json' },
       text: async () => JSON.stringify({ account_id: 'user:alice', cash: 1000 }),
     })
 
@@ -44,6 +46,7 @@ describe('ApiClient', () => {
   it('newsInbox should call correct endpoint with limit', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'application/json' },
       text: async () => JSON.stringify({ items: [] }),
     })
 
@@ -59,6 +62,7 @@ describe('ApiClient', () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
       status: 400,
+      headers: { get: () => 'application/json' },
       text: async () => JSON.stringify({ detail: 'Invalid symbol' }),
     })
 

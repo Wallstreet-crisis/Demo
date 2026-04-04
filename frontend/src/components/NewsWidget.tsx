@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Api, type NewsFeedItem, type NewsInboxResponse, type NewsInboxResponseItem } from '../api'
 import { useAppSession } from '../app/context'
@@ -62,7 +63,14 @@ export default function NewsWidget({ onShowNews, isFocused }: { onShowNews?: (it
     <CyberWidget 
       title="INTELLIGENCE_INBOX" 
       subtitle="ENCRYPTED_FEED_STREAM"
-      actions={<button className="cyber-button" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={refreshInbox}>SYNC</button>}
+      actions={
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <Link to="/news">
+            <button className="cyber-button" style={{ fontSize: '11px', padding: '2px 8px', color: 'var(--terminal-info)' }}>CENTER</button>
+          </Link>
+          <button className="cyber-button" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={refreshInbox}>SYNC</button>
+        </div>
+      }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {(isFocused ? (inbox?.items || []) : (inbox?.items || []).slice(0, 5)).map((it) => (
