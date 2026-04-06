@@ -17,7 +17,7 @@ interface ChatWsEvent {
 }
 
 export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
-  const { playerId } = useAppSession()
+  const { playerId, roomId } = useAppSession()
   const nav = useNavigate()
   const [activeThread, setActiveThread] = useState<'global' | ChatThreadResponse>('global')
   const [messages, setMessages] = useState<ChatMessageResponse[]>([])
@@ -112,7 +112,7 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
       }
     })
     return () => ws.close()
-  }, [activeThread, refreshMessages, refreshThreads, fetchMentionsData, playerId, ws])
+  }, [activeThread, refreshMessages, refreshThreads, fetchMentionsData, playerId, ws, roomId])
 
   // 检测用户是否在底部附近
   useEffect(() => {
@@ -226,6 +226,21 @@ export default function ChatWidget({ isFocused }: { isFocused?: boolean }) {
           payload
         })
       }
+      // 立即将消息添加到本地列表，提供即时反馈
+      const tempMsg: ChatMessageResponse = {
+        message_id: `temp-${Date.now()}`,
+        thread_id: activeThread === 'global' ? 'global' : activeThread.thread_id,
+        sender_id: `user:${playerId}`,
+        sender_display: playerId,
+        message_type: 'TEXT',
+        content: text,
+        payload: { ...payload, sender_caste: 'UNKNOWN' },
+        created_at: new Date().toISOString(),
+      }
+      setMessages(prev => {
+        if (prev.length >= 200) return [...prev.slice(-149), tempMsg]
+        return [...prev, tempMsg]
+      })
       setText('')
     } catch (e) {
       console.error('Failed to send message', e)

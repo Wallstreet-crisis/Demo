@@ -88,9 +88,8 @@ export class ApiClient {
     if (includeJsonContentType) {
       headers['Content-Type'] = 'application/json'
     }
-    if (options?.includeRoomId) {
-      headers['X-Room-Id'] = localStorage.getItem('if_room_id') || 'default'
-    }
+    // 默认发送 X-Room-Id，确保后端广播到正确房间
+    headers['X-Room-Id'] = localStorage.getItem('if_room_id') || 'default'
     return headers
   }
 

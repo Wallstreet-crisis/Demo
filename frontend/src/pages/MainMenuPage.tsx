@@ -111,25 +111,33 @@ export default function MainMenuPage() {
     }
   }
 
-  const handleResumeSimulation = () => {
+  const handleResumeSimulation = async () => {
     if (!selectedRoomId || !isInputValid) return
     setIsTransitioning(true)
     localStorage.removeItem('if_network_target') // Reset network target to default
     setRoomId(selectedRoomId)
-    const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
-    const activatePromise = Api.activateRoom(selectedRoomId)
-    void Promise.all([animationPromise, activatePromise])
-      .then(() => {
-        setGlobalPlayerId(inputPlayerId)
-        setCasteId('' as any)
-        nav('/onboarding')
-      })
-      .catch((e) => {
-        console.error('Failed to resume simulation:', e)
-        setRoomId('default')
-        setIsTransitioning(false)
-        alert('Failed to load simulation data for this player in the selected room.')
-      })
+    
+    try {
+      const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
+      const activatePromise = Api.activateRoom(selectedRoomId)
+      
+      const [, activateRes] = await Promise.all([animationPromise, activatePromise])
+      if (!activateRes.ok) {
+        throw new Error('Room activation failed')
+      }
+      
+      setGlobalPlayerId(inputPlayerId)
+      setCasteId('' as any)
+      nav('/onboarding')
+    } catch (e: any) {
+      console.error('Failed to resume simulation:', e)
+      setRoomId('default')
+      setIsTransitioning(false)
+      
+      // 提供更详细的错误信息
+      const detail = e?.body?.detail || e?.message || 'Unknown error'
+      alert(`Failed to load simulation: ${detail}`)
+    }
   }
 
   const handleJoinNetwork = async () => {
@@ -156,25 +164,32 @@ export default function MainMenuPage() {
     }
   }
 
-  const handleResumeNetworkSimulation = () => {
+  const handleResumeNetworkSimulation = async () => {
     if (!selectedRoomId || !networkIp.trim() || !isInputValid) return
     setIsTransitioning(true)
     localStorage.setItem('if_network_target', networkIp)
     setRoomId(selectedRoomId)
-    const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
-    void animationPromise
-      .then(() => {
-        setGlobalPlayerId(inputPlayerId)
-        setCasteId('' as any)
-        nav('/onboarding')
-      })
-      .catch((e) => {
-        console.error('Failed to join remote simulation:', e)
-        localStorage.removeItem('if_network_target')
-        setRoomId('default')
-        setIsTransitioning(false)
-        alert('Failed to join remote simulation for this player.')
-      })
+    
+    try {
+      // 先尝试激活远程房间（依赖后端 middleware 自动激活）
+      const activatePromise = Api.activateRoom(selectedRoomId)
+      const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
+      
+      const [, activateRes] = await Promise.all([animationPromise, activatePromise])
+      if (!activateRes.ok) {
+        throw new Error('Remote room activation failed')
+      }
+      
+      setGlobalPlayerId(inputPlayerId)
+      setCasteId('' as any)
+      nav('/onboarding')
+    } catch (e) {
+      console.error('Failed to join remote simulation:', e)
+      localStorage.removeItem('if_network_target')
+      setRoomId('default')
+      setIsTransitioning(false)
+      alert('Failed to join remote simulation. The room may not exist or is not activated on the remote server.')
+    }
   }
 
   return (

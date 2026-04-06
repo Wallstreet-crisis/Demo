@@ -20,7 +20,7 @@ function formatTime(s: string): string {
 
 export default function NewsWidget({ onShowNews, isFocused }: { onShowNews?: (item: NewsFeedItem) => void, isFocused?: boolean }) {
   void isFocused
-  const { playerId } = useAppSession()
+  const { playerId, roomId } = useAppSession()
   const [inbox, setInbox] = useState<NewsInboxResponse | null>(null)
   const [selectedItem, setSelectedItem] = useState<NewsInboxResponseItem | null>(null)
 
@@ -57,7 +57,7 @@ export default function NewsWidget({ onShowNews, isFocused }: { onShowNews?: (it
       if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerId])
+  }, [playerId, roomId])
 
   return (
     <CyberWidget 

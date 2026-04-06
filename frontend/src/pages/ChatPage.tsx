@@ -24,7 +24,7 @@ function formatTime(s: string): string {
 }
 
 export default function ChatPage() {
-  const { playerId } = useAppSession()
+  const { playerId, roomId } = useAppSession()
   const { notify } = useNotification()
   const [err, setErr] = useState<string>('')
   const [loadingThreads, setLoadingThreads] = useState(true)
@@ -225,7 +225,7 @@ export default function ChatPage() {
     return () => {
       ws.close()
     }
-  }, [playerId, refreshPublic, refreshThreads, ws, appendWsMsg])
+  }, [playerId, refreshPublic, refreshThreads, ws, appendWsMsg, roomId])
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>

@@ -19,7 +19,7 @@ function getEventType(payload: unknown): string | null {
 }
 
 export default function NewsPage() {
-  const { playerId } = useAppSession()
+  const { playerId, roomId } = useAppSession()
   const { notify } = useNotification()
   const [loading, setLoading] = useState(true)
 
@@ -217,7 +217,7 @@ export default function NewsPage() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [roomId])
 
   const handleAction = (action: 'propagate' | 'mutate' | 'contract' | 'suppress', item: NewsInboxResponseItem) => {
     setSelectedInboxItem(item)
