@@ -30,12 +30,6 @@ function getBaseUrl(): string {
   return import.meta.env.VITE_API_BASE_URL ?? '/api'
 }
 
-const defaultConfig: ApiClientConfig = {
-  get baseUrl() {
-    return getBaseUrl()
-  }
-}
-
 function joinUrl(baseUrl: string, path: string): string {
   const b = (baseUrl ?? '').replace(/\/$/, '')
   const p = (path ?? '').replace(/^\//, '')
@@ -83,7 +77,7 @@ export class ApiClient {
     return joinUrl(this.baseUrl, path)
   }
 
-  private buildHeaders(options?: RequestOptions, includeJsonContentType = false): HeadersInit {
+  private buildHeaders(_options?: RequestOptions, includeJsonContentType = false): HeadersInit {
     const headers: Record<string, string> = {}
     if (includeJsonContentType) {
       headers['Content-Type'] = 'application/json'

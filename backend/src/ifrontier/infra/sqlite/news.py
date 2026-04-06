@@ -24,11 +24,12 @@ class NewsRecord:
     truth_payload: Dict[str, Any]
     image_uri: Optional[str]
     preset_id: Optional[str]
+    rarity: str = "COMMON"
 
     @staticmethod
     def from_row(row: Any) -> NewsRecord:
         symbols = []
-        tags = {}
+        tags = []
         truth_payload = {}
         
         if row["symbols_json"]:
@@ -63,6 +64,7 @@ class NewsRecord:
             truth_payload=truth_payload,
             image_uri=row["image_uri"],
             preset_id=row["preset_id"],
+            rarity=row.get("rarity") or "COMMON",
         )
 
 
@@ -87,6 +89,7 @@ def init_news_schema() -> None:
             image_uri TEXT,
             image_anchor_id TEXT,
             preset_id TEXT,
+            rarity TEXT DEFAULT 'COMMON',
             created_at TEXT NOT NULL,
             
             author_id TEXT,
@@ -104,6 +107,14 @@ def init_news_schema() -> None:
         CREATE INDEX IF NOT EXISTS idx_news_kind ON news(kind);
         """
     )
+
+    columns = {
+        str(row[1])
+        for row in cur.execute("PRAGMA table_info(news)").fetchall()
+    }
+    if "rarity" not in columns:
+        cur.execute("ALTER TABLE news ADD COLUMN rarity TEXT DEFAULT 'COMMON'")
+
     conn.commit()
 
 
@@ -119,6 +130,7 @@ def save_news(
     image_uri: Optional[str] = None,
     image_anchor_id: Optional[str] = None,
     preset_id: Optional[str] = None,
+    rarity: str = "COMMON",
     published_at: Optional[str] = None,
     author_id: Optional[str] = None,
     parent_variant_id: Optional[str] = None,
@@ -139,9 +151,9 @@ def save_news(
             INSERT OR REPLACE INTO news (
                 card_id, variant_id, kind, text, symbols_json, tags_json, 
                 publisher_id, published_at, is_suppressed, suppression_reason,
-                truth_payload_json, image_uri, image_anchor_id, preset_id, created_at,
+                truth_payload_json, image_uri, image_anchor_id, preset_id, rarity, created_at,
                 author_id, parent_variant_id, mutation_depth, influence_cost, risk_roll_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 card_id,
@@ -158,6 +170,7 @@ def save_news(
                 image_uri,
                 image_anchor_id,
                 preset_id,
+                rarity,
                 now,
                 author_id,
                 parent_variant_id,
@@ -246,12 +259,13 @@ def list_user_inbox(user_id: str, limit: int = 50) -> List[NewsRecord]:
                 symbols=list(row.get("symbols") or []),
                 tags=list(row.get("tags") or []),
                 publisher_id=None,
-                published_at=str(row["created_at"]),
+                published_at=str(row.get("delivered_at") or ""),
                 is_suppressed=False,
                 suppression_reason=None,
                 truth_payload=dict(row.get("truth_payload") or {}),
                 image_uri=None,
                 preset_id=None,
+                rarity=str(row.get("rarity") or "COMMON"),
             )
         )
     return items
@@ -463,6 +477,7 @@ def list_inbox(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
             n.symbols_json,
             n.tags_json,
             n.truth_payload_json,
+            n.rarity,
             CASE WHEN no.card_id IS NOT NULL THEN 1 ELSE 0 END AS owns_card
         FROM news_deliveries d
         JOIN news n ON n.variant_id = d.variant_id
@@ -497,18 +512,20 @@ def list_inbox(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
 
         items.append(
             {
-                "delivery_id": str(r["delivery_id"]),
-                "card_id": str(r["card_id"]),
-                "variant_id": str(r["variant_id"]),
-                "kind": str(r["kind"]),
-                "from_actor_id": str(r["from_actor_id"]),
-                "visibility_level": str(r["visibility_level"]),
-                "delivery_reason": str(r["delivery_reason"]),
-                "created_at": str(r["created_at"]),
-                "text": str(r["text"]),
+                "delivery_id": r["delivery_id"],
+                "variant_id": r["variant_id"],
+                "to_player_id": r["to_player_id"],
+                "from_actor_id": r["from_actor_id"],
+                "visibility_level": r["visibility_level"],
+                "delivery_reason": r["delivery_reason"],
+                "delivered_at": r["created_at"],
+                "card_id": r["card_id"],
+                "kind": r["kind"],
+                "text": r["text"],
                 "symbols": symbols,
                 "tags": tags,
                 "truth_payload": truth_payload,
+                "rarity": r["rarity"] or "COMMON",
                 "owns_card": bool(r["owns_card"]),
             }
         )

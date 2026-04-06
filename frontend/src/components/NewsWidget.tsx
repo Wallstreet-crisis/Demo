@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Api, type NewsFeedItem, type NewsInboxResponse, type NewsInboxResponseItem } from '../api'
+import { Api, type NewsFeedItem, type NewsInboxResponse } from '../api'
 import { useAppSession } from '../app/context'
 import { WsClient } from '../api'
-import CyberWidget from './CyberWidget'
+import IntelligenceCard from './IntelligenceCard'
+import { Newspaper, ChevronRight } from 'lucide-react'
 
 function getEventType(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null
@@ -11,18 +12,11 @@ function getEventType(payload: unknown): string | null {
   return typeof v === 'string' ? v : null
 }
 
-function formatTime(s: string): string {
-  if (!s) return ''
-  const d = new Date(s)
-  if (Number.isNaN(d.getTime())) return s
-  return d.toLocaleTimeString()
-}
-
-export default function NewsWidget({ onShowNews, isFocused }: { onShowNews?: (item: NewsFeedItem) => void, isFocused?: boolean }) {
+export default function NewsWidget({ isFocused }: { onShowNews?: (item: NewsFeedItem) => void, isFocused?: boolean }) {
   void isFocused
   const { playerId, roomId } = useAppSession()
   const [inbox, setInbox] = useState<NewsInboxResponse | null>(null)
-  const [selectedItem, setSelectedItem] = useState<NewsInboxResponseItem | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const ws = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
   const refreshTimerRef = useRef<number | null>(null)
@@ -30,7 +24,7 @@ export default function NewsWidget({ onShowNews, isFocused }: { onShowNews?: (it
   const refreshInbox = async () => {
     if (!playerId) return
     try {
-      const r = await Api.newsInbox(`user:${playerId}`, 50)
+      const r = await Api.newsInbox(`user:${playerId}`, 10)
       setInbox(r)
     } catch (e) {
       console.error('Failed to refresh inbox', e)
@@ -59,107 +53,93 @@ export default function NewsWidget({ onShowNews, isFocused }: { onShowNews?: (it
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerId, roomId])
 
+  const items = useMemo(() => {
+    return (inbox?.items || []).slice(0, 6)
+  }, [inbox])
+
   return (
-    <CyberWidget 
-      title="INTELLIGENCE_INBOX" 
-      subtitle="ENCRYPTED_FEED_STREAM"
-      actions={
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <Link to="/news">
-            <button className="cyber-button" style={{ fontSize: '11px', padding: '2px 8px', color: 'var(--terminal-info)' }}>CENTER</button>
-          </Link>
-          <button className="cyber-button" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={refreshInbox}>SYNC</button>
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      height: '100%',
+      background: 'rgba(0,0,0,0.2)',
+      borderRadius: '12px',
+      overflow: 'hidden'
+    }}>
+      {/* Header */}
+      <div style={{ 
+        padding: '12px 16px', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        borderBottom: '1px solid rgba(255,255,255,0.05)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Newspaper size={16} color="var(--terminal-info)" />
+          <span style={{ fontWeight: 'bold', fontSize: '13px', letterSpacing: '1px' }}>INTELLIGENCE_INBOX</span>
         </div>
-      }
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        {(isFocused ? (inbox?.items || []) : (inbox?.items || []).slice(0, 5)).map((it) => (
-          <div
-            key={it.delivery_id}
-            onClick={() => {
-              if (onShowNews) {
-                const truth = (it.truth_payload && typeof it.truth_payload === 'object')
-                  ? (it.truth_payload as Record<string, unknown>)
-                  : null
-                const imageUri = truth && typeof truth.image_uri === 'string' ? truth.image_uri : null
-                // Prepare feed-like item for the popup
-                onShowNews({
-                  variant_id: it.variant_id,
-                  card_id: it.card_id,
-                  kind: it.kind,
-                  author_id: it.from_actor_id,
-                  text: it.text,
-                  image_uri: imageUri,
-                  created_at: it.delivered_at,
-                  symbols: it.symbols || [],
-                  tags: it.tags || []
-                });
-              } else {
-                setSelectedItem(it === selectedItem ? null : it);
-              }
-            }}
-            style={{
-              borderBottom: '1px solid rgba(51, 65, 85, 0.3)',
-              padding: '10px 8px',
-              fontSize: '13px',
-              cursor: 'pointer',
-              background: selectedItem === it ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-              transition: 'background 0.1s'
-            }}
-            onMouseOver={e => selectedItem !== it && (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
-            onMouseOut={e => selectedItem !== it && (e.currentTarget.style.background = 'transparent')}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '4px', color: '#64748b', fontWeight: '600' }}>
-              <span style={{ color: it.from_actor_id === 'SYSTEM' ? 'var(--terminal-warn)' : '#3b82f6' }}>
-                [{it.delivery_reason}]
-              </span>
-              <span>{formatTime(it.delivered_at)}</span>
+        <Link to="/news" style={{ textDecoration: 'none' }}>
+          <button className="cyber-button mini" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }}>
+            ALL_FILES <ChevronRight size={12} />
+          </button>
+        </Link>
+      </div>
+
+      {/* Card Content */}
+      <div style={{ 
+        flex: 1, 
+        overflowX: 'auto', 
+        overflowY: 'hidden',
+        display: 'flex',
+        gap: '16px',
+        padding: '16px',
+        alignItems: 'center',
+        background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 100%)'
+      }}>
+        {items.length > 0 ? (
+          items.map((it) => (
+            <div key={it.delivery_id} style={{ flexShrink: 0 }}>
+              <IntelligenceCard 
+                item={it}
+                isSelected={selectedId === it.delivery_id}
+                onClick={() => setSelectedId(it.delivery_id === selectedId ? null : it.delivery_id)}
+                showActions={false} // Dashboard don't show full actions to save space
+                className="dashboard-mini-card"
+              />
             </div>
-            <div style={{ 
-              lineHeight: 1.5, 
-              color: '#f1f5f9',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: '-webkit-box',
-              WebkitLineClamp: selectedItem === it ? 'none' : 2,
-              WebkitBoxOrient: 'vertical'
-            }}>
-              {it.text}
-            </div>
-            {selectedItem === it && (
-              <div style={{ 
-                marginTop: '12px', 
-                padding: '10px', 
-                background: 'rgba(0,0,0,0.2)', 
-                border: '1px solid var(--terminal-border)',
-                borderRadius: '2px',
-                fontSize: '11px' 
-              }}>
-                <div style={{ color: '#94a3b8', marginBottom: '4px' }}>SOURCE: <code style={{ color: '#3b82f6' }}>{it.from_actor_id}</code></div>
-                <div style={{ color: '#94a3b8', marginBottom: '8px' }}>VARIANT: <code style={{ color: '#94a3b8' }}>{it.variant_id}</code></div>
-                {it.truth_payload !== undefined && it.truth_payload !== null && (
-                  <pre style={{ 
-                    fontSize: '10px', 
-                    color: 'var(--terminal-success)', 
-                    marginTop: '8px', 
-                    background: '#0f172a', 
-                    padding: '8px',
-                    borderLeft: '2px solid var(--terminal-success)',
-                    overflow: 'auto'
-                  }}>
-                    {JSON.stringify(it.truth_payload as Record<string, unknown>, null, 2)}
-                  </pre>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-        {inbox?.items?.length === 0 && (
-          <div style={{ textAlign: 'center', color: '#64748b', padding: '40px 20px', fontSize: '13px' }}>
-            NO_INTEL_STREAM_DETECTED
+          ))
+        ) : (
+          <div style={{ 
+            width: '100%', 
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            color: '#444',
+            gap: '8px'
+          }}>
+            <Newspaper size={32} opacity={0.1} />
+            <span style={{ fontSize: '12px', letterSpacing: '2px' }}>NO_ACTIVE_INTEL</span>
           </div>
         )}
       </div>
-    </CyberWidget>
+
+      <style>{`
+        .dashboard-mini-card {
+          transform: scale(0.85);
+          transform-origin: center center;
+          transition: all 0.3s ease !important;
+        }
+        .dashboard-mini-card:hover {
+          transform: scale(0.9) translateY(-5px) !important;
+        }
+        .dashboard-mini-card.selected {
+          transform: scale(0.95) !important;
+          box-shadow: 0 0 20px rgba(0, 140, 255, 0.3) !important;
+        }
+      `}</style>
+    </div>
   )
 }
+

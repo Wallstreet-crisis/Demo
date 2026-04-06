@@ -339,6 +339,7 @@ export type NewsInboxResponseItem = {
   symbols?: string[]
   tags?: string[]
   truth_payload?: unknown
+  rarity?: string
 }
 
 export type NewsInboxResponse = {
@@ -447,6 +448,11 @@ export type NewsStoreCatalogItem = {
   price_cash: number
   requires_symbols?: boolean
   preview_text: string
+  description?: string
+  rarity?: string
+  default_ttl_hours?: number
+  preview_image_uri?: string | null
+  tags?: string[]
   presets?: NewsStoreCatalogPreset[]
   symbol_options?: string[]
 }

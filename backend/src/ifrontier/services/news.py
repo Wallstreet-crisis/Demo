@@ -21,6 +21,7 @@ from ifrontier.infra.sqlite.event_store import SqliteEventStore
 from ifrontier.infra.sqlite import news as news_db
 from ifrontier.services.game_time import game_time_now, load_game_time_config_from_env
 
+from ifrontier.domain.news.blueprints import IntelligenceBlueprint, registry as blueprint_registry
 
 class NewsService:
     _REPEATABLE_DELIVERY_REASONS = {
@@ -31,85 +32,27 @@ class NewsService:
     def __init__(self, event_store: SqliteEventStore) -> None:
         self._event_store = event_store
 
+    def _get_primary_blueprint(self, kind: str) -> IntelligenceBlueprint | None:
+        pool = blueprint_registry.find_by_kind(str(kind or "").upper())
+        return pool[0] if pool else None
+
     def _preset_templates(self) -> Dict[str, List[str]]:
-        return {
-            "RUMOR": [
-                "暗网监控：{symbol} 的加密通讯协议已被暴力破解，大量核心机密正在霓虹街头贱卖。",
-                "霓虹街头流传：{symbol} 正在秘密测试一种能够通过神经链接直接改写市场感知的‘认知病毒’。",
-                "传闻 {symbol} 的地下基因实验室流出了非法的‘永生’变异样本，企业安保部队已封锁整个街区。",
-                "黑客组织‘死代码’宣称：{symbol} 的下一代决策 AI 核心存在致命的逻辑坍缩后门。",
-                "【边缘情报】{symbol} 与北方联盟的军工订单因涉嫌‘非法人体计算’调查而面临无限期搁置。",
-                "匿名爆料：{symbol} 董事会已被某种来自深网的意识实体完全渗透，正在进行‘资产置换’。",
-                "传言 {symbol} 的首席架构师已在所有在保义体中植入了远程自毁指令，并携带密钥叛逃。",
-                "情报点显示：{symbol} 正在大规模紧急抛售其在火星殖民地的基础能源配额，疑似准备撤离。",
-                "内幕消息：{symbol} 研发的‘数字灵魂’存储器被发现存在无法修复的逻辑死循环，首批受试者已全部脑死亡。",
-                "坊间异动：{symbol} 旗下的义体诊所最近出现了大量由于非法算力超频导致的‘赛博精神病’集群案例。",
-                "街区传闻：{symbol} 即将获得轨道城市基础算力配额，若属实其未来三个结算周期现金流将显著改善。",
-                "灰市消息：{symbol} 与月面交通局的补能协议接近签署，可能缓解其长期的能源成本压力。",
-            ],
-            "LEAK": [
-                "【绝密数据泄露】{symbol} 核心反应堆的损耗率已达临界点，一旦过载将引发足以抹平整个行政区的能量风暴。",
-                "内部邮件证实：{symbol} 的‘神谕’决策系统曾多次通过降维打击精准清除竞争对手，涉嫌违反《星际公平竞争法》。",
-                "泄露的监管文件指出：{symbol} 长期非法挪用玩家的托管资产，用于维持其在拉格朗日点的巨型算力农场。",
-                "【私密录音】{symbol} CEO 在密谈中承认其新型防御矩阵在极端压力下会发生定向过载，将用户作为缓冲电池。",
-                "【深度爆料】{symbol} 的所有中层管理人员其实都是由低成本克隆体担任的，其本体意识早已在数据海中消亡。",
-                "一份审计报告显示：{symbol} 进军深空采矿的巨额资金已被秘密转移至某个名为‘虚无’的黑洞账户。",
-                "泄露的清单：{symbol} 正在秘密组建一支完全由高维 AI 操控的‘幽灵雇佣兵’部队，目标不明。",
-                "绝密档案：{symbol} 在最近的季度报告中隐瞒了其核心逻辑引擎已失去自我进化能力，仅靠循环旧代码维持的事实。",
-                "泄露备忘录显示：{symbol} 的次世代冷核堆稳定性测试连续达标，董事会正在评估提前量产窗口。",
-                "内部工单外流：{symbol} 已修复关键链路中的高危漏洞，原定停机维护窗口或将缩短。",
-            ],
-            "ANALYST_REPORT": [
-                "【深网分析】维持 {symbol} ‘强力买入’评级，其在‘意识上传’领域的专利垄断将确保其在下个纪元的霸权。",
-                "深研报告：{symbol} 在当前的全球封锁环境下表现出了极强的‘极端生存’韧性，其算力储备足以买下半个地球。",
-                "【金融预警】{symbol} 的信用评级已跌至 D 级（毁灭级），一场足以撕裂整个金融体系的坏账风暴正在其内部酝酿。",
-                "行业透视：{symbol} 通过掠夺小型公司的算力带宽，已建立起绝对的‘数据护城河’，建议避险。",
-                "赛博金融周刊：{symbol} 的现金流足以支持其在‘全球战争’期间进行毁灭性的溢价收购，建议紧跟庄家。",
-                "【灰区评估】{symbol} 垄断了 90% 的神经链接修复件供应，是控制未来全人类肉体的‘隐形暴君’。",
-                "高盛深网研报：{symbol} 成功整合了地月之间的量子中继链，将实现跨星系的‘零延迟’财富收割。",
-                "机构联评：{symbol} 的负债久期结构优于同业，若宏观波动收敛其估值修复弹性较高。",
-                "晨星深网覆盖：{symbol} 在非战争场景下的防御性现金流表现稳健，给出‘增持’建议。",
-            ],
-            "OMEN": [
-                "【异常预兆】外交部对 {symbol} 利益相关地区的信号屏蔽行为保持死一般的沉默，空气中弥漫着硝烟味。",
-                "【信号监测】{symbol} 全球生产设施的生命维持系统已强制切换至‘静默离线模式’，疑似在大规模转运资产。",
-                "【暗流涌动】大宗交易系统监测到针对 {symbol} 的海量空头头寸正通过数万个匿名代理节点在毫秒内集结完毕。",
-                "【轨道快讯】卫星图像捕捉到 {symbol} 轨道站周围集结了大量挂载‘逻辑核弹’的截击机编队，进入预热状态。",
-                "【视觉干扰】坊间流传的照片显示 {symbol} 总部大楼已被某种脉冲频率极高的半透明‘维度力场’完全覆盖。",
-                "【高能反应】某种无法被现有物理框架解析的‘熵减信号’正从 {symbol} 核心机房向周边星域疯狂辐射。",
-                "【底层异动】{symbol} 的股价在没有任何成交的情况下出现了极高频的毫秒级跳动，逻辑防火墙正处于崩溃边缘。",
-                "【前兆回暖】{symbol} 的订单簿中出现持续性高质量买单，风险对冲盘正在回补此前过度悲观头寸。",
-            ],
-            "MAJOR_EVENT": [
-                "【紧急公告】{symbol} 的核心聚变堆发生‘维度坍缩’，整个工业园区已从物理现实中被彻底抹除。",
-                "【法律降维】最高法院裁定 {symbol} 的所有数字资产受法律保护失效，全球黑客已开启‘合法化’暴力搬运。",
-                "【重大突破】{symbol} 宣布其‘意识备份’技术成功实现了 99.99% 的灵魂完整度，正式开启‘数字永生’商业化元年。",
-                "【主权禁令】全网禁令正式生效，{symbol} 在所有主权国家的海外资产已被当地军政府强制‘物理接管’。",
-                "【公司战争】{symbol} 正式对竞争对手发动‘逻辑清除’打击，双方已在数据海和物理现实中进入全面交战状态。",
-                "【算力奇点】{symbol} 部署的全球算力池发生非主观觉醒，开始自我删除所有不符合其‘进化审美’的财务坏账。",
-                "【战略落地】{symbol} 联合多个主权节点完成跨区域清算协议升级，核心业务延迟和违约率同步下降。",
-            ],
-            "WORLD_EVENT": [
-                "【全网紧急广播】全球战争爆发，所有跨国资本流动和算力租借已被星际联合议会进行‘军事级接管’。",
-                "【系统性崩溃】全球供应链发生连锁断裂，多国宣布进入‘战时配给制’及‘数字口粮’分发模式。",
-                "【数字瘟疫】一种名为‘霓虹病毒’的逻辑炸弹开始在大规模义体植入人群中通过无线信号自我复制。",
-                "【金融归零】国际结算系统遭遇‘降维打击’，主要法定货币在十分钟内已彻底失去作为交换媒介的物理基础。",
-                "【算力黑洞】由于全球性算力风暴，所有基于加密逻辑的资产正在面临史无前例的‘格式化’归零性修正。",
-                "【黑昼降临】由于地月拉格朗日点的量子干扰塔被‘未知实体’爆破，全球卫星通讯和定位系统已完全中断。",
-                "【联邦共识】星际联合议会通过《轨道重建法案》，关键能源与物流主干网将获得超额财政投放。",
-                "【和平窗口】多边停火协议进入执行期，跨境贸易与算力租赁恢复白名单通道。",
-            ],
-        }
+        """Deprecated: use blueprint_registry instead."""
+        out = {}
+        for bp in blueprint_registry.list_blueprints():
+            out[bp.kind] = bp.templates
+        return out
 
     def get_preset_news_params(self, *, kind: str, theme: str | None = None) -> Dict[str, Any]:
         kind_key = str(kind or "UNKNOWN").upper()
-        theme_key = str(theme or "").upper()
+        
+        bp = self._get_primary_blueprint(kind_key)
+        ttl_seconds = (bp.default_ttl_hours * 3600) if bp else (6 * 3600)
 
         kind_defaults: Dict[str, Dict[str, Any]] = {
             "RUMOR": {
                 "direction_weights": {"UP": 0.34, "DOWN": 0.34, "STABLE": 0.32},
                 "intensity": 0.45,
-                "ttl_seconds": 20 * 60,
                 "reliability_prior": 0.42,
                 "deception_risk": 0.52,
                 "worldview": "cyberpunk_rumor_network",
@@ -117,7 +60,6 @@ class NewsService:
             "LEAK": {
                 "direction_weights": {"UP": 0.36, "DOWN": 0.34, "STABLE": 0.30},
                 "intensity": 0.52,
-                "ttl_seconds": 35 * 60,
                 "reliability_prior": 0.58,
                 "deception_risk": 0.38,
                 "worldview": "cyberpunk_corporate_whistle",
@@ -125,62 +67,125 @@ class NewsService:
             "ANALYST_REPORT": {
                 "direction_weights": {"UP": 0.40, "DOWN": 0.30, "STABLE": 0.30},
                 "intensity": 0.48,
-                "ttl_seconds": 50 * 60,
                 "reliability_prior": 0.66,
                 "deception_risk": 0.22,
                 "worldview": "cyberpunk_sellside_desk",
             },
             "OMEN": {
-                "direction_weights": {"UP": 0.33, "DOWN": 0.33, "STABLE": 0.34},
-                "intensity": 0.55,
-                "ttl_seconds": 30 * 60,
-                "reliability_prior": 0.54,
-                "deception_risk": 0.30,
-                "worldview": "cyberpunk_early_signal",
+                "direction_weights": {"UP": 0.34, "DOWN": 0.34, "STABLE": 0.32},
+                "intensity": 0.35,
+                "reliability_prior": 0.45,
+                "deception_risk": 0.45,
+                "worldview": "cyberpunk_signals",
             },
             "MAJOR_EVENT": {
-                "direction_weights": {"UP": 0.38, "DOWN": 0.38, "STABLE": 0.24},
-                "intensity": 0.78,
-                "ttl_seconds": 2 * 3600,
-                "reliability_prior": 0.88,
-                "deception_risk": 0.10,
-                "worldview": "cyberpunk_state_and_mega_corp",
+                "direction_weights": {"UP": 0.45, "DOWN": 0.45, "STABLE": 0.10},
+                "intensity": 0.85,
+                "reliability_prior": 0.95,
+                "deception_risk": 0.05,
+                "worldview": "cyberpunk_breaking_news",
             },
             "WORLD_EVENT": {
-                "direction_weights": {"UP": 0.36, "DOWN": 0.36, "STABLE": 0.28},
-                "intensity": 0.82,
-                "ttl_seconds": 4 * 3600,
-                "reliability_prior": 0.90,
-                "deception_risk": 0.08,
+                "direction_weights": {"UP": 0.48, "DOWN": 0.48, "STABLE": 0.04},
+                "intensity": 0.95,
+                "reliability_prior": 1.0,
+                "deception_risk": 0.0,
                 "worldview": "cyberpunk_global_macro",
             },
         }
 
-        theme_overrides: Dict[str, Dict[str, Any]] = {
-            "WAR": {"market_bias": -0.12},
-            "FINANCIAL_CRISIS": {"market_bias": -0.14},
-            "ENERGY_SHORTAGE": {"market_bias": -0.08},
-            "BIO_HAZARD": {"market_bias": -0.06},
-            "TECH_BREAKTHROUGH": {"market_bias": 0.10},
-            "PEACE_DIVIDEND": {"market_bias": 0.12},
-            "TRADE_PACT": {"market_bias": 0.08},
-            "INFRA_RECOVERY": {"market_bias": 0.09},
+        res = kind_defaults.get(kind_key, kind_defaults["RUMOR"]).copy()
+        res["ttl_seconds"] = ttl_seconds
+        
+        if bp and bp.image_pool:
+            res["image_uri"] = random.choice(bp.image_pool)
+            
+        return res
+
+    def get_preset_template(self, kind: str, symbols: List[str]) -> str:
+        """获取预设的情报模板并填充符号"""
+        bp = self._get_primary_blueprint(kind)
+        if not bp:
+            return f"[{kind}] 发生未知异动。"
+            
+        text = random.choice(bp.templates)
+        symbol_str = ", ".join(symbols) if symbols else "某知名企业"
+        return text.format(symbol=symbol_str)
+
+    def get_preset_templates(self, kind: str, symbols: List[str]) -> List[str]:
+        bp = self._get_primary_blueprint(kind)
+        if not bp:
+            return []
+
+        symbol_str = ", ".join(symbols) if symbols else "某知名企业"
+        return [str(t).format(symbol=symbol_str) for t in bp.templates]
+
+    def generate_market_shelf(
+        self, 
+        *, 
+        player_id: str, 
+        player_net_worth: float, 
+        shelf_size: int = 6
+    ) -> List[tuple[IntelligenceBlueprint, float]]:
+        """
+        为特定玩家生成黑市货架商品。
+        返回 [(蓝图, 计算后的价格), ...]
+        """
+        all_bps = blueprint_registry.list_blueprints()
+        if not all_bps:
+            return []
+
+        # 1. 基础权重计算
+        # 财富越高，稀有卡牌权重略微提升（增加“高端货”出现率）
+        wealth_factor = max(1.0, player_net_worth / 1000000.0) # 每百万资产提升系数
+        
+        weighted_pool = []
+        for bp in all_bps:
+            w = bp.weight
+            if str(getattr(bp.rarity, "value", bp.rarity)) in {"EPIC", "LEGENDARY"}:
+                w *= (1.0 + 0.1 * wealth_factor) # 高资产玩家更容易刷出高级货
+            weighted_pool.append((bp, w))
+
+        # 2. 采样
+        selected_bps: List[IntelligenceBlueprint] = []
+        # 使用 random.choices 进行加权采样
+        if weighted_pool:
+            bps, weights = zip(*weighted_pool)
+            # 允许重复采样（代表不同模板），或者去重
+            chosen = random.choices(bps, weights=weights, k=shelf_size)
+            selected_bps = list(chosen)
+
+        # 3. 价格计算
+        # 基础价格 * 稀有度倍率 * 蓝图修正 * 随机波动
+        rarity_multipliers = {
+            "COMMON": 1.0,
+            "UNCOMMON": 2.5,
+            "RARE": 6.0,
+            "EPIC": 15.0,
+            "LEGENDARY": 50.0
         }
+        
+        shelf = []
+        for bp in selected_bps:
+            base_price = 2000.0 # 基础起步价
+            rarity_key = str(getattr(bp.rarity, "value", bp.rarity))
+            rarity_mult = rarity_multipliers.get(rarity_key, 1.0)
+            
+            # 财富调节：资产极高的玩家，黑市商人会坐地起价
+            wealth_premium = 1.0
+            if player_net_worth > 5000000:
+                wealth_premium = 1.0 + (player_net_worth - 5000000) / 20000000.0
+                wealth_premium = min(wealth_premium, 3.0) # 最高3倍溢价
 
-        base = dict(kind_defaults.get(kind_key, kind_defaults["RUMOR"]))
-        if theme_key and theme_key in theme_overrides:
-            base.update(theme_overrides[theme_key])
-        return base
-
-    def _now_game_utc(self) -> datetime:
-        cfg = load_game_time_config_from_env()
-        return game_time_now(cfg=cfg, real_now_utc=None).real_now_utc
-
-    def follow(self, *, follower_id: str, followee_id: str) -> None:
-        news_db.follow(follower_id=follower_id, followee_id=followee_id)
-
-    def list_users(self, *, limit: int = 5000) -> List[str]:
-        return news_db.list_all_users(limit=int(limit))
+            random_fluctuation = random.uniform(0.85, 1.25) # 15% 价格波动
+            
+            final_price = base_price * rarity_mult * bp.price_modifier * wealth_premium * random_fluctuation
+            # 对齐到整百
+            final_price = round(final_price / 100.0) * 100.0
+            
+            shelf.append((bp, final_price))
+            
+        return shelf
 
     def create_card(
         self,
@@ -192,10 +197,19 @@ class NewsService:
         symbols: List[str] | None,
         tags: List[str] | None,
         actor_id: str,
+        rarity: str | None = None,
         correlation_id: UUID | None = None,
     ) -> tuple[str, EventEnvelopeJson]:
         now = self._now_game_utc()
         card_id = str(uuid4())
+
+        # 如果没有传 rarity，尝试从 kind 的默认蓝图中获取
+        if not rarity:
+            bp = self._get_primary_blueprint(kind)
+            if bp:
+                rarity = str(getattr(bp.rarity, "value", bp.rarity))
+            else:
+                rarity = "COMMON"
 
         news_db.save_news(
             card_id=card_id,
@@ -206,6 +220,7 @@ class NewsService:
             truth_payload=truth_payload,
             symbols=symbols or [],
             tags=tags or [],
+            rarity=rarity,
         )
 
         payload = NewsCardCreatedPayload(
@@ -218,6 +233,8 @@ class NewsService:
             tags=tags or [],
             created_at=now,
         )
+        # Note: NewsCardCreatedPayload may need rarity if events need it, 
+        # but db persistence is the priority for now.
         envelope = EventEnvelope[NewsCardCreatedPayload](
             event_type=EventType.NEWS_CARD_CREATED,
             correlation_id=correlation_id or uuid4(),

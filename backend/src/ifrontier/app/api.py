@@ -37,6 +37,7 @@ from ifrontier.services.contract_agent import ContractAgent
 from ifrontier.services.chat import ChatService
 from ifrontier.services.news import NewsService
 from ifrontier.services.news_tick import NewsTickEngine
+from ifrontier.domain.news.blueprints import registry as blueprint_registry
 from ifrontier.services.game_time import load_game_time_config_from_env
 from ifrontier.services.market_session import get_market_session
 from ifrontier.infra.sqlite.hosting import get_hosting_state, upsert_hosting_state
@@ -579,6 +580,11 @@ class NewsStoreCatalogItem(BaseModel):
     price_cash: float
     requires_symbols: bool = False
     preview_text: str
+    description: str = ""
+    rarity: str = "COMMON"
+    default_ttl_hours: int = 6
+    preview_image_uri: Optional[str] = None
+    tags: List[str] = []
     presets: List[NewsStoreCatalogPreset]
     symbol_options: List[str] = []
 
@@ -586,19 +592,23 @@ class NewsStoreCatalogResponse(BaseModel):
     items: List[NewsStoreCatalogItem]
 
 @router.get("/news/store/catalog")
-async def news_store_catalog() -> NewsStoreCatalogResponse:
+async def news_store_catalog(user_id: str) -> NewsStoreCatalogResponse:
     from ifrontier.infra.sqlite.securities import list_securities
+    
+    # 1. 获取玩家资产水平
+    try:
+        snapshot = get_snapshot(user_id)
+        player_net_worth = float(snapshot.get("net_worth", 0.0))
+    except Exception:
+        player_net_worth = 0.0
 
-    items_cfg: List[Dict[str, Any]] = [
-        {"kind": "RUMOR", "price_cash": 2000.0, "requires_symbols": False},
-        {"kind": "LEAK", "price_cash": 15000.0, "requires_symbols": True},
-        {"kind": "ANALYST_REPORT", "price_cash": 8000.0, "requires_symbols": True},
-        {"kind": "OMEN", "price_cash": 25000.0, "requires_symbols": True},
-        {"kind": "DISCLOSURE", "price_cash": 45000.0, "requires_symbols": True},
-        {"kind": "EARNINGS", "price_cash": 35000.0, "requires_symbols": True},
-        {"kind": "MAJOR_EVENT", "price_cash": 100000.0, "requires_symbols": True},
-        {"kind": "WORLD_EVENT", "price_cash": 500000.0, "requires_symbols": False},
-    ]
+    # 2. 生成个性化货架
+    # shelf: List[tuple[IntelligenceBlueprint, float]]
+    shelf_data = _news_service.generate_market_shelf(
+        player_id=user_id,
+        player_net_worth=player_net_worth,
+        shelf_size=8
+    )
 
     sec_symbols = [s.symbol for s in list_securities()]
     if not sec_symbols:
@@ -614,9 +624,11 @@ async def news_store_catalog() -> NewsStoreCatalogResponse:
     }
 
     out: List[NewsStoreCatalogItem] = []
-    for it in items_cfg:
-        kind = str(it["kind"])
-        requires_symbols = bool(it.get("requires_symbols") or False)
+    for bp, price in shelf_data:
+        kind = bp.kind
+        # 某些类型强制需要 symbols
+        requires_symbols = kind not in ["RUMOR", "WORLD_EVENT", "SYSTEM"]
+        
         symbol_options: List[str] = []
         if requires_symbols:
             preferred = default_symbol_by_kind.get(kind, [])
@@ -633,14 +645,20 @@ async def news_store_catalog() -> NewsStoreCatalogResponse:
             if presets_texts
             else _news_service.get_preset_template(kind=kind, symbols=preview_symbols)
         )
+        
         out.append(
             NewsStoreCatalogItem(
                 kind=kind,
-                price_cash=float(it["price_cash"]),
+                price_cash=price,
                 requires_symbols=requires_symbols,
                 preview_text=str(preview),
+                description=str(bp.description),
+                rarity=str(getattr(bp.rarity, "value", bp.rarity)),
+                default_ttl_hours=int(bp.default_ttl_hours),
+                preview_image_uri=(bp.image_pool[0] if bp.image_pool else None),
+                tags=list(bp.tags),
                 presets=[
-                    NewsStoreCatalogPreset(preset_id=f"{kind}:{idx}", text=str(t))
+                    NewsStoreCatalogPreset(preset_id=f"{bp.id}:{idx}", text=str(t))
                     for idx, t in enumerate(presets_texts)
                 ],
                 symbol_options=list(symbol_options),
@@ -657,12 +675,13 @@ class NewsInboxResponseItem(BaseModel):
     from_actor_id: str
     visibility_level: str
     delivery_reason: str
-    created_at: str
+    delivered_at: str
     text: str
     symbols: List[str] = []
     tags: List[str] = []
     truth_payload: Optional[Dict[str, Any]] = None
     owns_card: bool = False
+    rarity: str = "COMMON"
 
 class NewsInboxResponse(BaseModel):
     items: List[NewsInboxResponseItem]
@@ -1726,6 +1745,14 @@ async def room_join(req: RoomJoinRequest) -> RoomJoinResponse:
     - 否则 → needs_onboarding
     """
     account_id = f"user:{str(req.player_id).lower()}"
+    
+    # 确保玩家在 news_users 表中存在，这样才能收到广播新闻
+    try:
+        from ifrontier.infra.sqlite import news as news_db
+        news_db.create_user(account_id)
+    except Exception:
+        pass
+    
     try:
         snap = get_snapshot(account_id)
         if snap.caste_id:
