@@ -571,23 +571,18 @@ async def debug_emit_event(req: DebugEmitEventRequest) -> DebugEmitEventResponse
 
     return DebugEmitEventResponse(event_id=event_json.event_id, correlation_id=event_json.correlation_id)
 
-class NewsStoreCatalogPreset(BaseModel):
-    preset_id: str
-    text: str
-
 class NewsStoreCatalogItem(BaseModel):
     kind: str
     price_cash: float
-    requires_symbols: bool = False
+    requires_symbols: bool
     preview_text: str
-    description: str = ""
-    rarity: str = "COMMON"
-    faction: Optional[str] = None
+    description: str
+    rarity: str
+    faction: str | None = None
     default_ttl_hours: int = 6
-    preview_image_uri: Optional[str] = None
+    preview_image_uri: str | None = None
     tags: List[str] = []
-    presets: List[NewsStoreCatalogPreset]
-    symbol_options: List[str] = []
+    symbol: str | None = None
 
 class NewsStoreCatalogResponse(BaseModel):
     items: List[NewsStoreCatalogItem]
@@ -634,19 +629,20 @@ async def news_store_catalog(user_id: str, force_refresh: bool = False) -> NewsS
         # 某些类型强制需要 symbols
         requires_symbols = kind not in ["RUMOR", "WORLD_EVENT", "SYSTEM"]
         
-        symbol_options: List[str] = []
+        assigned_symbol: str | None = None
         if requires_symbols:
             preferred = default_symbol_by_kind.get(kind, [])
-            for p in preferred:
-                if p in sec_symbols and p not in symbol_options:
-                    symbol_options.append(p)
-            if not symbol_options:
-                symbol_options = [str(sec_symbols[0])]
+            # 随机从推荐列表中选一个，或者回退到第一个
+            available = [p for p in preferred if p in sec_symbols]
+            if available:
+                assigned_symbol = random.choice(available)
+            else:
+                assigned_symbol = str(sec_symbols[0])
 
-        preview_symbols = symbol_options[:1]
+        preview_symbols = [assigned_symbol] if assigned_symbol else []
         presets_texts = _news_service.get_preset_templates(kind=kind, symbols=preview_symbols)
         preview = (
-            presets_texts[0]
+            random.choice(presets_texts)
             if presets_texts
             else _news_service.get_preset_template(kind=kind, symbols=preview_symbols)
         )
@@ -663,11 +659,7 @@ async def news_store_catalog(user_id: str, force_refresh: bool = False) -> NewsS
                 default_ttl_hours=int(bp.default_ttl_hours),
                 preview_image_uri=(bp.image_pool[0] if bp.image_pool else None),
                 tags=list(bp.tags),
-                presets=[
-                    NewsStoreCatalogPreset(preset_id=f"{bp.id}:{idx}", text=str(t))
-                    for idx, t in enumerate(presets_texts)
-                ],
-                symbol_options=list(symbol_options),
+                symbol=assigned_symbol,
             )
         )
 
@@ -3154,45 +3146,15 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     if system_price <= 0:
         raise HTTPException(status_code=400, detail="invalid system price")
 
-    requires_symbols = bool(cfg.get("requires_symbols") or False)
-    sec_symbols = [s.symbol for s in list_securities()]
-    if not sec_symbols:
-        sec_symbols = ["BLUEGOLD"]
-
-    default_symbol_by_kind: Dict[str, List[str]] = {
-        "LEAK": ["CIVILBANK", "NEURALINK", "FOODMART", "BLUEGOLD"],
-        "ANALYST_REPORT": ["NEURALINK", "CIVILBANK", "FOODMART", "BLUEGOLD"],
-        "OMEN": ["BLUEGOLD", "CIVILBANK", "NEURALINK", "FOODMART"],
-        "DISCLOSURE": ["CIVILBANK", "BLUEGOLD", "NEURALINK", "FOODMART"],
-        "EARNINGS": ["NEURALINK", "CIVILBANK", "FOODMART", "BLUEGOLD"],
-        "MAJOR_EVENT": ["BLUEGOLD", "NEURALINK", "CIVILBANK", "FOODMART"],
-    }
-
-    symbol_options: List[str] = []
-    if requires_symbols:
-        preferred = default_symbol_by_kind.get(kind_key, [])
-        for p in preferred:
-            if p in sec_symbols and p not in symbol_options:
-                symbol_options.append(p)
-        if not symbol_options:
-            symbol_options = [str(sec_symbols[0])]
-
     req_symbols = list(req.symbols or [])
-    # 对于不需要 symbols 的类型，允许 symbol 为空。
-    if symbol_options:
-        # 需要 symbols 的类型：必须且只能选择一个，并且必须在可选列表中。
-        if len(req_symbols) != 1:
-            raise HTTPException(status_code=400, detail="exactly one symbol required")
-        if req_symbols[0] not in symbol_options:
-            raise HTTPException(status_code=400, detail="symbol must be in symbol_options")
-
+    
     purchase_event_id = str(uuid4())
     try:
         spend_cash(account_id=req.buyer_user_id, amount=float(system_price), event_id=purchase_event_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # MAJOR_EVENT / WORLD_EVENT锛氳喘涔板嵆鍒涘缓浜嬩欢閾撅紝T0 寤惰繜骞挎挱锛涗笉绔嬪嵆鎶曢€掔粰鎵€鏈変汉
+    # MAJOR_EVENT / WORLD_EVENT
     if str(req.kind) in {"MAJOR_EVENT", "WORLD_EVENT"}:
         try:
             t0_at = None
@@ -3247,23 +3209,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
 
     # 普通卡等效为“随机捡到”的新闻，先投递给购买者，后续再由其手动助推传播。
     symbols = req_symbols
-    presets = _news_service.get_preset_templates(kind=str(req.kind), symbols=symbols)
-    preset_id = str(req.preset_id) if req.preset_id is not None else ""
-    initial_text = ""
-    if preset_id:
-        prefix = f"{str(req.kind)}:"
-        if not preset_id.startswith(prefix):
-            raise HTTPException(status_code=400, detail="invalid preset_id")
-        try:
-            idx = int(preset_id.split(":", 1)[1])
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail="invalid preset_id") from exc
-        if idx < 0 or idx >= len(presets):
-            raise HTTPException(status_code=400, detail="preset_id out of range")
-        initial_text = str(presets[idx])
-    else:
-        # default preset
-        initial_text = str(presets[0]) if presets else _news_service.get_preset_template(kind=str(req.kind), symbols=symbols)
+    initial_text = req.initial_text
 
     card_id, card_event = _news_service.create_card(
         kind=req.kind,

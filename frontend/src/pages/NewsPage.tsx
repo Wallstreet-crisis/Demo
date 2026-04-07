@@ -1,39 +1,61 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Clock, LayoutDashboard, LogOut, Newspaper, ShoppingCart } from 'lucide-react'
 import {
   Api,
   ApiError,
+  WsClient,
   type NewsInboxResponse,
   type NewsInboxResponseItem,
   type NewsStoreCatalogItem,
 } from '../api'
-import { useAppSession } from '../app/context'
-import { WsClient } from '../api'
 import { useNotification } from '../app/NotificationContext'
+import { useAppSession } from '../app/context'
 import ContractFormFromNews from '../components/ContractFormFromNews'
 import IntelligenceCard from '../components/IntelligenceCard'
-import { Newspaper, ShoppingCart, ArrowUpDown, Info, Clock } from 'lucide-react'
 
 function getEventType(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null
-  const v = (payload as Record<string, unknown>).event_type
-  return typeof v === 'string' ? v : null
+  const eventType = (payload as Record<string, unknown>).event_type
+  return typeof eventType === 'string' ? eventType : null
+}
+
+function getRarityColor(rarity?: string): string {
+  switch ((rarity || 'COMMON').toUpperCase()) {
+    case 'UNCOMMON':
+      return '#52c41a'
+    case 'RARE':
+      return '#1890ff'
+    case 'EPIC':
+      return '#722ed1'
+    case 'LEGENDARY':
+      return '#faad14'
+    default:
+      return '#8c8c8c'
+  }
 }
 
 export default function NewsPage() {
   const { playerId, roomId } = useAppSession()
   const { notify } = useNotification()
-  const [loading, setLoading] = useState(true)
 
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'collection' | 'store'>('collection')
   const [inbox, setInbox] = useState<NewsInboxResponse | null>(null)
   const [ownedCards, setOwnedCards] = useState<string[]>([])
-
+  const [selectedInboxItem, setSelectedInboxItem] = useState<NewsInboxResponseItem | null>(null)
   const [storeItems, setStoreItems] = useState<NewsStoreCatalogItem[]>([])
-  const [storeExpiresAt, setStoreExpiresAt] = useState<string>('')
-  const [timeLeft, setTimeLeft] = useState<string>('')
-  
-  const [targetVariantId, setTargetVariantId] = useState<string>('')
-  const [propLimit, setPropLimit] = useState<number>(100)
-  const [propSpendCash, setPropSpendCash] = useState<string>('500')
+  const [storeExpiresAt, setStoreExpiresAt] = useState('')
+  const [timeLeft, setTimeLeft] = useState('')
+  const [purchaseKind, setPurchaseKind] = useState('')
+  const [purchasePrice, setPurchasePrice] = useState(0)
+  const [purchaseInitialText, setPurchaseInitialText] = useState('')
+  const [purchaseSymbol, setPurchaseSymbol] = useState('')
+  const [filterKind, setFilterKind] = useState('ALL')
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
+  const [targetVariantId, setTargetVariantId] = useState('')
+  const [propLimit, setPropLimit] = useState(100)
+  const [propSpendCash, setPropSpendCash] = useState('500')
   const [propQuote, setPropQuote] = useState<{
     mutation_depth: number
     per_delivery_cost: number
@@ -41,205 +63,129 @@ export default function NewsPage() {
     affordable_limit: number
     estimated_total_cost: number
   } | null>(null)
-
-  const [purchaseKind, setPurchaseKind] = useState<string>('RUMOR')
-  const [purchasePrice, setPurchasePrice] = useState<number>(100)
-  const [purchasePresetId, setPurchasePresetId] = useState<string>('')
-  const [purchaseSymbol, setPurchaseSymbol] = useState<string>('')
-
-  const [selectedInboxItem, setSelectedInboxItem] = useState<NewsInboxResponseItem | null>(null)
-
-  // 篡改新闻状态
   const [showMutatePanel, setShowMutatePanel] = useState(false)
   const [mutateVariantId, setMutateVariantId] = useState('')
   const [mutateText, setMutateText] = useState('')
   const [mutateSpendCash, setMutateSpendCash] = useState('')
-
-  // 引用签约状态
+  const [showSuppressPanel, setShowSuppressPanel] = useState(false)
+  const [suppressChainId, setSuppressChainId] = useState('')
+  const [suppressInfluence, setSuppressInfluence] = useState(500)
+  const [suppressing, setSuppressing] = useState(false)
   const [showContractPanel, setShowContractPanel] = useState(false)
   const [contractNewsItem, setContractNewsItem] = useState<NewsInboxResponseItem | null>(null)
 
-  // 抑制状态
-  const [showSuppressPanel, setShowSuppressPanel] = useState(false)
-  const [suppressChainId, setSuppressChainId] = useState('')
-  const [suppressInfluence, setSuppressInfluence] = useState(500.0)
-  const [suppressing, setSuppressing] = useState(false)
-
-  // 界面 Tab 状态
-  const [activeTab, setActiveTab] = useState<'collection' | 'store'>('collection')
-  const [filterKind, setFilterKind] = useState<string>('ALL')
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
-
-  const ws = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
   const refreshTimerRef = useRef<number | null>(null)
+  const ws = useMemo(() => new WsClient({ baseUrl: import.meta.env.VITE_API_BASE_URL }), [])
+
+  const refreshInbox = useCallback(async () => {
+    if (!playerId) return
+    setLoading(true)
+    try {
+      const response = await Api.newsInbox(`user:${playerId}`, 50)
+      setInbox(response)
+      setSelectedInboxItem((prev) => {
+        if (!prev) return response.items[0] ?? null
+        return response.items.find((item) => item.delivery_id === prev.delivery_id) ?? response.items[0] ?? null
+      })
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : error instanceof Error ? error.message : String(error)
+      notify('error', `刷新收件箱失败: ${message}`)
+    } finally {
+      setLoading(false)
+    }
+  }, [notify, playerId])
+
+  const refreshOwnedCards = useCallback(async () => {
+    if (!playerId) return
+    try {
+      const response = await Api.newsOwnershipList(`user:${playerId}`)
+      setOwnedCards(Array.isArray(response.cards) ? response.cards : [])
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : error instanceof Error ? error.message : String(error)
+      notify('error', `获取持有卡牌失败: ${message}`)
+    }
+  }, [notify, playerId])
+
+  const refreshStoreCatalog = useCallback(async (force = false) => {
+    if (!playerId) return
+    setLoading(true)
+    try {
+      const response = await Api.newsStoreCatalog(`user:${playerId}`, force)
+      const items = Array.isArray(response.items) ? response.items : []
+      setStoreItems(items)
+      setStoreExpiresAt(response.expires_at || '')
+      if (items.length > 0) {
+        const next = items[0]
+        const fixedSymbol = (next as NewsStoreCatalogItem & { symbol?: string }).symbol || next.symbol_options?.[0] || ''
+        setPurchaseKind(next.kind)
+        setPurchasePrice(next.price_cash)
+        setPurchaseInitialText(next.preview_text || '')
+        setPurchaseSymbol(fixedSymbol)
+      }
+      if (force) notify('success', '黑市货架已刷新')
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : error instanceof Error ? error.message : String(error)
+      notify('error', `获取黑市货架失败: ${message}`)
+    } finally {
+      setLoading(false)
+    }
+  }, [notify, playerId])
 
   const fetchPropagateQuote = useCallback(async (variantId: string, cash: number, limit: number) => {
     if (!playerId || !variantId || cash <= 0 || limit <= 0) return
     try {
-      const r = await Api.newsPropagateQuote({
+      const response = await Api.newsPropagateQuote({
         variant_id: variantId,
         from_actor_id: `user:${playerId}`,
         spend_cash: cash,
         limit,
       })
-      setPropQuote(r)
-    } catch (e) {
-      console.error('Failed to fetch propagate quote', e)
+      setPropQuote(response)
+    } catch {
+      setPropQuote(null)
     }
   }, [playerId])
 
   useEffect(() => {
-    if (targetVariantId && Number(propSpendCash) > 0 && propLimit > 0) {
-      const timer = setTimeout(() => {
-        fetchPropagateQuote(targetVariantId, Number(propSpendCash), propLimit)
-      }, 500)
-      return () => clearTimeout(timer)
-    }
-  }, [targetVariantId, propSpendCash, propLimit, fetchPropagateQuote])
+    void refreshInbox()
+    void refreshOwnedCards()
+    void refreshStoreCatalog()
+  }, [refreshInbox, refreshOwnedCards, refreshStoreCatalog])
 
-  function scheduleRefreshInbox(): void {
-    if (refreshTimerRef.current !== null) return
-    refreshTimerRef.current = window.setTimeout(() => {
-      refreshTimerRef.current = null
-      refreshInbox()
-    }, 500)
-  }
-
-  async function refreshInbox(): Promise<void> {
-    setLoading(true)
-    try {
-      const r = await Api.newsInbox(`user:${playerId}`, 50)
-      setInbox(r)
-    } catch (e) {
-      const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
-      notify('error', `刷新收件箱失败: ${msg}`)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function refreshOwnedCards(): Promise<void> {
-    try {
-      const r = await Api.newsOwnershipList(`user:${playerId}`)
-      setOwnedCards(Array.isArray(r.cards) ? r.cards : [])
-    } catch (e) {
-      const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
-      notify('error', `获取已购卡片失败: ${msg}`)
-      setOwnedCards([])
-    }
-  }
-
-  async function purchase(): Promise<void> {
-    try {
-      const selected = storeItems.find((x) => x.kind === purchaseKind) ?? null
-      const options = selected?.symbol_options ?? []
-      const reqSymbols = options.length > 0 ? [purchaseSymbol || options[0]] : []
-      const presetId = purchasePresetId || (selected?.presets?.[0]?.preset_id ?? null)
-      const r = await Api.newsStorePurchase({
-        buyer_user_id: `user:${playerId}`,
-        kind: purchaseKind,
-        price_cash: Number(purchasePrice),
-        preset_id: presetId,
-        symbols: reqSymbols,
-        tags: [],
-      })
-      if (r.variant_id) setTargetVariantId(r.variant_id)
-      notify('success', `购买成功: ${r.kind}`)
-      await refreshInbox()
-      refreshOwnedCards()
-    } catch (e) {
-      const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
-      notify('error', msg)
-    }
-  }
-
-  async function refreshStoreCatalog(force = false): Promise<void> {
-    if (!playerId) return
-    setLoading(true)
-    try {
-      const r = await Api.newsStoreCatalog(`user:${playerId}`, force)
-      const items = Array.isArray(r.items) ? r.items : []
-      setStoreItems(items)
-      setStoreExpiresAt(r.expires_at || '')
-
-      if (items.length > 0) {
-        const selected = items.find((x) => x.kind === purchaseKind) ?? items[0]
-        if (selected) {
-          setPurchaseKind(selected.kind)
-          const p0 = selected.presets?.[0]?.preset_id ?? ''
-          setPurchasePresetId(p0)
-          const s0 = selected.symbol_options?.[0] ?? ''
-          setPurchaseSymbol(s0)
-        }
-      }
-      if (force) notify('success', '黑市货架已更新')
-    } catch (e) {
-      const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
-      notify('error', `获取新闻商店目录失败: ${msg}`)
-      setStoreItems([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // 倒计时逻辑
   useEffect(() => {
     if (!storeExpiresAt) return
-    
     const updateTimer = () => {
-      const now = new Date().getTime()
-      const expiry = new Date(storeExpiresAt).getTime()
-      const diff = expiry - now
-      
+      const diff = new Date(storeExpiresAt).getTime() - Date.now()
       if (diff <= 0) {
         setTimeLeft('已过期')
-        // 自动刷新
-        refreshStoreCatalog()
         return
       }
-      
-      const mins = Math.floor(diff / (1000 * 60))
-      const secs = Math.floor((diff % (1000 * 60)) / 1000)
-      setTimeLeft(`${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`)
+      const minutes = Math.floor(diff / 60000)
+      const seconds = Math.floor((diff % 60000) / 1000)
+      setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`)
     }
-    
     updateTimer()
-    const timer = setInterval(updateTimer, 1000)
-    return () => clearInterval(timer)
-  }, [storeExpiresAt, playerId])
+    const timer = window.setInterval(updateTimer, 1000)
+    return () => window.clearInterval(timer)
+  }, [storeExpiresAt])
 
   useEffect(() => {
-    refreshInbox()
-    refreshOwnedCards()
-    refreshStoreCatalog()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerId])
-
-  useEffect(() => {
-    const selected = storeItems.find((x) => x.kind === purchaseKind) ?? null
-    if (!selected) return
-    const nextPreset = selected.presets?.find((p) => p.preset_id === purchasePresetId) ?? selected.presets?.[0] ?? null
-    if (nextPreset) {
-      setPurchasePresetId(nextPreset.preset_id)
-    } else {
-      setPurchasePresetId('')
-    }
-
-    const opts = selected.symbol_options ?? []
-    if (opts.length > 0) {
-      if (!purchaseSymbol || !opts.includes(purchaseSymbol)) setPurchaseSymbol(opts[0])
-    } else {
-      if (purchaseSymbol) setPurchaseSymbol('')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [purchaseKind, storeItems])
+    if (!targetVariantId || Number(propSpendCash) <= 0 || propLimit <= 0) return
+    const timer = window.setTimeout(() => {
+      void fetchPropagateQuote(targetVariantId, Number(propSpendCash), propLimit)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [fetchPropagateQuote, propLimit, propSpendCash, targetVariantId])
 
   useEffect(() => {
     ws.connect('events', (payload) => {
-      const t = getEventType(payload)
-      if (typeof t === 'string' && t.startsWith('news.')) {
-        scheduleRefreshInbox()
-      }
+      const eventType = getEventType(payload)
+      if (!eventType || !eventType.startsWith('news.')) return
+      if (refreshTimerRef.current !== null) return
+      refreshTimerRef.current = window.setTimeout(() => {
+        refreshTimerRef.current = null
+        void refreshInbox()
+      }, 500)
     })
     return () => {
       ws.close()
@@ -248,678 +194,329 @@ export default function NewsPage() {
         refreshTimerRef.current = null
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId])
+  }, [refreshInbox, roomId, ws])
 
-  const handleAction = (action: 'propagate' | 'mutate' | 'contract' | 'suppress', item: NewsInboxResponseItem) => {
+  const kinds = useMemo(() => Array.from(new Set((inbox?.items || []).map((item) => item.kind.toUpperCase()))), [inbox])
+
+  const filteredInbox = useMemo(() => {
+    const items = [...(inbox?.items || [])]
+    items.sort((a, b) => {
+      const left = new Date(a.delivered_at).getTime()
+      const right = new Date(b.delivered_at).getTime()
+      return sortOrder === 'newest' ? right - left : left - right
+    })
+    if (filterKind === 'ALL') return items
+    return items.filter((item) => item.kind.toUpperCase() === filterKind)
+  }, [filterKind, inbox, sortOrder])
+
+  const categorizedInbox = useMemo(() => {
+    const active: NewsInboxResponseItem[] = []
+    const expired: NewsInboxResponseItem[] = []
+    filteredInbox.forEach((item) => {
+      const ageHours = (Date.now() - new Date(item.delivered_at).getTime()) / 3600000
+      const ttl = item.kind === 'WORLD_EVENT' ? 24 : 6
+      if (ageHours >= ttl) expired.push(item)
+      else active.push(item)
+    })
+    return { active, expired }
+  }, [filteredInbox])
+
+  const activeStoreItem = useMemo(() => {
+    return storeItems.find((item) => item.kind === purchaseKind && item.preview_text === purchaseInitialText) || storeItems[0] || null
+  }, [purchaseInitialText, purchaseKind, storeItems])
+
+  const previewItem = useMemo<NewsInboxResponseItem | null>(() => {
+    if (!activeStoreItem) return null
+    return {
+      delivery_id: 'preview',
+      card_id: 'preview',
+      variant_id: 'preview',
+      kind: activeStoreItem.kind,
+      from_actor_id: 'MARKET',
+      visibility_level: 'NORMAL',
+      delivery_reason: 'BLUEPRINT_PREVIEW',
+      delivered_at: new Date().toISOString(),
+      text: activeStoreItem.preview_text,
+      symbols: purchaseSymbol ? [purchaseSymbol] : [],
+      tags: activeStoreItem.tags || [],
+      truth_payload: { image_uri: activeStoreItem.preview_image_uri || null },
+      rarity: activeStoreItem.rarity || 'COMMON',
+      faction: activeStoreItem.faction,
+    }
+  }, [activeStoreItem, purchaseSymbol])
+
+  const handleAction = useCallback((action: 'propagate' | 'mutate' | 'contract' | 'suppress', item: NewsInboxResponseItem) => {
     setSelectedInboxItem(item)
     if (action === 'propagate') {
       setTargetVariantId(item.variant_id)
-      notify('info', '已选择该变体，请在下方传播面板操作')
-    } else if (action === 'mutate') {
+      notify('info', '已将当前变体载入传播面板')
+      return
+    }
+    if (action === 'mutate') {
       setMutateVariantId(item.variant_id)
       setMutateText(item.text)
       setShowMutatePanel(true)
-    } else if (action === 'contract') {
+      return
+    }
+    if (action === 'contract') {
       setContractNewsItem(item)
       setShowContractPanel(true)
-    } else if (action === 'suppress') {
-      const payload = item.truth_payload as any
-      const chainId = payload?.chain_id || ''
-      setSuppressChainId(chainId)
-      setShowSuppressPanel(true)
+      return
     }
-  }
+    const payload = item.truth_payload as Record<string, unknown> | null
+    setSuppressChainId(String(payload?.chain_id || ''))
+    setShowSuppressPanel(true)
+  }, [notify])
 
-  async function propagateLast(): Promise<void> {
-    const vid = targetVariantId
-    if (!vid) {
+  const handlePurchase = useCallback(async () => {
+    if (!playerId || !purchaseKind) return
+    setLoading(true)
+    try {
+      await Api.newsStorePurchase({
+        buyer_user_id: `user:${playerId}`,
+        kind: purchaseKind,
+        price_cash: purchasePrice,
+        initial_text: purchaseInitialText,
+        symbols: purchaseSymbol ? [purchaseSymbol] : [],
+      })
+      notify('success', `已购入 ${purchaseKind}`)
+      await refreshInbox()
+      await refreshOwnedCards()
+      await refreshStoreCatalog()
+      setActiveTab('collection')
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : error instanceof Error ? error.message : String(error)
+      notify('error', `购买失败: ${message}`)
+    } finally {
+      setLoading(false)
+    }
+  }, [notify, playerId, purchaseInitialText, purchaseKind, purchasePrice, purchaseSymbol, refreshInbox, refreshOwnedCards, refreshStoreCatalog])
+
+  const propagateLast = useCallback(async () => {
+    if (!playerId || !targetVariantId) {
       notify('error', '请先选择一个情报变体')
       return
     }
     const spendCash = propSpendCash.trim() === '' ? undefined : Number(propSpendCash)
     if (spendCash !== undefined && (!Number.isFinite(spendCash) || spendCash <= 0)) {
-      notify('error', '投入资金必须为正数')
+      notify('error', '投入现金必须为正数')
       return
     }
     try {
-      const r = await Api.newsPropagate({
-        variant_id: vid,
+      const response = await Api.newsPropagate({
+        variant_id: targetVariantId,
         from_actor_id: `user:${playerId}`,
         visibility_level: 'NORMAL',
-        spend_influence: 0.0,
+        spend_influence: 0,
         spend_cash: spendCash,
-        limit: Number(propLimit),
+        limit: propLimit,
       })
-      notify('success', `传播成功: 已送达 ${r.delivered} 人`)
+      notify('success', `传播成功，送达 ${response.delivered} 人`)
       await refreshInbox()
-    } catch (e) {
-      const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
-      notify('error', msg)
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : error instanceof Error ? error.message : String(error)
+      notify('error', message)
     }
-  }
-
-  const kinds = useMemo(() => {
-    const k = new Set<string>()
-    inbox?.items?.forEach(it => k.add(it.kind.toUpperCase()))
-    return Array.from(k)
-  }, [inbox])
-
-  const filteredInbox = useMemo(() => {
-    if (!inbox?.items) return []
-    let items = [...inbox.items]
-    
-    // Sort
-    items.sort((a, b) => {
-      const da = new Date(a.delivered_at).getTime()
-      const db = new Date(b.delivered_at).getTime()
-      return sortOrder === 'newest' ? db - da : da - db
-    })
-
-    // Filter
-    if (filterKind !== 'ALL') {
-      items = items.filter(it => it.kind.toUpperCase() === filterKind)
-    }
-    
-    return items
-  }, [inbox, filterKind, sortOrder])
-
-  const categorizedInbox = useMemo(() => {
-    const active: NewsInboxResponseItem[] = []
-    const expired: NewsInboxResponseItem[] = []
-    
-    filteredInbox.forEach(it => {
-      const createdAt = new Date(it.delivered_at)
-      const ageHours = (new Date().getTime() - createdAt.getTime()) / (1000 * 60 * 60)
-      const ttl = it.kind === 'WORLD_EVENT' ? 24 : 6
-      if (ageHours >= ttl) {
-        expired.push(it)
-      } else {
-        active.push(it)
-      }
-    })
-    
-    return { active, expired }
-  }, [filteredInbox])
-
-  const activeStoreItem = useMemo(() => {
-    return storeItems.find(it => it.kind === purchaseKind) || null
-  }, [storeItems, purchaseKind])
-
-  const getRarityColor = (rarity?: string) => {
-    switch ((rarity || 'COMMON').toUpperCase()) {
-      case 'UNCOMMON': return '#52c41a'
-      case 'RARE': return '#1890ff'
-      case 'EPIC': return '#722ed1'
-      case 'LEGENDARY': return '#faad14'
-      default: return '#8c8c8c'
-    }
-  }
-
-  const getRarityLabel = (rarity?: string) => {
-    switch ((rarity || 'COMMON').toUpperCase()) {
-      case 'UNCOMMON': return '罕见'
-      case 'RARE': return '珍稀'
-      case 'EPIC': return '史诗'
-      case 'LEGENDARY': return '传说'
-      default: return '基础'
-    }
-  }
-
-  const previewItem = useMemo((): NewsInboxResponseItem | null => {
-    if (!activeStoreItem) return null
-    const preset = activeStoreItem.presets?.find(p => p.preset_id === purchasePresetId) || activeStoreItem.presets?.[0]
-    return {
-      delivery_id: 'preview',
-      card_id: 'preview',
-      variant_id: purchasePresetId || 'preview',
-      kind: purchaseKind,
-      from_actor_id: 'MARKET',
-      visibility_level: 'NORMAL',
-      delivery_reason: 'BLUEPRINT_PREVIEW',
-      delivered_at: new Date().toISOString(),
-      text: preset?.text.replace('{symbol}', purchaseSymbol || '[$SYMBOL]') || activeStoreItem.preview_text,
-      symbols: purchaseSymbol ? [purchaseSymbol] : [],
-      tags: activeStoreItem.tags || [],
-      truth_payload: {
-        image_uri: activeStoreItem.preview_image_uri || null,
-        impact: 'UNKNOWN'
-      },
-      rarity: activeStoreItem.rarity || 'COMMON'
-    }
-  }, [activeStoreItem, purchaseKind, purchasePresetId, purchaseSymbol])
+  }, [notify, playerId, propLimit, propSpendCash, refreshInbox, targetVariantId])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%', color: '#e0e0e0' }}>
-      {/* Header Tabs */}
-      <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid #333', paddingBottom: '12px' }}>
-        <TabBtn 
-          active={activeTab === 'collection'} 
-          onClick={() => setActiveTab('collection')} 
-          icon={Newspaper} 
-          label="情报仓库 (Collection)" 
-        />
-        <TabBtn 
-          active={activeTab === 'store'} 
-          onClick={() => setActiveTab('store')} 
-          icon={ShoppingCart} 
-          label="黑市情报 (Black Market)" 
-        />
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ background: 'var(--terminal-info)', padding: '10px', borderRadius: '4px' }}>
+            <Newspaper size={24} color="#000" />
+          </div>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 900, letterSpacing: '4px', textTransform: 'uppercase' }}>
+              Intelligence <span style={{ color: 'var(--terminal-info)' }}>Network</span>
+            </h1>
+            <div style={{ fontSize: '10px', color: '#666', letterSpacing: '2px', marginTop: '4px' }}>
+              ROOM_{roomId?.toUpperCase()} // SIGNAL_MATRIX
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button onClick={() => { window.location.hash = '#/' }} style={navButtonStyle('#999', 'rgba(255,255,255,0.05)')}>
+            <LayoutDashboard size={14} /> DASHBOARD
+          </button>
+          <button onClick={() => { window.location.hash = '#/' }} style={navButtonStyle('#ff4d4f', 'rgba(255,77,79,0.1)')}>
+            <LogOut size={14} /> EXIT
+          </button>
+        </div>
+      </header>
+
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid #333', paddingBottom: '2px' }}>
+        <TabBtn active={activeTab === 'collection'} onClick={() => setActiveTab('collection')} icon={Newspaper} label="情报仓库" />
+        <TabBtn active={activeTab === 'store'} onClick={() => setActiveTab('store')} icon={ShoppingCart} label="黑市情报" />
       </div>
 
       {activeTab === 'collection' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '24px', flex: 1, minHeight: 0 }}>
-          {/* Left: Card Collection */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0 }}>
-            {/* Filter Bar */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              background: 'rgba(20, 20, 20, 0.4)',
-              padding: '12px 20px',
-              borderRadius: '2px',
-              borderWidth: '1px',
-              borderStyle: 'solid',
-              borderColor: 'rgba(255,255,255,0.05)',
-              backdropFilter: 'blur(10px)'
-            }}>
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                <span style={{ fontSize: '10px', color: '#444', fontWeight: '900', letterSpacing: '2px', textTransform: 'uppercase' }}>Filter_Protocol:</span>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <FilterChip active={filterKind === 'ALL'} onClick={() => setFilterKind('ALL')} label="ALL_FILES" />
-                  {kinds.map(k => (
-                    <FilterChip key={k} active={filterKind === k} onClick={() => setFilterKind(k)} label={k} />
-                  ))}
-                </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 450px', gap: '24px', minHeight: 0, flex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0, overflowY: 'auto', paddingRight: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', flexWrap: 'wrap', background: 'rgba(20,20,20,0.5)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '4px', padding: '12px 16px' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <FilterChip active={filterKind === 'ALL'} onClick={() => setFilterKind('ALL')} label="全部" />
+                {kinds.map((kind) => (
+                  <FilterChip key={kind} active={filterKind === kind} onClick={() => setFilterKind(kind)} label={kind} />
+                ))}
               </div>
-              <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                <button 
-                  onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')}
-                  style={{ 
-                    background: 'none', 
-                    border: 'none', 
-                    color: '#444', 
-                    cursor: 'pointer', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '6px', 
-                    fontSize: '10px',
-                    fontWeight: '900',
-                    letterSpacing: '1px',
-                    textTransform: 'uppercase',
-                    transition: 'color 0.2s'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#444'}
-                >
-                  <ArrowUpDown size={12} />
-                  {sortOrder === 'newest' ? 'NEWEST_FIRST' : 'OLDEST_FIRST'}
-                </button>
-                <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.05)' }} />
-                <button 
-                  onClick={refreshInbox} 
-                  disabled={loading} 
-                  className="cyber-button mini"
-                  style={{ 
-                    background: 'transparent',
-                    borderWidth: '1px',
-                    borderStyle: 'solid',
-                    borderColor: 'var(--terminal-info)33',
-                    color: 'var(--terminal-info)',
-                    fontSize: '10px',
-                    fontWeight: 'bold',
-                    letterSpacing: '2px',
-                    padding: '6px 16px',
-                    borderRadius: '2px'
-                  }}
-                >
-                  {loading ? 'RE-SYNCING...' : 'SYNC_INBOX'}
-                </button>
-              </div>
+              <button onClick={() => setSortOrder((prev) => prev === 'newest' ? 'oldest' : 'newest')} style={ghostButtonStyle}>
+                {sortOrder === 'newest' ? '按最新排序' : '按最早排序'}
+              </button>
             </div>
 
-            {/* Card Grid */}
-            <div style={{ 
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '32px',
-              overflowY: 'auto',
-              padding: '4px',
-              flex: 1,
-              paddingRight: '10px'
-            }}>
-              {/* Active Section */}
+            <section>
+              <h3 style={sectionTitleStyle}>ACTIVE_INTELLIGENCE ({categorizedInbox.active.length})</h3>
+              <div style={cardGridStyle}>
+                {categorizedInbox.active.map((item) => (
+                  <IntelligenceCard
+                    key={item.delivery_id}
+                    item={item}
+                    stage={ownedCards.includes(item.card_id) ? 'HELD' : 'CIRCULATING'}
+                    isSelected={selectedInboxItem?.delivery_id === item.delivery_id}
+                    onClick={() => setSelectedInboxItem(item)}
+                    onAction={handleAction}
+                  />
+                ))}
+              </div>
+            </section>
+
+            {categorizedInbox.expired.length > 0 && (
               <section>
-                <h3 style={{ fontSize: '12px', color: '#555', marginBottom: '16px', letterSpacing: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--terminal-success)' }} />
-                  ACTIVE_INTELLIGENCE ({categorizedInbox.active.length})
-                </h3>
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', 
-                  gap: '20px'
-                }}>
-                  {categorizedInbox.active.map(it => (
-                    <IntelligenceCard 
-                      key={it.delivery_id} 
-                      item={it} 
-                      isSelected={selectedInboxItem?.delivery_id === it.delivery_id}
-                      onClick={() => setSelectedInboxItem(it)}
+                <h3 style={sectionTitleStyle}>ARCHIVED_HISTORY ({categorizedInbox.expired.length})</h3>
+                <div style={{ ...cardGridStyle, opacity: 0.65 }}>
+                  {categorizedInbox.expired.map((item) => (
+                    <IntelligenceCard
+                      key={item.delivery_id}
+                      item={item}
+                      stage="EXPIRED"
+                      isSelected={selectedInboxItem?.delivery_id === item.delivery_id}
+                      onClick={() => setSelectedInboxItem(item)}
                       onAction={handleAction}
-                      stage={ownedCards.includes(it.card_id) ? 'HELD' : 'CIRCULATING'}
                     />
                   ))}
                 </div>
               </section>
-
-              {/* Expired Section */}
-              {categorizedInbox.expired.length > 0 && (
-                <section>
-                  <h3 style={{ fontSize: '12px', color: '#555', marginBottom: '16px', letterSpacing: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#444' }} />
-                    ARCHIVED_HISTORY ({categorizedInbox.expired.length})
-                  </h3>
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', 
-                    gap: '20px',
-                    opacity: 0.6
-                  }}>
-                    {categorizedInbox.expired.map(it => (
-                      <IntelligenceCard 
-                        key={it.delivery_id} 
-                        item={it} 
-                        isSelected={selectedInboxItem?.delivery_id === it.delivery_id}
-                        onClick={() => setSelectedInboxItem(it)}
-                        onAction={handleAction}
-                        stage="EXPIRED"
-                      />
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {filteredInbox.length === 0 && (
-                <div style={{ 
-                  height: '300px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '12px',
-                  color: '#666',
-                  borderWidth: '2px',
-                  borderStyle: 'dashed',
-                  borderColor: '#333',
-                  borderRadius: '12px'
-                }}>
-                  <Newspaper size={48} opacity={0.2} />
-                  <span>暂无匹配情报</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Action Panel */}
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '24px',
-            overflowY: 'auto',
-            paddingRight: '4px'
-          }}>
-            {selectedInboxItem ? (
-              <div style={{ 
-                background: 'rgba(26, 26, 26, 0.4)',
-                borderWidth: '1px',
-                borderStyle: 'solid',
-                borderColor: 'var(--terminal-info)33',
-                borderRadius: '4px',
-                padding: '24px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '20px',
-                backdropFilter: 'blur(10px)',
-                position: 'relative'
-              }}>
-                {/* Corner Decoration */}
-                <div style={{ position: 'absolute', top: 0, right: 0, width: '40px', height: '40px', background: 'linear-gradient(45deg, transparent 50%, var(--terminal-info) 50%)', opacity: 0.1 }} />
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '4px', height: '16px', background: 'var(--terminal-info)' }} />
-                    <span style={{ fontWeight: '900', fontSize: '14px', letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--terminal-info)' }}>
-                      Intelligence Analysis
-                    </span>
-                  </div>
-                  <button onClick={() => setSelectedInboxItem(null)} style={{ 
-                    background: 'none', 
-                    border: 'none', 
-                    color: '#444', 
-                    cursor: 'pointer',
-                    fontSize: '18px'
-                  }}>✕</button>
-                </div>
-
-                <div style={{ 
-                  fontSize: '15px', 
-                  lineHeight: '1.7', 
-                  color: '#fff', 
-                  background: 'rgba(0,0,0,0.6)', 
-                  padding: '20px', 
-                  borderRadius: '2px', 
-                  borderLeft: '2px solid var(--terminal-info)',
-                  fontFamily: 'system-ui',
-                  boxShadow: 'inset 0 0 20px rgba(0,0,0,0.4)'
-                }}>
-                  {selectedInboxItem.text}
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <MetaBox label="Variant Signature" value={selectedInboxItem.variant_id.slice(0, 12)} />
-                  <MetaBox label="Origin Entity" value={selectedInboxItem.from_actor_id} />
-                  <MetaBox label="Impact Targets" value={selectedInboxItem.symbols?.join(', ') || 'GLOBAL_SCOPE'} />
-                  <MetaBox label="Delivery Protocol" value={selectedInboxItem.delivery_reason} />
-                </div>
-
-                {!!selectedInboxItem.truth_payload && (
-                  <div style={{ 
-                    background: 'rgba(0,0,0,0.4)', 
-                    padding: '16px', 
-                    borderRadius: '2px', 
-                    borderWidth: '1px', 
-                    borderStyle: 'solid', 
-                    borderColor: 'rgba(255,255,255,0.05)' 
-                  }}>
-                    <div style={{ fontSize: '10px', color: '#444', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>
-                      Core Data Stream (Hex/Json)
-                    </div>
-                    <pre style={{ 
-                      margin: 0, 
-                      fontSize: '12px', 
-                      color: 'var(--terminal-success)', 
-                      whiteSpace: 'pre-wrap', 
-                      fontFamily: 'monospace',
-                      opacity: 0.8,
-                      lineHeight: '1.4'
-                    }}>
-                      {String(JSON.stringify(selectedInboxItem.truth_payload, null, 2) ?? '')}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div style={{ 
-                background: 'rgba(26, 26, 26, 0.2)',
-                borderWidth: '1px',
-                borderStyle: 'dashed',
-                borderColor: '#222',
-                borderRadius: '4px',
-                padding: '60px 20px',
-                textAlign: 'center',
-                color: '#333',
-                fontSize: '12px',
-                letterSpacing: '2px',
-                textTransform: 'uppercase'
-              }}>
-                [ Waiting for Intelligence Selection ]
-              </div>
             )}
 
-            {/* Propagate Panel */}
-            <div style={{ 
-              background: 'rgba(26, 26, 26, 0.4)',
-              borderWidth: '1px',
-              borderStyle: 'solid',
-              borderColor: 'var(--terminal-success)22',
-              borderRadius: '4px',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '20px',
-              backdropFilter: 'blur(10px)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '4px', height: '16px', background: 'var(--terminal-success)' }} />
-                <span style={{ fontWeight: '900', fontSize: '14px', letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--terminal-success)' }}>
-                  Amplifier System
-                </span>
+            {filteredInbox.length === 0 && (
+              <div style={{ padding: '48px 24px', textAlign: 'center', color: '#555', border: '1px dashed #333', borderRadius: '4px' }}>
+                暂无匹配情报
+              </div>
+            )}
+          </div>
+
+          <div style={{ width: '450px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={sidePanelStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <strong style={{ color: 'var(--terminal-info)' }}>Intelligence Analysis</strong>
+                {selectedInboxItem && <button onClick={() => setSelectedInboxItem(null)} style={iconCloseButtonStyle}>✕</button>}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '10px', color: '#444', textTransform: 'uppercase', letterSpacing: '1px' }}>Target Identification</label>
-                  <input 
-                    value={targetVariantId} 
-                    onChange={e => setTargetVariantId(e.target.value)} 
-                    placeholder="Auto-mapped from selection..."
-                    style={{ 
-                      background: 'rgba(0,0,0,0.4)', 
-                      borderWidth: '1px',
-                      borderStyle: 'solid',
-                      borderColor: '#222',
-                      color: 'var(--terminal-success)', 
-                      padding: '12px', 
-                      borderRadius: '2px', 
-                      fontSize: '12px',
-                      fontFamily: 'monospace'
-                    }}
-                  />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '10px', color: '#444', textTransform: 'uppercase', letterSpacing: '1px' }}>Node Coverage</label>
-                    <input type="number" value={propLimit} onChange={(e) => setPropLimit(Number(e.target.value))} style={{ 
-                      background: 'rgba(0,0,0,0.4)', 
-                      borderWidth: '1px',
-                      borderStyle: 'solid',
-                      borderColor: '#222',
-                      color: '#fff', 
-                      padding: '12px', 
-                      borderRadius: '2px',
-                      fontFamily: 'monospace'
-                    }} />
+              {selectedInboxItem ? (
+                <>
+                  <div style={{ background: 'rgba(0,0,0,0.55)', padding: '16px', borderLeft: '2px solid var(--terminal-info)', lineHeight: 1.7 }}>
+                    {selectedInboxItem.text}
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '10px', color: '#444', textTransform: 'uppercase', letterSpacing: '1px' }}>Energy Budget ($)</label>
-                    <input value={propSpendCash} onChange={(e) => setPropSpendCash(e.target.value)} style={{ 
-                      background: 'rgba(0,0,0,0.4)', 
-                      borderWidth: '1px',
-                      borderStyle: 'solid',
-                      borderColor: '#222',
-                      color: '#fff', 
-                      padding: '12px', 
-                      borderRadius: '2px',
-                      fontFamily: 'monospace'
-                    }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <MetaBox label="变体" value={selectedInboxItem.variant_id.slice(0, 12)} />
+                    <MetaBox label="来源" value={selectedInboxItem.from_actor_id} />
+                    <MetaBox label="标的" value={selectedInboxItem.symbols?.join(', ') || 'GLOBAL'} />
+                    <MetaBox label="投递" value={selectedInboxItem.delivery_reason} />
                   </div>
-                </div>
-                
-                {propQuote && (
-                  <div style={{ background: 'rgba(0,0,0,0.6)', padding: '16px', borderRadius: '2px', border: '1px solid var(--terminal-success)11', fontSize: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ color: '#444', textTransform: 'uppercase', fontSize: '10px' }}>Reachable Nodes</span>
-                      <span style={{ color: 'var(--terminal-success)', fontWeight: 'bold' }}>{propQuote.affordable_limit}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#444', textTransform: 'uppercase', fontSize: '10px' }}>Total Resource Consumption</span>
-                      <span style={{ color: 'var(--terminal-warn)', fontWeight: 'bold' }}>${propQuote.estimated_total_cost.toFixed(2)}</span>
-                    </div>
-                  </div>
-                )}
-
-                <button 
-                  onClick={propagateLast} 
-                  className="cyber-button" 
-                  style={{ 
-                    background: 'var(--terminal-success)', 
-                    color: '#000', 
-                    fontWeight: '900',
-                    height: '50px',
-                    borderRadius: '2px',
-                    letterSpacing: '2px',
-                    textTransform: 'uppercase',
-                    fontSize: '14px',
-                    boxShadow: '0 0 20px var(--terminal-success)33'
-                  }}
-                >
-                  Initiate Broadcast
-                </button>
-              </div>
+                  {selectedInboxItem.truth_payload && (
+                    <pre style={{ margin: 0, background: 'rgba(0,0,0,0.45)', padding: '12px', color: '#7dd3fc', fontSize: '12px', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                      {JSON.stringify(selectedInboxItem.truth_payload, null, 2)}
+                    </pre>
+                  )}
+                </>
+              ) : (
+                <div style={{ color: '#444', textAlign: 'center', padding: '40px 20px' }}>选择一张卡牌查看右侧分析面板</div>
+              )}
             </div>
 
-            {/* Quick Actions */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <button 
-                onClick={() => selectedInboxItem ? handleAction('mutate', selectedInboxItem) : notify('error', '请先选择一张情报卡牌')}
-                style={{ 
-                  background: 'rgba(250, 173, 20, 0.05)', 
-                  border: '1px solid rgba(250, 173, 20, 0.2)', 
-                  color: 'var(--terminal-warn)', 
-                  padding: '14px', 
-                  borderRadius: '2px', 
-                  cursor: 'pointer', 
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  letterSpacing: '1px',
-                  textTransform: 'uppercase',
-                  transition: 'all 0.3s'
-                }}
-              >
-                Modify Variant
+            <div style={sidePanelStyle}>
+              <strong style={{ color: 'var(--terminal-success)' }}>Amplifier System</strong>
+              <input value={targetVariantId} onChange={(e) => setTargetVariantId(e.target.value)} placeholder="目标变体 ID" style={inputStyle} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <input type="number" value={propLimit} onChange={(e) => setPropLimit(Number(e.target.value))} placeholder="传播人数" style={inputStyle} />
+                <input value={propSpendCash} onChange={(e) => setPropSpendCash(e.target.value)} placeholder="投入现金" style={inputStyle} />
+              </div>
+              {propQuote && <div style={{ color: '#888', fontSize: '12px' }}>预计成本 ${propQuote.estimated_total_cost.toFixed(2)}，最多送达 {propQuote.affordable_limit} 节点</div>}
+              <button onClick={() => { void propagateLast() }} className="cyber-button" style={{ background: 'var(--terminal-success)', color: '#000', fontWeight: 900, padding: '14px' }}>
+                Initiate Broadcast
               </button>
-              <button 
-                onClick={() => selectedInboxItem ? handleAction('contract', selectedInboxItem) : notify('error', '请先选择一张情报卡牌')}
-                style={{ 
-                  background: 'rgba(24, 144, 255, 0.05)', 
-                  border: '1px solid rgba(24, 144, 255, 0.2)', 
-                  color: 'var(--terminal-info)', 
-                  padding: '14px', 
-                  borderRadius: '2px', 
-                  cursor: 'pointer', 
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  letterSpacing: '1px',
-                  textTransform: 'uppercase',
-                  transition: 'all 0.3s'
-                }}
-              >
-                Execute Contract
-              </button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                <button onClick={() => selectedInboxItem ? handleAction('mutate', selectedInboxItem) : notify('error', '请先选择一张情报卡牌')} style={actionButtonStyle('rgba(250,173,20,0.06)', '#faad14')}>
+                  篡改
+                </button>
+                <button onClick={() => selectedInboxItem ? handleAction('contract', selectedInboxItem) : notify('error', '请先选择一张情报卡牌')} style={actionButtonStyle('rgba(24,144,255,0.06)', '#1890ff')}>
+                  签约
+                </button>
+                <button onClick={() => selectedInboxItem ? handleAction('suppress', selectedInboxItem) : notify('error', '请先选择一张情报卡牌')} style={actionButtonStyle('rgba(255,77,79,0.06)', '#ff4d4f')}>
+                  抑制
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {activeTab === 'store' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '32px', flex: 1, minHeight: 0 }}>
-          {/* Left: Blueprint Selection */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', paddingRight: '10px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 450px', gap: '24px', minHeight: 0, flex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto', paddingRight: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '16px' }}>
               <div>
-                <h2 style={{ color: '#faad14', letterSpacing: '2px', marginBottom: '8px' }}>地下情报黑市 (Black Market)</h2>
-                <p style={{ color: '#666', fontSize: '13px', margin: 0 }}>基于你的财富地位，黑市商人为你准备了以下专属蓝图。</p>
+                <h2 style={{ margin: 0, color: '#faad14', letterSpacing: '2px' }}>地下情报黑市</h2>
+                <p style={{ margin: '8px 0 0 0', color: '#666', fontSize: '13px' }}>货架出售固定情报，所见即所得，不再提供模板二次定制。</p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                {timeLeft && (
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '10px', color: '#444', textTransform: 'uppercase' }}>货架自动刷新倒计时</div>
-                    <div style={{ fontSize: '16px', color: '#faad14', fontFamily: 'monospace', fontWeight: 'bold' }}>{timeLeft}</div>
-                  </div>
-                )}
-                <button 
-                  onClick={() => refreshStoreCatalog(true)}
-                  disabled={loading}
-                  className="cyber-button mini"
-                  style={{ 
-                    background: 'rgba(250, 173, 20, 0.1)', 
-                    borderColor: '#faad1444',
-                    color: '#faad14',
-                    padding: '8px 16px'
-                  }}
-                >
-                  {loading ? '刷新中...' : '手动刷新货架'}
-                </button>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ color: '#444', fontSize: '10px' }}>货架刷新倒计时</div>
+                <div style={{ color: '#faad14', fontFamily: 'monospace', fontWeight: 900 }}>{timeLeft || '--:--'}</div>
               </div>
             </div>
 
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
-              gap: '20px' 
-            }}>
-              {storeItems.map((it, idx) => {
-                const rColor = getRarityColor(it.rarity)
-                const isSelected = purchaseKind === it.kind && idx === storeItems.findIndex(s => s.kind === it.kind)
-                
+            <div style={storeGridStyle}>
+              {storeItems.map((item, index) => {
+                const symbol = (item as NewsStoreCatalogItem & { symbol?: string }).symbol || item.symbol_options?.[0] || ''
+                const selected = purchaseKind === item.kind && purchaseInitialText === item.preview_text
                 return (
-                  <div 
-                    key={`${it.kind}-${idx}`} 
-                    className={`market-blueprint-card ${isSelected ? 'selected' : ''}`}
-                    style={{ 
-                      background: 'rgba(20, 20, 20, 0.6)', 
-                      borderWidth: '1px',
-                      borderStyle: 'solid',
-                      borderColor: isSelected ? '#faad14' : 'rgba(255,255,255,0.05)',
-                      borderRadius: '2px',
-                      padding: '24px',
+                  <div
+                    key={`${item.kind}-${index}`}
+                    className={`market-blueprint-card ${selected ? 'selected' : ''}`}
+                    onClick={() => {
+                      setPurchaseKind(item.kind)
+                      setPurchasePrice(item.price_cash)
+                      setPurchaseInitialText(item.preview_text || '')
+                      setPurchaseSymbol(symbol)
+                    }}
+                    style={{
+                      background: selected ? 'rgba(250,173,20,0.08)' : 'rgba(20,20,20,0.6)',
+                      border: `1px solid ${selected ? '#faad14' : 'rgba(255,255,255,0.06)'}`,
+                      borderRadius: '4px',
+                      padding: '22px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '16px',
-                      position: 'relative',
+                      gap: '12px',
                       cursor: 'pointer',
-                      transition: 'all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1)',
-                      overflow: 'hidden',
-                      backdropFilter: 'blur(10px)'
-                    }}
-                    onClick={() => {
-                      setPurchaseKind(it.kind)
-                      setPurchasePrice(it.price_cash)
-                      if (it.presets?.[0]) setPurchasePresetId(it.presets[0].preset_id)
+                      transition: 'all 0.3s ease',
+                      minHeight: '220px',
                     }}
                   >
-                    {/* Background Noise/Pattern */}
-                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.03, pointerEvents: 'none', background: 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyBAMAAADsEZWCAAAAGFBMVEUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAt6pY6AAAAB3RSTlMAoIDAgICA0RECDAAAAEtJREFUOMtjYEAFeR0IXE9IDAKiUAgIgoAIFALCEAisEIYQAoGICBQCghAIhIDoEYYpBAIBURBCIBRCEIAKghAIhIDoEQIDUAgIBEYIABWzI0Y39r8oAAAAAElFTkSuQmCC")' }} />
-
-                    {/* Rarity Accent */}
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: rColor, opacity: isSelected ? 1 : 0.3 }} />
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 2 }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ color: rColor, fontSize: '9px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '2px' }}>{getRarityLabel(it.rarity)} Protocol</span>
-                        <span style={{ color: '#fff', fontWeight: '900', fontSize: '18px', letterSpacing: '1px' }}>{it.kind}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <div>
+                        <div style={{ color: getRarityColor(item.rarity), fontSize: '10px', fontWeight: 900, letterSpacing: '2px' }}>{item.rarity || 'COMMON'}</div>
+                        <div style={{ color: '#fff', fontSize: '18px', fontWeight: 900 }}>{item.kind}</div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ color: '#faad14', fontSize: '20px', fontWeight: '900', fontFamily: 'monospace' }}>
-                          ${it.price_cash.toLocaleString()}
-                        </div>
-                      </div>
+                      <div style={{ color: '#faad14', fontFamily: 'monospace', fontWeight: 900 }}>${item.price_cash.toLocaleString()}</div>
                     </div>
-
-                    <p style={{ fontSize: '13px', color: '#666', margin: 0, lineHeight: '1.6', height: '42px', overflow: 'hidden', zIndex: 2 }}>
-                      {it.description || it.preview_text}
-                    </p>
-
-                    <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 2, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
-                      <div style={{ display: 'flex', gap: '12px', fontSize: '10px', color: '#444', fontWeight: 'bold' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Newspaper size={10} /> {it.presets?.length || 0} TEMPLATES</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={10} /> {it.default_ttl_hours || 6}H TTL</span>
+                    <div style={{ color: '#bbb', fontSize: '13px', lineHeight: 1.7 }}>{item.description || item.preview_text}</div>
+                    <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#666', fontSize: '10px' }}>
+                        <Clock size={12} /> {item.default_ttl_hours || 6}H TTL
                       </div>
-                      {it.tags && it.tags.length > 0 && (
-                        <div style={{ 
-                          background: 'rgba(250, 173, 20, 0.1)', 
-                          padding: '2px 8px', 
-                          borderRadius: '2px', 
-                          fontSize: '9px', 
-                          color: '#faad14',
-                          border: '1px solid rgba(250, 173, 20, 0.2)',
-                          textTransform: 'uppercase',
-                          fontWeight: 'bold'
-                        }}>
-                          {it.tags[0]}
-                        </div>
-                      )}
+                      <div style={{ color: '#faad14', fontFamily: 'monospace', fontSize: '11px', fontWeight: 900 }}>{symbol ? `$${symbol}` : 'GLOBAL'}</div>
                     </div>
                   </div>
                 )
@@ -927,387 +524,246 @@ export default function NewsPage() {
             </div>
           </div>
 
-          {/* Right: Configurator & Preview */}
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '24px',
-            background: 'rgba(26, 26, 26, 0.6)',
-            borderWidth: '1px',
-            borderStyle: 'solid',
-            borderColor: 'rgba(250, 173, 20, 0.2)',
-            borderRadius: '4px',
-            padding: '32px',
-            position: 'sticky',
-            top: 0,
-            backdropFilter: 'blur(20px)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-              <div style={{ width: '4px', height: '20px', background: '#faad14' }} />
-              <h3 style={{ margin: 0, fontSize: '16px', color: '#faad14', fontWeight: '900', letterSpacing: '2px', textTransform: 'uppercase' }}>
-                Fabrication Unit
-              </h3>
-            </div>
-
+          <div style={{ ...sidePanelStyle, width: '450px', flexShrink: 0 }}>
+            <strong style={{ color: '#faad14' }}>Purchase Confirmation</strong>
             {previewItem ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {/* Visual Preview */}
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'center', 
-                  padding: '20px',
-                  background: 'rgba(0,0,0,0.4)',
-                  borderRadius: '2px',
-                  border: '1px dashed rgba(250, 173, 20, 0.1)'
-                }}>
-                  <IntelligenceCard 
-                    item={previewItem} 
-                    stage="PREVIEW" 
-                    showActions={false}
-                    className="preview-card-animation"
-                  />
+              <>
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 12px 0' }}>
+                  <IntelligenceCard item={previewItem} stage="PREVIEW" showActions={false} />
                 </div>
-
-                <div style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  gap: '12px', 
-                  background: 'rgba(0,0,0,0.6)', 
-                  padding: '20px', 
-                  borderRadius: '2px',
-                  borderLeft: '2px solid #faad14'
-                }}>
-                  <div style={{ fontSize: '10px', color: '#444', fontWeight: '900', letterSpacing: '2px', textTransform: 'uppercase' }}>
-                    Blueprint Specifications
-                  </div>
-                  <div style={{ fontSize: '13px', color: '#aaa', lineHeight: '1.7', fontFamily: 'system-ui' }}>
-                    {activeStoreItem?.description || activeStoreItem?.preview_text}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '2px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                      <div style={{ fontSize: '9px', color: '#444', marginBottom: '4px', textTransform: 'uppercase' }}>Duration</div>
-                      <div style={{ color: '#fff', fontSize: '13px', fontWeight: 'bold', fontFamily: 'monospace' }}>{activeStoreItem?.default_ttl_hours || 6} HOURS</div>
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '2px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                      <div style={{ fontSize: '9px', color: '#444', marginBottom: '4px', textTransform: 'uppercase' }}>Available Sets</div>
-                      <div style={{ color: '#fff', fontSize: '13px', fontWeight: 'bold', fontFamily: 'monospace' }}>{activeStoreItem?.presets?.length || 0} VARIANTS</div>
-                    </div>
-                  </div>
+                <div style={{ background: 'rgba(0,0,0,0.55)', padding: '16px', borderLeft: '2px solid #faad14', lineHeight: 1.7 }}>
+                  <div style={{ color: '#fff', fontWeight: 900, marginBottom: '8px' }}>{activeStoreItem?.kind}</div>
+                  <div style={{ color: '#aaa' }}>{purchaseInitialText}</div>
+                  {purchaseSymbol && <div style={{ marginTop: '10px', color: '#faad14', fontFamily: 'monospace' }}>BOUND_SYMBOL: ${purchaseSymbol}</div>}
                 </div>
-
-                {/* Controls */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '10px', color: '#444', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Select Prototype Base</label>
-                    <select
-                      value={purchasePresetId}
-                      onChange={(e) => setPurchasePresetId(e.target.value)}
-                      style={{ 
-                        background: 'rgba(0,0,0,0.8)', 
-                        border: '1px solid #333', 
-                        color: '#fff', 
-                        padding: '12px', 
-                        borderRadius: '2px', 
-                        fontSize: '13px',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {activeStoreItem?.presets?.map(p => (
-                        <option key={p.preset_id} value={p.preset_id}>{p.preset_id}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {activeStoreItem?.symbol_options && activeStoreItem.symbol_options.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '10px', color: '#444', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Target Asset Binding</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {activeStoreItem.symbol_options.map(s => (
-                          <button
-                            key={s}
-                            onClick={() => setPurchaseSymbol(s)}
-                            style={{ 
-                              background: purchaseSymbol === s ? '#faad14' : 'rgba(0,0,0,0.4)',
-                              color: purchaseSymbol === s ? '#000' : '#666',
-                              border: purchaseSymbol === s ? '1px solid #faad14' : '1px solid #222',
-                              padding: '6px 14px',
-                              borderRadius: '2px',
-                              fontSize: '11px',
-                              fontWeight: 'bold',
-                              fontFamily: 'monospace',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            ${s}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{ marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '24px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                      <span style={{ color: '#444', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Acquisition Cost</span>
-                      <span style={{ color: '#faad14', fontSize: '24px', fontWeight: '900', fontFamily: 'monospace' }}>${purchasePrice.toLocaleString()}</span>
-                    </div>
-                    <button 
-                      onClick={purchase}
-                      style={{ 
-                        width: '100%',
-                        background: '#faad14', 
-                        color: '#000', 
-                        border: 'none', 
-                        padding: '18px', 
-                        borderRadius: '2px', 
-                        fontWeight: '900', 
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '12px',
-                        fontSize: '14px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '2px',
-                        boxShadow: '0 0 30px rgba(250, 173, 20, 0.2)',
-                        transition: 'all 0.3s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#ffc53d'
-                        e.currentTarget.style.boxShadow = '0 0 40px rgba(250, 173, 20, 0.4)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = '#faad14'
-                        e.currentTarget.style.boxShadow = '0 0 30px rgba(250, 173, 20, 0.2)'
-                      }}
-                    >
-                      <ShoppingCart size={18} />
-                      Inject Intelligence
-                    </button>
-                  </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <MetaBox label="阵营" value={activeStoreItem?.faction || 'NEUTRAL'} />
+                  <MetaBox label="时效" value={`${activeStoreItem?.default_ttl_hours || 6}H`} />
                 </div>
-              </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#666' }}>交易价格</span>
+                  <span style={{ color: '#faad14', fontSize: '28px', fontWeight: 900, fontFamily: 'monospace' }}>${purchasePrice.toLocaleString()}</span>
+                </div>
+                <button onClick={() => { void handlePurchase() }} disabled={loading} className="cyber-button" style={{ background: '#faad14', color: '#000', fontWeight: 900, padding: '16px' }}>
+                  {loading ? 'TRANSACTION_IN_PROGRESS...' : 'AUTHORIZE_TRANSACTION'}
+                </button>
+              </>
             ) : (
-              <div style={{ height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#222', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '2px', fontSize: '12px' }}>
-                Select a prototype to<br />begin fabrication
-              </div>
+              <div style={{ color: '#444', textAlign: 'center', padding: '56px 20px' }}>请选择一张黑市情报卡</div>
             )}
           </div>
         </div>
       )}
 
-      {/* Overlays / Modals */}
       {showMutatePanel && (
-        <Overlay title="🖋️ 篡改情报变体" onClose={() => setShowMutatePanel(false)} color="#faad14">
+        <Overlay title="篡改情报变体" onClose={() => setShowMutatePanel(false)} color="#faad14">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <textarea 
-              value={mutateText} 
-              onChange={e => setMutateText(e.target.value)}
-              rows={6}
-              style={{ width: '100%', padding: '12px', background: '#000', color: '#fff', border: '1px solid #333', borderRadius: '8px', fontSize: '14px', lineHeight: '1.6' }}
-            />
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', color: '#666' }}>投入修改预算:</span>
-              <input value={mutateSpendCash} onChange={e => setMutateSpendCash(e.target.value)} placeholder="0" style={{ flex: 1, background: '#000', border: '1px solid #333', color: '#fff', padding: '8px', borderRadius: '4px' }} />
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => setShowMutatePanel(false)} className="cyber-button" style={{ flex: 1, background: '#333' }}>取消</button>
-              <button 
-                onClick={async () => {
-                  try {
-                    const r = await Api.newsMutateVariant({
-                      parent_variant_id: mutateVariantId,
-                      editor_id: `user:${playerId}`,
-                      new_text: mutateText,
-                      spend_cash: mutateSpendCash ? Number(mutateSpendCash) : undefined,
-                    })
-                    notify('success', `篡改序列执行成功`)
-                    setTargetVariantId(r.new_variant_id)
-                    setShowMutatePanel(false)
-                    refreshInbox()
-                  } catch (e) { notify('error', '篡改序列执行失败') }
-                }}
-                className="cyber-button" 
-                style={{ flex: 1, background: '#faad14', color: '#000', fontWeight: 'bold' }}
-              >
-                注入修改变体
-              </button>
-            </div>
+            <textarea value={mutateText} onChange={(e) => setMutateText(e.target.value)} rows={7} style={{ ...inputStyle, resize: 'vertical', minHeight: '160px' }} />
+            <input value={mutateSpendCash} onChange={(e) => setMutateSpendCash(e.target.value)} placeholder="投入修改预算" style={inputStyle} />
+            <button
+              onClick={async () => {
+                try {
+                  const response = await Api.newsMutateVariant({
+                    parent_variant_id: mutateVariantId,
+                    editor_id: `user:${playerId}`,
+                    new_text: mutateText,
+                    spend_cash: mutateSpendCash ? Number(mutateSpendCash) : undefined,
+                  })
+                  notify('success', '篡改序列执行成功')
+                  setTargetVariantId(response.new_variant_id)
+                  setShowMutatePanel(false)
+                  await refreshInbox()
+                } catch {
+                  notify('error', '篡改序列执行失败')
+                }
+              }}
+              className="cyber-button"
+              style={{ background: '#faad14', color: '#000', fontWeight: 900, padding: '14px' }}
+            >
+              注入修改变体
+            </button>
           </div>
         </Overlay>
       )}
 
       {showSuppressPanel && (
-        <Overlay title="🚫 抑制抹除序列" onClose={() => setShowSuppressPanel(false)} color="#ff4d4f">
+        <Overlay title="抑制抹除序列" onClose={() => setShowSuppressPanel(false)} color="#ff4d4f">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ background: '#ff4d4f11', border: '1px solid #ff4d4f33', padding: '12px', borderRadius: '8px', fontSize: '12px', color: '#ff4d4f' }}>
-              警告：抑制序列将消耗大量资源尝试抹除该情报链的所有后续传播。
-            </div>
-            <MetaBox label="情报链 ID" value={suppressChainId} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '11px', color: '#555' }}>投入影响力 (Influence)</label>
-              <input type="number" value={suppressInfluence} onChange={e => setSuppressInfluence(Number(e.target.value))} style={{ background: '#000', border: '1px solid #333', color: '#fff', padding: '8px', borderRadius: '4px' }} />
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => setShowSuppressPanel(false)} className="cyber-button" style={{ flex: 1, background: '#333' }}>放弃</button>
-              <button 
-                disabled={suppressing}
-                onClick={async () => {
-                  if (!suppressChainId) return notify('error', '未检测到情报链ID')
-                  setSuppressing(true)
-                  try {
-                    await Api.newsSuppress({
-                      actor_id: `user:${playerId}`,
-                      chain_id: suppressChainId,
-                      spend_influence: suppressInfluence
-                    })
-                    notify('success', '抹除序列已上线')
-                    setShowSuppressPanel(false)
-                  } catch (e) { notify('error', '抹除序列初始化失败') } 
-                  finally { setSuppressing(false) }
-                }}
-                className="cyber-button" 
-                style={{ flex: 1, background: '#ff4d4f', color: '#fff' }}
-              >
-                {suppressing ? 'EXECUTING...' : '执行抹除'}
-              </button>
-            </div>
+            <MetaBox label="情报链 ID" value={suppressChainId || '未检测到'} />
+            <input type="number" value={suppressInfluence} onChange={(e) => setSuppressInfluence(Number(e.target.value))} style={inputStyle} />
+            <button
+              disabled={suppressing}
+              onClick={async () => {
+                if (!suppressChainId) {
+                  notify('error', '未检测到情报链ID')
+                  return
+                }
+                setSuppressing(true)
+                try {
+                  await Api.newsSuppress({
+                    actor_id: `user:${playerId}`,
+                    chain_id: suppressChainId,
+                    spend_influence: suppressInfluence,
+                  })
+                  notify('success', '抹除序列已上线')
+                  setShowSuppressPanel(false)
+                } catch {
+                  notify('error', '抹除序列初始化失败')
+                } finally {
+                  setSuppressing(false)
+                }
+              }}
+              className="cyber-button"
+              style={{ background: '#ff4d4f', color: '#fff', fontWeight: 900, padding: '14px' }}
+            >
+              {suppressing ? 'EXECUTING...' : '执行抹除'}
+            </button>
           </div>
         </Overlay>
       )}
 
       {showContractPanel && contractNewsItem && (
-        <Overlay title="🤝 引用签约协议" onClose={() => setShowContractPanel(false)} color="var(--terminal-info)">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <ContractFormFromNews 
-              newsItem={contractNewsItem}
-              onError={(msg) => msg ? notify('error', msg) : setShowContractPanel(false)}
-            />
-            <button onClick={() => setShowContractPanel(false)} className="cyber-button" style={{ background: '#333' }}>放弃签约</button>
-          </div>
+        <Overlay title="引用签约协议" onClose={() => setShowContractPanel(false)} color="var(--terminal-info)">
+          <ContractFormFromNews newsItem={contractNewsItem} onError={(message) => { if (message) notify('error', message) }} />
         </Overlay>
       )}
 
       <style>{`
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
         .market-blueprint-card:hover {
           border-color: #faad1488 !important;
           transform: translateY(-4px);
         }
         .market-blueprint-card.selected {
-          box-shadow: 0 0 30px #faad1422;
+          box-shadow: 0 0 30px rgba(250, 173, 20, 0.16);
         }
       `}</style>
     </div>
   )
 }
 
-function TabBtn({ active, onClick, icon: Icon, label }: { active: boolean, onClick: () => void, icon: any, label: string }) {
+const storeGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+  gap: '20px',
+} as const
+
+const cardGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+  gap: '20px',
+} as const
+
+const sidePanelStyle = {
+  background: 'rgba(26,26,26,0.55)',
+  border: '1px solid rgba(255,255,255,0.06)',
+  borderRadius: '4px',
+  padding: '24px',
+  display: 'flex',
+  flexDirection: 'column' as const,
+  gap: '16px',
+  backdropFilter: 'blur(10px)',
+} as const
+
+const sectionTitleStyle = {
+  fontSize: '12px',
+  color: '#555',
+  marginBottom: '16px',
+  letterSpacing: '2px',
+} as const
+
+const inputStyle = {
+  background: 'rgba(0,0,0,0.45)',
+  border: '1px solid #222',
+  color: '#fff',
+  padding: '12px',
+  borderRadius: '2px',
+  fontSize: '12px',
+  fontFamily: 'monospace',
+} as const
+
+const ghostButtonStyle = {
+  background: 'transparent',
+  border: '1px solid #333',
+  color: '#888',
+  padding: '8px 12px',
+  borderRadius: '2px',
+  cursor: 'pointer',
+} as const
+
+const iconCloseButtonStyle = {
+  background: 'none',
+  border: 'none',
+  color: '#555',
+  cursor: 'pointer',
+  fontSize: '18px',
+} as const
+
+function navButtonStyle(color: string, background: string) {
+  return {
+    background,
+    border: `1px solid ${color}33`,
+    color,
+    padding: '8px 20px',
+    borderRadius: '2px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    letterSpacing: '1px',
+    cursor: 'pointer',
+  } as const
+}
+
+function actionButtonStyle(background: string, color: string) {
+  return {
+    background,
+    border: `1px solid ${color}33`,
+    color,
+    padding: '12px',
+    borderRadius: '2px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: 'bold',
+  } as const
+}
+
+function TabBtn({ active, onClick, icon: Icon, label }: { active: boolean; onClick: () => void; icon: typeof Newspaper; label: string }) {
   return (
-    <button 
-      onClick={onClick}
-      style={{
-        background: active ? 'rgba(24, 144, 255, 0.1)' : 'transparent',
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        borderColor: active ? 'var(--terminal-info)' : 'rgba(255,255,255,0.05)',
-        padding: '12px 24px',
-        borderRadius: '2px', // 尖锐边缘
-        color: active ? '#fff' : '#666',
-        fontSize: '13px',
-        fontWeight: 'bold',
-        textTransform: 'uppercase',
-        letterSpacing: '2px',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
-    >
-      {active && (
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '2px',
-          height: '100%',
-          background: 'var(--terminal-info)',
-          boxShadow: '0 0 10px var(--terminal-info)'
-        }} />
-      )}
+    <button onClick={onClick} style={{ background: active ? 'rgba(24,144,255,0.1)' : 'transparent', border: `1px solid ${active ? 'var(--terminal-info)' : 'rgba(255,255,255,0.05)'}`, padding: '12px 24px', borderRadius: '2px', color: active ? '#fff' : '#666', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
       <Icon size={16} color={active ? 'var(--terminal-info)' : '#666'} />
       {label}
     </button>
   )
 }
 
-function FilterChip({ active, onClick, label }: { active: boolean, onClick: () => void, label: string }) {
+function FilterChip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
-    <button 
-      onClick={onClick}
-      style={{
-        background: active ? 'rgba(24, 144, 255, 0.15)' : 'rgba(255,255,255,0.02)',
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        borderColor: active ? 'var(--terminal-info)' : 'rgba(255,255,255,0.05)',
-        padding: '4px 14px',
-        borderRadius: '2px',
-        color: active ? '#fff' : '#444',
-        fontSize: '10px',
-        cursor: 'pointer',
-        fontWeight: '900',
-        letterSpacing: '1px',
-        textTransform: 'uppercase',
-        transition: 'all 0.2s'
-      }}
-    >
+    <button onClick={onClick} style={{ background: active ? 'rgba(24,144,255,0.15)' : 'rgba(255,255,255,0.02)', border: `1px solid ${active ? 'var(--terminal-info)' : 'rgba(255,255,255,0.05)'}`, color: active ? '#fff' : '#444', padding: '4px 12px', borderRadius: '2px', cursor: 'pointer', fontSize: '10px', fontWeight: 900 }}>
       {label}
     </button>
   )
 }
 
-function MetaBox({ label, value }: { label: string, value: string }) {
+function MetaBox({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      gap: '4px',
-      background: 'rgba(255,255,255,0.02)',
-      padding: '10px',
-      borderRadius: '2px',
-      border: '1px solid rgba(255,255,255,0.05)'
-    }}>
-      <span style={{ fontSize: '9px', color: '#444', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>{label}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '2px', border: '1px solid rgba(255,255,255,0.05)' }}>
+      <span style={{ fontSize: '9px', color: '#444', textTransform: 'uppercase', fontWeight: 'bold' }}>{label}</span>
       <span style={{ fontSize: '12px', color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'monospace' }}>{value}</span>
     </div>
   )
 }
 
-function Overlay({ title, children, onClose, color }: { title: string, children: React.ReactNode, onClose: () => void, color: string }) {
+function Overlay({ title, children, onClose, color }: { title: string; children: ReactNode; onClose: () => void; color: string }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
-      <div style={{ 
-        width: '500px', 
-        background: '#141414', 
-        border: `1px solid ${color}44`, 
-        borderRadius: '16px',
-        padding: '24px',
-        boxShadow: `0 20px 40px rgba(0,0,0,0.5), 0 0 20px ${color}11`
-      }}>
+      <div style={{ width: '500px', background: '#141414', border: `1px solid ${color}44`, borderRadius: '16px', padding: '24px', boxShadow: `0 20px 40px rgba(0,0,0,0.5), 0 0 20px ${color}11` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3 style={{ margin: 0, color, letterSpacing: '1px' }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: '20px' }}>✕</button>
+          <h3 style={{ margin: 0, color }}>{title}</h3>
+          <button onClick={onClose} style={iconCloseButtonStyle}>✕</button>
         </div>
         {children}
       </div>
     </div>
   )
 }
-
