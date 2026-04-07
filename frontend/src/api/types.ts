@@ -340,6 +340,7 @@ export type NewsInboxResponseItem = {
   tags?: string[]
   truth_payload?: unknown
   rarity?: string
+  faction?: string
 }
 
 export type NewsInboxResponse = {
@@ -390,10 +391,12 @@ export type NewsFeedItem = {
   kind: string
   author_id: string
   text: string
-  image_uri: string | null
+  image_uri?: string | null
   created_at: string
-  symbols: string[]
-  tags: string[]
+  symbols?: string[]
+  tags?: string[]
+  rarity?: string
+  faction?: string
 }
 
 export type NewsFeedResponse = {
@@ -450,6 +453,7 @@ export type NewsStoreCatalogItem = {
   preview_text: string
   description?: string
   rarity?: string
+  faction?: string
   default_ttl_hours?: number
   preview_image_uri?: string | null
   tags?: string[]
@@ -459,6 +463,7 @@ export type NewsStoreCatalogItem = {
 
 export type NewsStoreCatalogResponse = {
   items: NewsStoreCatalogItem[]
+  expires_at: string
 }
 
 export type NewsStoreCatalogPreset = {

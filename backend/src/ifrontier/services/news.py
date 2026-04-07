@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
@@ -125,38 +125,52 @@ class NewsService:
         *, 
         player_id: str, 
         player_net_worth: float, 
-        shelf_size: int = 6
-    ) -> List[tuple[IntelligenceBlueprint, float]]:
+        shelf_size: int = 6,
+        force_refresh: bool = False
+    ) -> Dict[str, Any]:
         """
-        为特定玩家生成黑市货架商品。
-        返回 [(蓝图, 计算后的价格), ...]
+        为特定玩家生成/获取黑市货架商品。
+        返回 {"items": [(蓝图, 价格), ...], "expires_at": ISOString}
         """
+        now = datetime.now(timezone.utc)
+        
+        # 1. 尝试获取现有货架
+        if not force_refresh:
+            existing = news_db.get_market_shelf(player_id)
+            if existing:
+                expires_at = datetime.fromisoformat(existing["expires_at"])
+                if expires_at > now:
+                    # 货架未过期，还原蓝图对象
+                    items = []
+                    for item in existing["items"]:
+                        bp = blueprint_registry.get_blueprint(item["blueprint_id"])
+                        if bp:
+                            items.append((bp, float(item["price"])))
+                    
+                    if items:
+                        return {"items": items, "expires_at": existing["expires_at"]}
+
+        # 2. 生成新货架
         all_bps = blueprint_registry.list_blueprints()
         if not all_bps:
-            return []
+            return {"items": [], "expires_at": now.isoformat()}
 
-        # 1. 基础权重计算
-        # 财富越高，稀有卡牌权重略微提升（增加“高端货”出现率）
-        wealth_factor = max(1.0, player_net_worth / 1000000.0) # 每百万资产提升系数
-        
+        # 基础权重计算
+        wealth_factor = max(1.0, player_net_worth / 1000000.0)
         weighted_pool = []
         for bp in all_bps:
             w = bp.weight
             if str(getattr(bp.rarity, "value", bp.rarity)) in {"EPIC", "LEGENDARY"}:
-                w *= (1.0 + 0.1 * wealth_factor) # 高资产玩家更容易刷出高级货
+                w *= (1.0 + 0.1 * wealth_factor)
             weighted_pool.append((bp, w))
 
-        # 2. 采样
         selected_bps: List[IntelligenceBlueprint] = []
-        # 使用 random.choices 进行加权采样
         if weighted_pool:
             bps, weights = zip(*weighted_pool)
-            # 允许重复采样（代表不同模板），或者去重
             chosen = random.choices(bps, weights=weights, k=shelf_size)
             selected_bps = list(chosen)
 
-        # 3. 价格计算
-        # 基础价格 * 稀有度倍率 * 蓝图修正 * 随机波动
+        # 价格计算
         rarity_multipliers = {
             "COMMON": 1.0,
             "UNCOMMON": 2.5,
@@ -165,27 +179,31 @@ class NewsService:
             "LEGENDARY": 50.0
         }
         
-        shelf = []
+        final_items_for_db = []
+        final_items_for_return = []
+        
         for bp in selected_bps:
-            base_price = 2000.0 # 基础起步价
+            base_price = 2000.0
             rarity_key = str(getattr(bp.rarity, "value", bp.rarity))
             rarity_mult = rarity_multipliers.get(rarity_key, 1.0)
             
-            # 财富调节：资产极高的玩家，黑市商人会坐地起价
             wealth_premium = 1.0
             if player_net_worth > 5000000:
                 wealth_premium = 1.0 + (player_net_worth - 5000000) / 20000000.0
-                wealth_premium = min(wealth_premium, 3.0) # 最高3倍溢价
+                wealth_premium = min(wealth_premium, 3.0)
 
-            random_fluctuation = random.uniform(0.85, 1.25) # 15% 价格波动
+            random_fluctuation = random.uniform(0.85, 1.25)
+            final_price = round(base_price * rarity_mult * bp.price_modifier * wealth_premium * random_fluctuation / 100.0) * 100.0
             
-            final_price = base_price * rarity_mult * bp.price_modifier * wealth_premium * random_fluctuation
-            # 对齐到整百
-            final_price = round(final_price / 100.0) * 100.0
+            final_items_for_db.append({"blueprint_id": bp.full_id, "price": final_price})
+            final_items_for_return.append((bp, final_price))
             
-            shelf.append((bp, final_price))
-            
-        return shelf
+        # 保存到数据库
+        expires_at_dt = now + timedelta(hours=1) # 默认 1 小时刷新一次
+        expires_at_str = expires_at_dt.isoformat()
+        news_db.save_market_shelf(player_id, final_items_for_db, expires_at_str)
+        
+        return {"items": final_items_for_return, "expires_at": expires_at_str}
 
     def create_card(
         self,
@@ -200,16 +218,24 @@ class NewsService:
         rarity: str | None = None,
         correlation_id: UUID | None = None,
     ) -> tuple[str, EventEnvelopeJson]:
-        now = self._now_game_utc()
+        now = datetime.now(timezone.utc)
         card_id = str(uuid4())
+        bp = self._get_primary_blueprint(kind)
 
         # 如果没有传 rarity，尝试从 kind 的默认蓝图中获取
         if not rarity:
-            bp = self._get_primary_blueprint(kind)
             if bp:
                 rarity = str(getattr(bp.rarity, "value", bp.rarity))
             else:
                 rarity = "COMMON"
+
+        faction = bp.faction if bp else None
+        if bp and bp.behavior_bindings:
+            merged_truth = dict(truth_payload or {})
+            for k, v in bp.behavior_bindings.items():
+                if k not in merged_truth:
+                    merged_truth[k] = v
+            truth_payload = merged_truth
 
         news_db.save_news(
             card_id=card_id,
@@ -221,6 +247,7 @@ class NewsService:
             symbols=symbols or [],
             tags=tags or [],
             rarity=rarity,
+            faction=faction,
         )
 
         payload = NewsCardCreatedPayload(
@@ -256,8 +283,7 @@ class NewsService:
         risk_roll: Dict[str, Any] | None = None,
         correlation_id: UUID | None = None,
     ) -> tuple[str, EventEnvelopeJson]:
-        now = self._now_game_utc()
-        variant_id = str(uuid4())
+        now = datetime.now(timezone.utc)
 
         card = news_db.get_news(card_id=card_id, variant_id=None)
         if card is None:
@@ -306,7 +332,7 @@ class NewsService:
         risk_roll: Dict[str, Any] | None = None,
         correlation_id: UUID | None = None,
     ) -> tuple[str, EventEnvelopeJson]:
-        now = self._now_game_utc()
+        now = datetime.now(timezone.utc)
         new_variant_id = str(uuid4())
 
         parent = news_db.get_variant(parent_variant_id)
@@ -362,7 +388,7 @@ class NewsService:
         delivery_reason: str,
         correlation_id: UUID | None = None,
     ) -> tuple[str | None, EventEnvelopeJson | None]:
-        now = self._now_game_utc()
+        now = datetime.now(timezone.utc)
 
         variant = news_db.get_variant(variant_id)
         if variant is None or not variant.get("card_id"):
@@ -385,6 +411,7 @@ class NewsService:
 
         news_db.deliver_variant(
             delivery_id=delivery_id,
+            card_id=card_id,
             variant_id=variant_id,
             to_player_id=to_player_id,
             from_actor_id=from_actor_id,

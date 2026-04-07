@@ -1,6 +1,49 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Api, type NewsFeedItem, WsClient } from '../api'
 import CyberWidget from './CyberWidget'
+import { 
+  Building2, 
+  Fingerprint, 
+  ShieldCheck, 
+  Globe, 
+  Sword, 
+  Cpu,
+  Zap,
+  Flame,
+  Newspaper,
+  TrendingUp,
+  Clock,
+  ShieldAlert
+} from 'lucide-react'
+
+const KIND_CONFIG: Record<string, { color: string; icon: any; label: string }> = {
+  RUMOR: { color: '#ff4d4f', icon: ShieldAlert, label: '传闻' },
+  LEAK: { color: '#fa8c16', icon: Flame, label: '泄密' },
+  ANALYST_REPORT: { color: '#1890ff', icon: TrendingUp, label: '研报' },
+  OMEN: { color: '#722ed1', icon: Zap, label: '征兆' },
+  DISCLOSURE: { color: '#52c41a', icon: Newspaper, label: '公告' },
+  EARNINGS: { color: '#eb2f96', icon: TrendingUp, label: '财报' },
+  MAJOR_EVENT: { color: '#faad14', icon: Flame, label: '要闻' },
+  WORLD_EVENT: { color: '#13c2c2', icon: Globe, label: '全服' },
+  SYSTEM: { color: '#8c8c8c', icon: Clock, label: '系统' },
+}
+
+const FACTION_CONFIG: Record<string, { icon: any; label: string; color: string }> = {
+  CORPORATE: { icon: Building2, label: '企业联盟', color: '#1890ff' },
+  UNDERGROUND: { icon: Fingerprint, label: '地下阵线', color: '#ff4d4f' },
+  GOVERNMENT: { icon: ShieldCheck, label: '联邦政府', color: '#52c41a' },
+  NEUTRAL: { icon: Globe, label: '中立势力', color: '#8c8c8c' },
+  MERCENARY: { icon: Sword, label: '雇佣兵团', color: '#faad14' },
+  HACKER: { icon: Cpu, label: '黑客组织', color: '#722ed1' },
+}
+
+const RARITY_CONFIG: Record<string, { color: string; label: string; animation?: string }> = {
+  COMMON: { color: '#8c8c8c', label: '基础' },
+  UNCOMMON: { color: '#52c41a', label: '罕见' },
+  RARE: { color: '#1890ff', label: '珍稀' },
+  EPIC: { color: '#722ed1', label: '史诗', animation: 'rarity-pulse-epic-widget 3s infinite' },
+  LEGENDARY: { color: '#faad14', label: '传说', animation: 'rarity-pulse-legendary-widget 2s infinite' },
+}
 
 export default function NewsBroadcastWidget({ isFocused, onShowNews }: { isFocused?: boolean, onShowNews?: (item: NewsFeedItem) => void }) {
   void isFocused
@@ -67,12 +110,28 @@ export default function NewsBroadcastWidget({ isFocused, onShowNews }: { isFocus
   }
 
   const activeItem = feed[currentIndex]
+  const rarity = (activeItem?.rarity || 'COMMON').toUpperCase()
+  const rarityConfig = RARITY_CONFIG[rarity] || RARITY_CONFIG.COMMON
+  
+  const kind = (activeItem?.kind || 'SYSTEM').toUpperCase()
+  const kindConfig = KIND_CONFIG[kind] || KIND_CONFIG.SYSTEM
+  
+  const faction = (activeItem?.faction || 'NEUTRAL').toUpperCase()
+  const factionConfig = FACTION_CONFIG[faction] || FACTION_CONFIG.NEUTRAL
+  const FactionIcon = factionConfig.icon
 
   return (
     <CyberWidget 
       title="GLOBAL_BROADCAST" 
       subtitle="LIVE_NEURAL_FEED"
-      style={{ background: '#000', border: '2px solid var(--terminal-warn)' }}
+      style={{ 
+        background: '#000', 
+        borderWidth: '2px',
+        borderStyle: 'solid',
+        borderColor: rarityConfig.color,
+        animation: rarityConfig.animation || 'none',
+        transition: 'all 0.5s ease'
+      }}
       actions={
         <div style={{ display: 'flex', gap: '4px' }}>
           <button className="cyber-button" style={{ fontSize: '10px', padding: '2px 6px' }} onClick={() => handleManualNav('prev')}>◄</button>
@@ -94,7 +153,9 @@ export default function NewsBroadcastWidget({ isFocused, onShowNews }: { isFocus
                   height: '140px', 
                   overflow: 'hidden', 
                   marginBottom: '12px',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: 'rgba(255,255,255,0.1)',
                   background: '#0a0a0a'
                 }}>
                   <img 
@@ -105,18 +166,33 @@ export default function NewsBroadcastWidget({ isFocused, onShowNews }: { isFocus
                   />
                 </div>
               )}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <span style={{ 
-                  background: 'var(--terminal-warn)', 
+                  background: rarityConfig.color, 
                   color: '#000', 
                   fontSize: '9px', 
                   fontWeight: 'bold', 
-                  padding: '1px 4px',
-                  borderRadius: '2px'
+                  padding: '1px 6px',
+                  borderRadius: '2px',
+                  textTransform: 'uppercase'
                 }}>
-                  {activeItem.kind}
+                  {kindConfig.label}
                 </span>
-                <span style={{ color: '#64748b', fontSize: '9px' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '4px',
+                  fontSize: '9px',
+                  color: factionConfig.color,
+                  background: 'rgba(0,0,0,0.4)',
+                  padding: '1px 6px',
+                  borderRadius: '2px',
+                  border: `1px solid ${factionConfig.color}44`
+                }}>
+                  <FactionIcon size={10} />
+                  {factionConfig.label}
+                </div>
+                <span style={{ color: '#64748b', fontSize: '9px', marginLeft: 'auto' }}>
                   {new Date(activeItem.created_at).toLocaleTimeString()}
                 </span>
               </div>
@@ -128,7 +204,9 @@ export default function NewsBroadcastWidget({ isFocused, onShowNews }: { isFocus
                 margin: '0 0 8px 0',
                 fontFamily: 'Orbitron, sans-serif',
                 letterSpacing: '1px',
-                borderLeft: '3px solid var(--terminal-warn)',
+                borderLeftWidth: '3px',
+                borderLeftStyle: 'solid',
+                borderLeftColor: rarityConfig.color,
                 paddingLeft: '10px'
               }}>
                 {activeItem.text.split('\n')[0]}
@@ -199,6 +277,16 @@ export default function NewsBroadcastWidget({ isFocused, onShowNews }: { isFocus
       </div>
       
       <style>{`
+        @keyframes rarity-pulse-epic-widget {
+          0% { box-shadow: 0 0 5px rgba(114, 46, 209, 0.2); }
+          50% { box-shadow: 0 0 15px rgba(114, 46, 209, 0.4); }
+          100% { box-shadow: 0 0 5px rgba(114, 46, 209, 0.2); }
+        }
+        @keyframes rarity-pulse-legendary-widget {
+          0% { box-shadow: 0 0 8px rgba(250, 173, 20, 0.3); }
+          50% { box-shadow: 0 0 25px rgba(250, 173, 20, 0.6); }
+          100% { box-shadow: 0 0 8px rgba(250, 173, 20, 0.3); }
+        }
         @keyframes news-progress {
           from { width: 0%; }
           to { width: 100%; }

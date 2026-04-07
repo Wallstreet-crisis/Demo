@@ -98,7 +98,8 @@ class MarketMaker:
                                 snap = get_snapshot(self._cfg.account_id)
                     else:
                         avail = float(snap.positions.get(str(sec.symbol).upper(), 0.0))
-                        if avail >= float(noise_qty) - 1e-9:
+                        # 留一点 Buffer 避免浮点误差
+                        if avail >= float(noise_qty) + 1e-6:
                             noise_matches = submit_market_order(
                                 account_id=self._cfg.account_id,
                                 symbol=sec.symbol,
@@ -111,7 +112,9 @@ class MarketMaker:
                 except Exception:
                     pass
 
-            if float(snap.positions.get(sec.symbol, 0.0)) >= float(qty) - 1e-9:
+            # 再次检查持仓，留出 Buffer 避免 apply_trade_executed 报错
+            current_pos = float(snap.positions.get(sec.symbol.upper(), 0.0))
+            if current_pos >= float(qty) + 1e-6:
                 _, matches = submit_limit_order(
                     account_id=self._cfg.account_id,
                     symbol=sec.symbol,

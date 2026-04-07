@@ -24,6 +24,8 @@ class NewsSignal:
     market_bias: float = 0.0
     ttl_seconds: int = 1800
     cluster_id: str = ""
+    # 新增行为绑定相关字段
+    behavior_bindings: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -112,6 +114,18 @@ class NewsIntelligenceEngine:
             text=news_text,
         )
 
+        # 提取 behavior_bindings
+        # 已经在 NewsService.create_card 中合并到了 truth_payload
+        bindings = {}
+        for k, v in payload.items():
+            if k in {
+                "market_volatility", "sentiment_shift", "price_impact", 
+                "insider_trading_signal", "institutional_bias", 
+                "target_price_modifier", "sector_wide_impact", 
+                "fundamental_shift", "macro_regime_change", "global_liquidity_delta"
+            }:
+                bindings[k] = v
+
         return NewsSignal(
             signal_id=f"sig:{variant_id}",
             variant_id=variant_id,
@@ -129,6 +143,7 @@ class NewsIntelligenceEngine:
             market_bias=float(market_bias),
             ttl_seconds=int(ttl_seconds),
             cluster_id=cluster_id,
+            behavior_bindings=bindings,
         )
 
     def ingest(self, signal: NewsSignal) -> None:
@@ -167,7 +182,33 @@ class NewsIntelligenceEngine:
             reliability = float(s.reliability_prior) * (1.0 - float(s.deception_risk) * max(0.2, 1.1 - rumor_sensitivity))
             weight = float(s.intensity) * float(decay) * float(force_boost) * max(0.05, reliability)
 
+            bindings = dict(s.behavior_bindings or {})
+
+            market_volatility = float(bindings.get("market_volatility") or 0.0)
+            if abs(market_volatility) > 1e-9:
+                weight *= max(0.5, min(2.0, 1.0 + market_volatility))
+
+            institutional_bias = float(bindings.get("institutional_bias") or 0.0)
+            if abs(institutional_bias) > 1e-9:
+                weight *= max(0.7, min(1.8, 1.0 + institutional_bias))
+
             sym_bias = float(s.direction_map.get(sym, 0.0)) + float(s.market_bias)
+
+            price_impact = float(bindings.get("price_impact") or 0.0)
+            if abs(price_impact) > 1e-9:
+                sym_bias *= max(0.6, min(2.2, 1.0 + price_impact))
+
+            tpm = float(bindings.get("target_price_modifier") or 1.0)
+            if abs(tpm - 1.0) > 1e-9:
+                sym_bias *= max(0.6, min(2.5, tpm))
+
+            liquidity_delta = float(bindings.get("global_liquidity_delta") or 0.0)
+            if abs(liquidity_delta) > 1e-9:
+                sym_bias += max(-0.5, min(0.5, liquidity_delta))
+
+            if bool(bindings.get("macro_regime_change")):
+                weight *= 1.1
+
             contribution = weight * sym_bias
 
             # 同簇饱和累加，避免重复新闻无限放大
@@ -189,6 +230,9 @@ class NewsIntelligenceEngine:
         urgency = max(0.0, min(1.0, 0.65 * abs(net_bias) + 0.25 * conflict + 0.2 * (1.0 - risk_appetite)))
         if abs(net_bias) >= 0.35 and confidence >= 0.55:
             urgency = max(urgency, 0.45)
+
+        if any(bool((s.behavior_bindings or {}).get("insider_trading_signal")) for s in self._signals):
+            urgency = max(urgency, 0.55)
 
         return SymbolOutlook(
             symbol=sym,

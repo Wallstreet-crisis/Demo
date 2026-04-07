@@ -24,7 +24,11 @@ class NewsRecord:
     truth_payload: Dict[str, Any]
     image_uri: Optional[str]
     preset_id: Optional[str]
+    created_at: str = ""
+    author_id: Optional[str] = None
+    parent_variant_id: Optional[str] = None
     rarity: str = "COMMON"
+    faction: Optional[str] = None
 
     @staticmethod
     def from_row(row: Any) -> NewsRecord:
@@ -32,40 +36,54 @@ class NewsRecord:
         tags = []
         truth_payload = {}
         
-        if row["symbols_json"]:
-            try:
-                symbols = json.loads(row["symbols_json"])
-            except (json.JSONDecodeError, TypeError):
-                pass
+        is_dict = isinstance(row, dict)
+        def get_v(key: str, default: Any = None):
+            if is_dict: return row.get(key, default)
+            try: return row[key]
+            except: return default
 
-        if row["tags_json"]:
-            try:
-                tags = json.loads(row["tags_json"])
-            except (json.JSONDecodeError, TypeError):
-                pass
+        symbols_json = get_v("symbols_json")
+        if symbols_json:
+            try: symbols = json.loads(symbols_json)
+            except: pass
+
+        tags_json = get_v("tags_json")
+        if tags_json:
+            try: tags = json.loads(tags_json)
+            except: pass
                 
-        if row["truth_payload_json"]:
-            try:
-                truth_payload = json.loads(row["truth_payload_json"])
-            except (json.JSONDecodeError, TypeError):
-                pass
+        truth_payload_json = get_v("truth_payload_json")
+        if truth_payload_json:
+            try: truth_payload = json.loads(truth_payload_json)
+            except: pass
 
         return NewsRecord(
-            card_id=row["card_id"],
-            variant_id=row["variant_id"],
-            kind=row["kind"],
-            text=row["text"],
+            card_id=get_v("card_id"),
+            variant_id=get_v("variant_id"),
+            kind=get_v("kind"),
+            text=get_v("text"),
             symbols=symbols,
             tags=tags,
-            publisher_id=row["publisher_id"],
-            published_at=row["published_at"],
-            is_suppressed=bool(row["is_suppressed"]),
-            suppression_reason=row["suppression_reason"],
+            publisher_id=get_v("publisher_id"),
+            published_at=get_v("published_at"),
+            is_suppressed=bool(get_v("is_suppressed", 0)),
+            suppression_reason=get_v("suppression_reason"),
             truth_payload=truth_payload,
-            image_uri=row["image_uri"],
-            preset_id=row["preset_id"],
-            rarity=row.get("rarity") or "COMMON",
+            image_uri=get_v("image_uri"),
+            preset_id=get_v("preset_id"),
+            created_at=get_v("created_at", ""),
+            author_id=get_v("author_id"),
+            parent_variant_id=get_v("parent_variant_id"),
+            rarity=get_v("rarity") or "COMMON",
+            faction=get_v("faction"),
         )
+
+
+def _add_column_if_not_exists(cur, table: str, column: str, type_def: str):
+    try:
+        cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {type_def}")
+    except:
+        pass
 
 
 def init_news_schema() -> None:
@@ -89,31 +107,49 @@ def init_news_schema() -> None:
             image_uri TEXT,
             image_anchor_id TEXT,
             preset_id TEXT,
-            rarity TEXT DEFAULT 'COMMON',
-            created_at TEXT NOT NULL,
-            
+            created_at TEXT,
             author_id TEXT,
             parent_variant_id TEXT,
-            mutation_depth INTEGER DEFAULT 0,
-            influence_cost REAL DEFAULT 0.0,
-            risk_roll_json TEXT,
-            
-            PRIMARY KEY (card_id, variant_id)
+            rarity TEXT DEFAULT 'COMMON',
+            faction TEXT
         );
+        CREATE INDEX IF NOT EXISTS idx_news_card_id ON news(card_id);
+        CREATE INDEX IF NOT EXISTS idx_news_variant_id ON news(variant_id);
 
-        CREATE INDEX IF NOT EXISTS idx_news_published_at ON news(published_at DESC);
-        CREATE INDEX IF NOT EXISTS idx_news_symbols ON news(symbols_json);
-        CREATE INDEX IF NOT EXISTS idx_news_tags ON news(tags_json);
-        CREATE INDEX IF NOT EXISTS idx_news_kind ON news(kind);
+        CREATE TABLE IF NOT EXISTS news_market_shelves (
+            player_id TEXT PRIMARY KEY,
+            items_json TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
         """
     )
 
-    columns = {
-        str(row[1])
-        for row in cur.execute("PRAGMA table_info(news)").fetchall()
-    }
-    if "rarity" not in columns:
-        cur.execute("ALTER TABLE news ADD COLUMN rarity TEXT DEFAULT 'COMMON'")
+    # 动态迁移补充缺失列
+    _add_column_if_not_exists(cur, "news", "created_at", "TEXT")
+    _add_column_if_not_exists(cur, "news", "author_id", "TEXT")
+    _add_column_if_not_exists(cur, "news", "parent_variant_id", "TEXT")
+    _add_column_if_not_exists(cur, "news", "rarity", "TEXT DEFAULT 'COMMON'")
+    _add_column_if_not_exists(cur, "news", "faction", "TEXT")
+
+    conn.commit()
+
+    # 动态迁移缺失列
+    info = cur.execute("PRAGMA table_info(news)").fetchall()
+    columns = {str(row[1]) for row in info}
+    
+    migrations = [
+        ("rarity", "TEXT DEFAULT 'COMMON'"),
+        ("author_id", "TEXT"),
+        ("parent_variant_id", "TEXT"),
+        ("mutation_depth", "INTEGER DEFAULT 0"),
+        ("influence_cost", "REAL DEFAULT 0.0"),
+        ("risk_roll_json", "TEXT"),
+    ]
+    
+    for col_name, col_def in migrations:
+        if col_name not in columns:
+            cur.execute(f"ALTER TABLE news ADD COLUMN {col_name} {col_def}")
 
     conn.commit()
 
@@ -137,6 +173,7 @@ def save_news(
     mutation_depth: int = 0,
     influence_cost: float = 0.0,
     risk_roll: Optional[Dict[str, Any]] = None,
+    faction: Optional[str] = None,
 ) -> None:
     conn = get_connection()
     now = datetime.now(timezone.utc).isoformat()
@@ -151,9 +188,9 @@ def save_news(
             INSERT OR REPLACE INTO news (
                 card_id, variant_id, kind, text, symbols_json, tags_json, 
                 publisher_id, published_at, is_suppressed, suppression_reason,
-                truth_payload_json, image_uri, image_anchor_id, preset_id, rarity, created_at,
+                truth_payload_json, image_uri, image_anchor_id, preset_id, rarity, faction, created_at,
                 author_id, parent_variant_id, mutation_depth, influence_cost, risk_roll_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 card_id,
@@ -171,6 +208,7 @@ def save_news(
                 image_anchor_id,
                 preset_id,
                 rarity,
+                faction,
                 now,
                 author_id,
                 parent_variant_id,
@@ -248,27 +286,7 @@ def list_news_by_tag(tag: str, limit: int = 50) -> List[NewsRecord]:
 
 def list_user_inbox(user_id: str, limit: int = 50) -> List[NewsRecord]:
     rows = list_inbox(user_id=user_id, limit=limit)
-    items: List[NewsRecord] = []
-    for row in rows:
-        items.append(
-            NewsRecord(
-                card_id=str(row["card_id"]),
-                variant_id=str(row["variant_id"]),
-                kind=str(row["kind"]),
-                text=str(row["text"]),
-                symbols=list(row.get("symbols") or []),
-                tags=list(row.get("tags") or []),
-                publisher_id=None,
-                published_at=str(row.get("delivered_at") or ""),
-                is_suppressed=False,
-                suppression_reason=None,
-                truth_payload=dict(row.get("truth_payload") or {}),
-                image_uri=None,
-                preset_id=None,
-                rarity=str(row.get("rarity") or "COMMON"),
-            )
-        )
-    return items
+    return [NewsRecord.from_row(r) for r in rows]
 
 
 def get_card_owner(card_id: str) -> Optional[str]:
@@ -306,8 +324,16 @@ def init_news_relationships_schema() -> None:
             PRIMARY KEY (card_id, user_id)
         );
 
+        CREATE TABLE IF NOT EXISTS news_market_shelves (
+            user_id TEXT PRIMARY KEY,
+            items_json TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS news_deliveries (
             delivery_id TEXT PRIMARY KEY,
+            card_id TEXT NOT NULL,
             variant_id TEXT NOT NULL,
             to_player_id TEXT NOT NULL,
             from_actor_id TEXT NOT NULL,
@@ -410,6 +436,7 @@ def list_owned_cards(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
 
 def deliver_variant(
     delivery_id: str,
+    card_id: str,
     variant_id: str,
     to_player_id: str,
     from_actor_id: str,
@@ -422,12 +449,13 @@ def deliver_variant(
         conn.execute(
             """
             INSERT INTO news_deliveries (
-                delivery_id, variant_id, to_player_id, from_actor_id, 
+                delivery_id, card_id, variant_id, to_player_id, from_actor_id, 
                 visibility_level, delivery_reason, delivered_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 delivery_id,
+                card_id,
                 variant_id,
                 to_player_id,
                 from_actor_id,
@@ -470,14 +498,9 @@ def list_inbox(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
             d.from_actor_id,
             d.visibility_level,
             d.delivery_reason,
-            d.delivered_at AS created_at,
-            n.card_id,
-            n.kind,
-            n.text,
-            n.symbols_json,
-            n.tags_json,
-            n.truth_payload_json,
-            n.rarity,
+            d.delivered_at AS delivered_at,
+            d.delivered_at AS published_at,
+            n.*,
             CASE WHEN no.card_id IS NOT NULL THEN 1 ELSE 0 END AS owns_card
         FROM news_deliveries d
         JOIN news n ON n.variant_id = d.variant_id
@@ -491,44 +514,21 @@ def list_inbox(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
 
     items: List[Dict[str, Any]] = []
     for r in rows:
-        symbols: List[str] = []
-        tags: List[str] = []
-        truth_payload: Optional[Dict[str, Any]] = None
-        if r["symbols_json"]:
-            try:
-                symbols = json.loads(r["symbols_json"])
-            except Exception:
-                symbols = []
-        if r["tags_json"]:
-            try:
-                tags = json.loads(r["tags_json"])
-            except Exception:
-                tags = []
-        if r["truth_payload_json"]:
-            try:
-                truth_payload = json.loads(r["truth_payload_json"])
-            except Exception:
-                truth_payload = {}
-
-        items.append(
-            {
-                "delivery_id": r["delivery_id"],
-                "variant_id": r["variant_id"],
-                "to_player_id": r["to_player_id"],
-                "from_actor_id": r["from_actor_id"],
-                "visibility_level": r["visibility_level"],
-                "delivery_reason": r["delivery_reason"],
-                "delivered_at": r["created_at"],
-                "card_id": r["card_id"],
-                "kind": r["kind"],
-                "text": r["text"],
-                "symbols": symbols,
-                "tags": tags,
-                "truth_payload": truth_payload,
-                "rarity": r["rarity"] or "COMMON",
-                "owns_card": bool(r["owns_card"]),
-            }
-        )
+        d_row = dict(r)
+        
+        # 转换 JSON 字段
+        for field in ["symbols_json", "tags_json", "truth_payload_json", "risk_roll_json"]:
+            if field in d_row and d_row[field]:
+                try:
+                    d_row[field.replace("_json", "")] = json.loads(d_row[field])
+                except:
+                    d_row[field.replace("_json", "")] = [] if "json" in field else {}
+        
+        # 兼容 NewsRecord.from_row 的字段名
+        d_row["created_at"] = r["delivered_at"]
+        d_row["owns_card"] = bool(r["owns_card"])
+        
+        items.append(d_row)
     return items
 
 
@@ -540,10 +540,40 @@ def list_all_users(limit: int = 5000) -> List[str]:
     return [r["user_id"] for r in rows]
 
 
-def count_cards() -> int:
+def get_market_shelf(user_id: str) -> Optional[Dict[str, Any]]:
     conn = get_connection()
-    row = conn.execute("SELECT count(*) as c FROM news WHERE variant_id IS NULL").fetchone()
-    return row["c"] if row else 0
+    row = conn.execute(
+        "SELECT items_json, expires_at, created_at FROM news_market_shelves WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    
+    return {
+        "user_id": user_id,
+        "items": json.loads(row["items_json"]),
+        "expires_at": row["expires_at"],
+        "created_at": row["created_at"],
+    }
+
+
+def save_market_shelf(user_id: str, items: List[Dict[str, Any]], expires_at: str) -> None:
+    conn = get_connection()
+    now = datetime.now(timezone.utc).isoformat()
+    with conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO news_market_shelves (user_id, items_json, expires_at, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, json.dumps(items, ensure_ascii=False), expires_at, now),
+        )
+
+
+def clear_market_shelf(user_id: str) -> None:
+    conn = get_connection()
+    with conn:
+        conn.execute("DELETE FROM news_market_shelves WHERE user_id = ?", (user_id,))
 
 
 def list_user_inbox_news(user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
@@ -561,6 +591,15 @@ def list_user_inbox_news(user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
         (user_id, limit)
     ).fetchall()
     return [{"text": r["text"], "delivered_at": r["delivered_at"]} for r in rows]
+
+
+def count_cards() -> int:
+    """获取新闻卡片总数。"""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT COUNT(*) as cnt FROM news WHERE variant_id IS NULL"
+    ).fetchone()
+    return row["cnt"] if row else 0
 
 
 def list_all_cards(limit: int = 50) -> List[Dict[str, Any]]:

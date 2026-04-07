@@ -265,7 +265,8 @@ export const Api = {
   newsOwnershipTransfer: (req: NewsOwnershipTransferRequest) => api.post<NewsOwnershipEventResponse>('/news/ownership/transfer', req, roomRequest),
   newsOwnershipList: (user_id: string, limit = 200) =>
     api.get<NewsOwnedCardsResponse>(`/news/ownership/${encodeURIComponent(user_id)}`, { limit }, roomRequest),
-  newsStoreCatalog: () => getWithBootstrapCache<NewsStoreCatalogResponse>('newsStoreCatalog', 10000, () => api.get<NewsStoreCatalogResponse>('/news/store/catalog', undefined, roomRequest)),
+  newsStoreCatalog: (user_id: string, force_refresh = false) => 
+    api.get<NewsStoreCatalogResponse>('/news/store/catalog', { user_id, force_refresh }, roomRequest),
   newsStorePurchase: (req: NewsStorePurchaseRequest) => api.post<NewsStorePurchaseResponse>('/news/store/purchase', req, roomRequest),
 
   hostingEnable: (user_id: string) => api.post<HostingEnableResponse>(`/hosting/${encodeURIComponent(user_id)}/enable`, undefined, roomRequest),

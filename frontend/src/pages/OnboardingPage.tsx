@@ -130,7 +130,7 @@ export default function OnboardingPage() {
           // 新闻数据
           Api.newsInbox(`user:${globalPlayerId}`, 50).catch(e => console.error("Prefetch news inbox fail", e)),
           Api.newsPublicFeed(10).catch(e => console.error("Prefetch news feed fail", e)),
-          Api.newsStoreCatalog().catch(e => console.error("Prefetch news catalog fail", e)),
+          Api.newsStoreCatalog(`user:${globalPlayerId}`).catch(e => console.error("Prefetch news catalog fail", e)),
           // AI 状态
           Api.hostingStatus(`user:${globalPlayerId}`).catch(e => console.error("Prefetch hosting fail", e)),
         ]

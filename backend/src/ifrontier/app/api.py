@@ -582,6 +582,7 @@ class NewsStoreCatalogItem(BaseModel):
     preview_text: str
     description: str = ""
     rarity: str = "COMMON"
+    faction: Optional[str] = None
     default_ttl_hours: int = 6
     preview_image_uri: Optional[str] = None
     tags: List[str] = []
@@ -590,9 +591,10 @@ class NewsStoreCatalogItem(BaseModel):
 
 class NewsStoreCatalogResponse(BaseModel):
     items: List[NewsStoreCatalogItem]
+    expires_at: str
 
 @router.get("/news/store/catalog")
-async def news_store_catalog(user_id: str) -> NewsStoreCatalogResponse:
+async def news_store_catalog(user_id: str, force_refresh: bool = False) -> NewsStoreCatalogResponse:
     from ifrontier.infra.sqlite.securities import list_securities
     
     # 1. 获取玩家资产水平
@@ -603,12 +605,15 @@ async def news_store_catalog(user_id: str) -> NewsStoreCatalogResponse:
         player_net_worth = 0.0
 
     # 2. 生成个性化货架
-    # shelf: List[tuple[IntelligenceBlueprint, float]]
-    shelf_data = _news_service.generate_market_shelf(
+    # shelf_data: {"items": [(bp, price), ...], "expires_at": str}
+    shelf_result = _news_service.generate_market_shelf(
         player_id=user_id,
         player_net_worth=player_net_worth,
-        shelf_size=8
+        shelf_size=8,
+        force_refresh=force_refresh
     )
+    shelf_items = shelf_result.get("items", [])
+    expires_at = shelf_result.get("expires_at", "")
 
     sec_symbols = [s.symbol for s in list_securities()]
     if not sec_symbols:
@@ -624,7 +629,7 @@ async def news_store_catalog(user_id: str) -> NewsStoreCatalogResponse:
     }
 
     out: List[NewsStoreCatalogItem] = []
-    for bp, price in shelf_data:
+    for bp, price in shelf_items:
         kind = bp.kind
         # 某些类型强制需要 symbols
         requires_symbols = kind not in ["RUMOR", "WORLD_EVENT", "SYSTEM"]
@@ -654,6 +659,7 @@ async def news_store_catalog(user_id: str) -> NewsStoreCatalogResponse:
                 preview_text=str(preview),
                 description=str(bp.description),
                 rarity=str(getattr(bp.rarity, "value", bp.rarity)),
+                faction=bp.faction,
                 default_ttl_hours=int(bp.default_ttl_hours),
                 preview_image_uri=(bp.image_pool[0] if bp.image_pool else None),
                 tags=list(bp.tags),
@@ -665,7 +671,7 @@ async def news_store_catalog(user_id: str) -> NewsStoreCatalogResponse:
             )
         )
 
-    return NewsStoreCatalogResponse(items=out)
+    return NewsStoreCatalogResponse(items=out, expires_at=expires_at)
 
 class NewsInboxResponseItem(BaseModel):
     delivery_id: str
@@ -682,6 +688,7 @@ class NewsInboxResponseItem(BaseModel):
     truth_payload: Optional[Dict[str, Any]] = None
     owns_card: bool = False
     rarity: str = "COMMON"
+    faction: Optional[str] = None
 
 class NewsInboxResponse(BaseModel):
     items: List[NewsInboxResponseItem]
@@ -701,6 +708,8 @@ class NewsFeedItem(BaseModel):
     created_at: str
     symbols: List[str] = []
     tags: List[str] = []
+    rarity: str = "COMMON"
+    faction: Optional[str] = None
 
 class NewsFeedResponse(BaseModel):
     items: List[NewsFeedItem]
@@ -732,6 +741,8 @@ async def news_public_feed(limit: int = 20) -> NewsFeedResponse:
             created_at=created_at,
             symbols=symbols,
             tags=tags,
+            rarity=getattr(r, "rarity", "COMMON") or "COMMON",
+            faction=getattr(r, "faction", None),
         ))
     return NewsFeedResponse(items=items)
 
