@@ -42,26 +42,29 @@ def init_bot_accounts() -> None:
     securities = list_securities()
     symbols = [s.symbol for s in securities]
 
+    # 做市商初始资本池配置（仅首次创建时使用）
+    MM_INITIAL_CASH = 1_000_000_000.0
+    MM_INITIAL_POSITION_PER_SYMBOL = 1_000_000.0
+
     with conn:
-        # ── 做市商 mm:1 ──
+        # ── 做市商 mm:1 —— 仅首次创建时分配资金，不再每次启动补仓 ──
         row = conn.execute("SELECT 1 FROM accounts WHERE account_id = ?", ("mm:1",)).fetchone()
         if not row:
-            create_account("mm:1", owner_type="market_maker", initial_cash=1_000_000_000.0)
+            create_account("mm:1", owner_type="market_maker", initial_cash=MM_INITIAL_CASH)
+            if symbols:
+                for sym in symbols:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?)",
+                        ("mm:1", sym, MM_INITIAL_POSITION_PER_SYMBOL),
+                    )
         else:
-            # 确保做市商现金充足
-            conn.execute("UPDATE accounts SET cash = MAX(cash, 500000000.0) WHERE account_id = 'mm:1'")
-
-        if symbols:
-            for sym in symbols:
-                # 确保做市商持仓充足，防止 tick 时报错
-                conn.execute(
-                    "INSERT OR IGNORE INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?)",
-                    ("mm:1", sym, 1_000_000.0),
-                )
-                conn.execute(
-                    "UPDATE positions SET quantity = MAX(quantity, 500000.0) WHERE account_id = 'mm:1' AND symbol = ?",
-                    (sym,),
-                )
+            # 已有做市商：仅确保新标的有初始持仓行（不补量）
+            if symbols:
+                for sym in symbols:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO positions(account_id, symbol, quantity) VALUES (?, ?, ?)",
+                        ("mm:1", sym, 0.0),
+                    )
 
         # ── Bot 账户 ──
         for p in default_bot_profiles():
