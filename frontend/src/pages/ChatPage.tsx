@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction, type Dispatch } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Api,
   ApiError,
@@ -213,6 +214,40 @@ export default function ChatPage() {
     }
   }
 
+  const renderContent = (content: string, _payload?: Record<string, any>) => {
+    if (!content) return null;
+    
+    const nav = useNavigate();
+    const parts = content.split(/(#(?:con:[a-zA-Z0-9\-]{3,40}))/g);
+    
+    return (
+      <div style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>
+        {parts.map((part, i) => {
+          if (part.startsWith('#con:')) {
+            return (
+              <span 
+                key={i} 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  nav('/contracts', { state: { targetContractId: part.slice(1) } });
+                }}
+                style={{ 
+                  color: '#1890ff', 
+                  cursor: 'pointer', 
+                  textDecoration: 'underline',
+                  fontWeight: 'bold'
+                }}
+              >
+                {part}
+              </span>
+            );
+          }
+          return <span key={i}>{part}</span>;
+        })}
+      </div>
+    );
+  };
+
   useEffect(() => {
     refreshPublic()
     refreshThreads()
@@ -322,7 +357,7 @@ export default function ChatPage() {
                       <span style={{ fontWeight: 700 }}>{m.sender_display}</span>
                       <span style={{ color: '#888', fontSize: 12 }}>{formatTime(m.created_at)}</span>
                     </div>
-                    <div style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                    {renderContent(m.content, m.payload)}
                   </div>
                 </div>
               )
@@ -400,7 +435,7 @@ export default function ChatPage() {
                           <span style={{ fontWeight: 700 }}>{m.sender_display}</span>
                           <span style={{ color: '#888', fontSize: 12 }}>{formatTime(m.created_at)}</span>
                         </div>
-                        <div style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                        {renderContent(m.content, m.payload)}
                       </div>
                     </div>
                   )

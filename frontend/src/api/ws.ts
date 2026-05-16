@@ -30,6 +30,7 @@ export class WsClient {
   private _channel?: string
   private _handler?: WsMessageHandler
   private _statusHandler?: WsStatusHandler
+  private _listeners: Set<WsMessageHandler> = new Set()
   private _retryCount = 0
   private _retryTimer?: number
   private _keepaliveTimer?: number
@@ -42,6 +43,14 @@ export class WsClient {
 
   constructor(opts?: WsClientConfig) {
     this.cfg = opts
+  }
+
+  addListener(handler: WsMessageHandler): void {
+    this._listeners.add(handler)
+  }
+
+  removeListener(handler: WsMessageHandler): void {
+    this._listeners.delete(handler)
   }
 
   private get _reconnectMs(): number {
@@ -98,9 +107,20 @@ export class WsClient {
           const batch = this._msgQueue.splice(0)
           this._flushScheduled = false
           const h = this._handler
-          if (!h) return
-          for (const msg of batch) {
-            h(msg)
+          if (h) {
+            for (const msg of batch) {
+              h(msg)
+            }
+          }
+          // Notify dynamic listeners
+          for (const listener of this._listeners) {
+            try {
+              for (const msg of batch) {
+                listener(msg)
+              }
+            } catch (e) {
+              console.error('[WsClient] Listener error:', e)
+            }
           }
         })
       }

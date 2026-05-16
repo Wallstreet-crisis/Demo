@@ -222,18 +222,19 @@ def get_contract_as_dict(contract_id: str) -> Optional[Dict[str, Any]]:
 
 def list_contracts_for_player(player_id: str, limit: int = 50) -> List[ContractRecord]:
     conn = get_connection()
-    # Simple search in parties_json or invited_parties_json
-    # For better performance, a separate join table is usually better, but this follows existing patterns here
-    pattern = f'%"{player_id}"%'
+    # 同时检索参与者、被邀请者和创建者，使用更稳健的模糊匹配
+    pid = str(player_id).lower()
+    pattern = f'%{pid}%'
     rows = conn.execute(
         """
         SELECT * FROM contracts
-        WHERE parties_json LIKE ? OR invited_parties_json LIKE ? OR creator_id = ?
+        WHERE parties_json LIKE ? OR invited_parties_json LIKE ? OR creator_id = ? OR creator_id LIKE ?
         ORDER BY created_at DESC
         LIMIT ?
         """,
-        (pattern, pattern, player_id, limit),
+        (pattern, pattern, pid, pattern, limit),
     ).fetchall()
+    # ... 后续转换代码保持不变
 
     return [
         ContractRecord(
@@ -498,6 +499,7 @@ def add_proposal_approval(proposal_id: str, approver: str) -> Optional[ProposalR
 def list_contracts_by_actor(
     actor_id: str | None = None,
     actor_id_plain: str | None = None,
+    creator_id: str | None = None,
     status: str | None = None,
     limit: int = 50
 ) -> List[Dict[str, Any]]:
@@ -509,27 +511,35 @@ def list_contracts_by_actor(
     params = []
     
     if actor_id is not None:
-        conditions.append("(parties_json LIKE ? OR invited_parters_json LIKE ? OR creator_id = ?)")
-        pattern = f'%"{actor_id}"%'
-        params.extend([pattern, pattern, actor_id])
+        aid = str(actor_id).lower()
+        pattern = f'%{aid}%'
+        conditions.append("(parties_json LIKE ? OR invited_parties_json LIKE ? OR creator_id = ? OR creator_id LIKE ?)")
+        params.extend([pattern, pattern, aid, pattern])
     
     if actor_id_plain is not None:
-        conditions.append("(parties_json LIKE ? OR invited_parties_json LIKE ? OR creator_id = ?)")
-        pattern = f'%"{actor_id_plain}"%'
-        params.extend([pattern, pattern, actor_id_plain])
+        aidp = str(actor_id_plain).lower()
+        pattern = f'%{aidp}%'
+        conditions.append("(parties_json LIKE ? OR invited_parties_json LIKE ? OR creator_id = ? OR creator_id LIKE ?)")
+        params.extend([pattern, pattern, aidp, pattern])
+
+    if creator_id is not None:
+        cid = str(creator_id).lower()
+        pattern = f'%{cid}%'
+        conditions.append("(creator_id = ? OR creator_id LIKE ?)")
+        params.extend([cid, pattern])
     
     where_clause = " OR ".join(conditions) if conditions else "1=1"
     
     if status is not None:
-        where_clause += f" AND status = ?"
+        where_clause = f"({where_clause}) AND status = ?"
         params.append(status.upper())
     
     params.append(limit)
     
     rows = conn.execute(
         f"""
-        SELECT contract_id, title, kind, status, created_at,
-               parties_json, required_signers_json, signatures_json
+        SELECT contract_id, title, kind, status, created_at, creator_id,
+               parties_json, required_signers_json, signed_parties_json
         FROM contracts
         WHERE {where_clause}
         ORDER BY created_at DESC
@@ -547,8 +557,9 @@ def list_contracts_by_actor(
             "kind": r["kind"],
             "status": r["status"],
             "created_at": r["created_at"],
+            "creator_id": r["creator_id"],
             "parties": json.loads(r["parties_json"] or "[]"),
             "required_signers": json.loads(r["required_signers_json"] or "[]"),
-            "signatures": json.loads(r["signatures_json"] or "[]"),
+            "signatures": json.loads(r["signed_parties_json"] or "[]"),
         })
     return result

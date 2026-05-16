@@ -76,6 +76,7 @@ export type ContractBriefResponse = {
   kind: string
   status: string
   created_at?: string | null
+  creator_id?: string | null
   parties?: string[]
   required_signers?: string[]
   signatures?: string[]

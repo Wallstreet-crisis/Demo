@@ -11,6 +11,7 @@ from ifrontier.services.news_tick_scheduler import NewsTickScheduler
 from ifrontier.services.market_session_scheduler import MarketSessionScheduler
 from ifrontier.services.market_maker_scheduler import MarketMakerScheduler
 from ifrontier.services.hosting_scheduler import HostingScheduler
+from ifrontier.services.victory_scheduler import VictoryScheduler
 
 
 class RoomEngine:
@@ -22,6 +23,7 @@ class RoomEngine:
         self.market_session_scheduler: Optional[MarketSessionScheduler] = None
         self.market_maker_scheduler: Optional[MarketMakerScheduler] = None
         self.hosting_scheduler: Optional[HostingScheduler] = None
+        self.victory_scheduler: Optional[VictoryScheduler] = None
 
     def _make_broadcaster(self):
         room_id_captured = self.room_id
@@ -117,6 +119,12 @@ class RoomEngine:
             make_facade=make_user_facade,
         )
 
+        self.victory_scheduler = VictoryScheduler(
+            tick_interval_seconds=5.0,
+            broadcaster=broadcaster,
+            get_channel_size=get_size,
+        )
+
         token = room_id_var.set(self.room_id)
         try:
             self.contract_scheduler.start()
@@ -124,11 +132,13 @@ class RoomEngine:
             self.market_session_scheduler.start()
             self.market_maker_scheduler.start()
             self.hosting_scheduler.start()
+            self.victory_scheduler.start()
         finally:
             room_id_var.reset(token)
 
     async def stop_schedulers(self):
         tasks = []
+        if self.victory_scheduler: tasks.append(self.victory_scheduler.stop())
         if self.hosting_scheduler: tasks.append(self.hosting_scheduler.stop())
         if self.market_maker_scheduler: tasks.append(self.market_maker_scheduler.stop())
         if self.market_session_scheduler: tasks.append(self.market_session_scheduler.stop())

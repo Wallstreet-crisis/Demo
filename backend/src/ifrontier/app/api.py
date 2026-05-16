@@ -67,6 +67,19 @@ def _make_broadcaster_for_events():
 
     return _broadcast
 
+from ifrontier.services.victory import PlayerStatus
+
+def assert_player_can_act(player_id: str):
+    """检查玩家是否可以进行操作（未破产且未出局）。"""
+    try:
+        snap = get_snapshot(player_id)
+        if snap.status == PlayerStatus.BANKRUPT:
+            raise HTTPException(status_code=403, detail="PLAYER_BANKRUPT: You have gone bankrupt and can only spectate.")
+        if snap.status == PlayerStatus.SPECTATOR:
+            raise HTTPException(status_code=403, detail="PLAYER_SPECTATOR: You are currently a spectator.")
+    except ValueError:
+        pass # 允许新账户或系统操作
+
 router = APIRouter()
 
 _event_store = SqliteEventStore()
@@ -1437,6 +1450,7 @@ class MyOpenOrdersListResponse(BaseModel):
 @router.post("/orders/limit")
 async def submit_player_limit_order(req: PlayerLimitOrderRequest) -> PlayerOrderResponse:
     account_id = f"user:{str(req.player_id).lower()}"
+    assert_player_can_act(account_id)
     try:
         order_id, matches = submit_limit_order(
             account_id=account_id,
@@ -1523,6 +1537,7 @@ class PlayerCancelOrderRequest(BaseModel):
 @router.post("/orders/{order_id}/cancel")
 async def cancel_player_order(order_id: str, req: PlayerCancelOrderRequest) -> None:
     account_id = f"user:{str(req.player_id).lower()}"
+    assert_player_can_act(account_id)
     try:
         ok = cancel_order(order_id=order_id, account_id=account_id)
     except Exception as exc:
@@ -1541,6 +1556,7 @@ class PlayerMarketOrderRequest(BaseModel):
 @router.post("/orders/market")
 async def submit_player_market_order(req: PlayerMarketOrderRequest) -> None:
     account_id = f"user:{str(req.player_id).lower()}"
+    assert_player_can_act(account_id)
     try:
         q = float(req.quantity)
         if q <= 0:
@@ -2181,6 +2197,7 @@ async def wealth_public_get(user_id: str) -> WealthPublicResponse:
 
 @router.post("/contracts/create")
 async def contract_create(req: ContractCreateRequest) -> ContractCreateResponse:
+    assert_player_can_act(req.actor_id)
     try:
         party_ids = _normalize_contract_party_ids(req.parties)
         contract_id = _contract_service.create_contract(
@@ -2239,6 +2256,7 @@ class ContractBriefResponse(BaseModel):
     kind: str
     status: str
     created_at: str | None = None
+    creator_id: str | None = None
     parties: List[str] = []
     required_signers: List[str] = []
     signatures: List[str] = []
@@ -2277,6 +2295,7 @@ async def list_contracts(
         records = contracts_db.list_contracts_by_actor(
             actor_id=aid,
             actor_id_plain=aid_plain,
+            creator_id=aid,  # 显式传入 creator_id 进行检索
             status=st,
             limit=limit,
         )
@@ -2288,6 +2307,7 @@ async def list_contracts(
                 kind=str(r.get("kind") or ""),
                 status=str(r.get("status") or ""),
                 created_at=str(r.get("created_at") or "") or None,
+                creator_id=str(r.get("creator_id") or "") or None,
                 parties=list(r.get("parties") or []),
                 required_signers=list(r.get("required_signers") or []),
                 signatures=list(r.get("signatures") or []),
@@ -2296,8 +2316,9 @@ async def list_contracts(
             if (r.get("contract_id") is not None)
         ]
         return ContractListResponse(items=items)
-    except Exception:
-        return ContractListResponse(items=[])
+    except Exception as exc:
+        _log.exception("Failed to list contracts for actor_id=%s status=%s limit=%s", aid, st, limit)
+        raise HTTPException(status_code=500, detail="Failed to list contracts") from exc
 
 
 class ContractRuleEventItem(BaseModel):
@@ -2463,6 +2484,7 @@ class ContractSignResponse(BaseModel):
 
 @router.post("/contracts/{contract_id}/sign")
 async def contract_sign(contract_id: str, req: ContractSignRequest) -> ContractSignResponse:
+    assert_player_can_act(req.signer)
     try:
         status = _contract_service.sign_contract(contract_id=contract_id, signer=str(req.signer).strip().lower())
     except ValueError as exc:
@@ -2689,6 +2711,7 @@ class NewsMutateVariantResponse(BaseModel):
 
 @router.post("/news/variants/mutate")
 async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVariantResponse:
+    assert_player_can_act(req.actor_id)
     cash_cost = 0.0
     if req.spend_cash is not None and req.spend_cash > 0:
         cash_cost = float(req.spend_cash)
@@ -2805,6 +2828,7 @@ async def news_propagate_quote(req: NewsPropagateQuoteRequest) -> NewsPropagateQ
 
 @router.post("/news/propagate")
 async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
+    assert_player_can_act(req.actor_id)
     requested_limit = int(req.limit)
     if requested_limit <= 0:
         return NewsPropagateResponse(delivered=0, correlation_id=req.correlation_id)
@@ -2924,6 +2948,7 @@ class NewsSuppressResponse(BaseModel):
 
 @router.post("/news/suppress")
 async def news_suppress(req: NewsSuppressRequest) -> NewsSuppressResponse:
+    assert_player_can_act(req.actor_id)
     try:
         event_json = _news_tick_engine.suppress_propagation(
             actor_id=req.actor_id,

@@ -14,6 +14,8 @@ class AccountSnapshot:
     cash: float
     positions: Dict[str, float]
     caste_id: str | None = None
+    status: str = "ACTIVE"
+    total_valuation: float = 0.0
 
 
 @dataclass
@@ -41,20 +43,30 @@ def get_snapshot(account_id: str) -> AccountSnapshot:
     cur = conn.cursor()
 
     row = cur.execute(
-        "SELECT cash, caste_id FROM accounts WHERE account_id = ?", (account_id,)
+        "SELECT cash, caste_id, status, total_valuation FROM accounts WHERE account_id = ?", (account_id,)
     ).fetchone()
     if row is None:
         raise ValueError(f"account {account_id} does not exist")
 
     cash = float(row["cash"])
     caste_id = row["caste_id"]
+    status = str(row["status"])
+    total_valuation = float(row["total_valuation"])
+
     positions: Dict[str, float] = {}
     for prow in cur.execute(
         "SELECT symbol, quantity FROM positions WHERE account_id = ?", (account_id,)
     ):
         positions[str(prow["symbol"])] = float(prow["quantity"])
 
-    return AccountSnapshot(account_id=account_id, cash=cash, positions=positions, caste_id=caste_id)
+    return AccountSnapshot(
+        account_id=account_id,
+        cash=cash,
+        positions=positions,
+        caste_id=caste_id,
+        status=status,
+        total_valuation=total_valuation,
+    )
 
 
 def apply_trade_executed(

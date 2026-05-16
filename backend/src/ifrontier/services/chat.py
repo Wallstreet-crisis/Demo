@@ -61,6 +61,17 @@ def _lookup_caste(sender_id: str) -> str:
     return caste
 
 
+import re
+
+def _extract_mentions(content: str) -> Dict[str, List[str]]:
+    """提取内容中的 @用户 和 #合约。"""
+    players = re.findall(r"@([a-zA-Z0-9_]{3,20})", content)
+    contracts = re.findall(r"#(con:[a-zA-Z0-9\-]{3,40})", content)
+    return {
+        "players": list(set(players)),
+        "contracts": list(set(contracts))
+    }
+
 class ChatService:
     def __init__(self, *, event_store: SqliteEventStore) -> None:
         self._event_store = event_store
@@ -227,10 +238,13 @@ class ChatService:
         
         sender_caste = "UNKNOWN" if anonymous else _lookup_caste(sender_id)
 
+        mentions = _extract_mentions(content)
         stored_payload = dict(payload or {})
         stored_payload["anonymous"] = bool(anonymous)
         stored_payload["sender_display"] = sender_display
         stored_payload["sender_caste"] = sender_caste
+        stored_payload["mentions_players"] = mentions["players"]
+        stored_payload["mentions_contracts"] = mentions["contracts"]
         
         insert_message(
             message_id=message_id,
@@ -285,10 +299,13 @@ class ChatService:
         
         sender_caste = "UNKNOWN" if anonymous else _lookup_caste(sender_id)
 
+        mentions = _extract_mentions(content)
         stored_payload = dict(payload or {})
         stored_payload["anonymous"] = bool(anonymous)
         stored_payload["sender_display"] = sender_display
         stored_payload["sender_caste"] = sender_caste
+        stored_payload["mentions_players"] = mentions["players"]
+        stored_payload["mentions_contracts"] = mentions["contracts"]
 
         insert_message(
             message_id=message_id,

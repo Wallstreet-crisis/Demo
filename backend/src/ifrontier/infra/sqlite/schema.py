@@ -28,7 +28,9 @@ def init_schema() -> None:
             account_id TEXT PRIMARY KEY,
             owner_type TEXT NOT NULL,
             caste_id TEXT,
-            cash REAL NOT NULL DEFAULT 0
+            cash REAL NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'ACTIVE',
+            total_valuation REAL NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS positions (
@@ -67,6 +69,22 @@ def init_schema() -> None:
             _log.info("Migrated accounts table: added caste_id column")
         except Exception as e:
             _log.warning("Migration failed (caste_id): %s", e)
+
+    if "status" not in columns:
+        try:
+            cur.execute("ALTER TABLE accounts ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE'")
+            conn.commit()
+            _log.info("Migrated accounts table: added status column")
+        except Exception as e:
+            _log.warning("Migration failed (status): %s", e)
+
+    if "total_valuation" not in columns:
+        try:
+            cur.execute("ALTER TABLE accounts ADD COLUMN total_valuation REAL NOT NULL DEFAULT 0")
+            conn.commit()
+            _log.info("Migrated accounts table: added total_valuation column")
+        except Exception as e:
+            _log.warning("Migration failed (total_valuation): %s", e)
 
     # 订单簿（LIMIT 订单入簿，MARKET 订单由撮合引擎吃单实现）
     init_order_schema()

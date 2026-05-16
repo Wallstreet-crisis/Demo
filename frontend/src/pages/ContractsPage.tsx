@@ -32,10 +32,22 @@ export default function ContractsPage() {
 
   // 处理从新闻页面传来的预填内容
   useEffect(() => {
-    const state = location.state as { prefillDraft?: string } | null
+    const state = location.state as { prefillDraft?: string; targetContractId?: string } | null
     if (state?.prefillDraft) {
       setNaturalLanguage(state.prefillDraft)
       notify('info', '已预填新闻相关内容，可直接点击"生成草案"')
+    }
+    if (state?.targetContractId) {
+      setTargetId(state.targetContractId)
+      // 延迟一下确保组件状态已同步
+      setTimeout(() => {
+        Api.contractGet(state.targetContractId!).then(res => {
+          setContractDetail(res)
+          notify('success', '已自动加载引用的合约详情')
+        }).catch(() => {
+          notify('error', '无法加载引用的合约')
+        })
+      }, 100)
     }
   }, [location.state, notify])
 
@@ -498,6 +510,8 @@ export default function ContractsPage() {
       }
       // Refresh detail if open
       if (contractDetail) fetchContractDetail()
+      // 强制刷新 Mention 列表数据，确保 # 提示包含最新合约
+      fetchMentionsData()
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
       notify('error', `操作失败: ${msg}`)

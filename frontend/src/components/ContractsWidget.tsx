@@ -116,23 +116,45 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
 
   const pendingMySignContracts = useMemo(() => {
     if (!actorId) return []
+    const myId = actorId.toLowerCase()
     return [...contracts]
       .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
       .filter((c) => {
-        const required = new Set(c.required_signers || [])
-        if (!required.has(actorId)) return false
-        const signed = new Set(c.signatures || [])
-        return !signed.has(actorId)
+        const required = new Set((c.required_signers || []).map(s => s.toLowerCase()))
+        const signed = new Set((c.signatures || []).map(s => s.toLowerCase()))
+        return required.has(myId) && !signed.has(myId)
       })
   }, [contracts, actorId])
 
   const signedContracts = useMemo(() => {
     if (!actorId) return []
+    const myId = actorId.toLowerCase()
     return [...contracts]
       .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
       .filter((c) => {
-        const signed = new Set(c.signatures || [])
-        return signed.has(actorId)
+        const signed = new Set((c.signatures || []).map(s => s.toLowerCase()))
+        return signed.has(myId)
+      })
+  }, [contracts, actorId])
+
+  const otherRelatedContracts = useMemo(() => {
+    if (!actorId) return []
+    const myId = actorId.toLowerCase()
+    return [...contracts]
+      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+      .filter((c) => {
+        const required = new Set((c.required_signers || []).map(s => s.toLowerCase()))
+        const signed = new Set((c.signatures || []).map(s => s.toLowerCase()))
+        const parties = new Set((c.parties || []).map(s => s.toLowerCase()))
+        const creator = String(c.creator_id || '').toLowerCase()
+        
+        // 如果我是参与者但不需要签，或者我根本不在参与者里（但我能搜到说明我是创建者）
+        const isParticipant = parties.has(myId)
+        const needsSign = required.has(myId)
+        const hasSigned = signed.has(myId)
+        const isCreator = creator !== '' && creator === myId
+        
+        return (isParticipant || isCreator || !needsSign) && !needsSign && !hasSigned
       })
   }, [contracts, actorId])
 
@@ -403,7 +425,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: isFocused ? '1fr 1fr' : '1fr', gap: '8px', padding: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isFocused ? 'repeat(3, 1fr)' : '1fr', gap: '8px', padding: '8px' }}>
             <div style={{ minHeight: 0 }}>
               <div style={{ fontSize: '10px', color: 'var(--terminal-info)', marginBottom: '6px', fontWeight: 600 }}>
                 待我签署 ({pendingMySignContracts.length})
@@ -416,7 +438,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
                     <div key={`pending-${c.contract_id}`} style={{ border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '4px', padding: '6px 8px', background: 'rgba(30, 41, 59, 0.35)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                         <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600 }}>{c.title || c.contract_id}</span>
-                        <span style={{ fontSize: '10px', color: statusColor(c.status) }}>EXEC: {c.status}</span>
+                        <span style={{ fontSize: '10px', color: statusColor(c.status) }}>{c.status}</span>
                       </div>
                       <div style={{ marginTop: '4px', fontSize: '10px', color: '#94a3b8' }}>
                         #{c.contract_id.slice(0, 10)} · 签署进度 {signed}/{Math.max(total, 1)}
@@ -425,7 +447,33 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
                   )
                 })}
                 {pendingMySignContracts.length === 0 && (
-                  <div style={{ fontSize: '10px', color: '#64748b', padding: '6px 2px' }}>暂无待你签署的契约</div>
+                  <div style={{ fontSize: '10px', color: '#64748b', padding: '6px 2px' }}>暂无</div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ minHeight: 0 }}>
+              <div style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '6px', fontWeight: 600 }}>
+                其他参与 ({otherRelatedContracts.length})
+              </div>
+              <div style={{ display: 'grid', gap: '6px', maxHeight: isFocused ? '180px' : '120px', overflowY: 'auto', paddingRight: '2px' }} className="custom-scrollbar">
+                {(isFocused ? otherRelatedContracts : otherRelatedContracts.slice(0, 3)).map((c) => {
+                  const total = (c.required_signers || []).length
+                  const signed = (c.signatures || []).length
+                  return (
+                    <div key={`other-${c.contract_id}`} style={{ border: '1px solid rgba(148, 163, 184, 0.15)', borderRadius: '4px', padding: '6px 8px', background: 'rgba(15, 23, 42, 0.25)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600 }}>{c.title || c.contract_id}</span>
+                        <span style={{ fontSize: '10px', color: statusColor(c.status) }}>{c.status}</span>
+                      </div>
+                      <div style={{ marginTop: '4px', fontSize: '10px', color: '#64748b' }}>
+                        #{c.contract_id.slice(0, 10)} · 签署 {signed}/{Math.max(total, 1)}
+                      </div>
+                    </div>
+                  )
+                })}
+                {otherRelatedContracts.length === 0 && (
+                  <div style={{ fontSize: '10px', color: '#64748b', padding: '6px 2px' }}>暂无</div>
                 )}
               </div>
             </div>
@@ -442,7 +490,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
                     <div key={`signed-${c.contract_id}`} style={{ border: '1px solid rgba(16, 185, 129, 0.28)', borderRadius: '4px', padding: '6px 8px', background: 'rgba(15, 23, 42, 0.45)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                         <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600 }}>{c.title || c.contract_id}</span>
-                        <span style={{ fontSize: '10px', color: statusColor(c.status) }}>EXEC: {c.status}</span>
+                        <span style={{ fontSize: '10px', color: statusColor(c.status) }}>{c.status}</span>
                       </div>
                       <div style={{ marginTop: '4px', fontSize: '10px', color: '#94a3b8' }}>
                         #{c.contract_id.slice(0, 10)} · 全体签署 {signed}/{Math.max(total, 1)}
@@ -451,7 +499,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
                   )
                 })}
                 {signedContracts.length === 0 && (
-                  <div style={{ fontSize: '10px', color: '#64748b', padding: '6px 2px' }}>暂无你已签署的契约</div>
+                  <div style={{ fontSize: '10px', color: '#64748b', padding: '6px 2px' }}>暂无</div>
                 )}
               </div>
             </div>

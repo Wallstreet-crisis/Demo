@@ -84,6 +84,9 @@ export default function Layout() {
   const [hostingLoading, setHostingLoading] = useState(false)
   const [marketSession, setMarketSession] = useState<MarketSessionResponse | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  
+  const [playerStatus, setPlayerStatus] = useState<string>('ACTIVE')
+  const [settlementInfo, setSettlementInfo] = useState<{message: string, achievement?: string} | null>(null)
 
   const [systemMenuOpen, setSystemMenuOpen] = useState(false)
   const [disconnectConfirm, setDisconnectConfirm] = useState(false)
@@ -94,6 +97,32 @@ export default function Layout() {
   const caste = useMemo(() => {
     return CASTES.find(c => c.id === sess.casteId)
   }, [sess.casteId])
+
+  useEffect(() => {
+    if (!sess.playerId) return
+    
+    // 监听状态变更事件
+    const handleEvents = (ev: any) => {
+      if (ev.event_type === 'player.status_changed' && ev.player_id === `user:${sess.playerId}`) {
+        setPlayerStatus(ev.new_status)
+        if (ev.new_status !== 'ACTIVE') {
+          setSettlementInfo({
+            message: ev.message,
+            achievement: ev.achievement
+          })
+        }
+      } else if (ev.event_type === 'game.victory') {
+        // 全局胜利事件
+        setSettlementInfo({
+          message: ev.reason,
+          achievement: ev.achievement
+        })
+      }
+    }
+
+    presenceWs.addListener(handleEvents)
+    return () => presenceWs.removeListener(handleEvents)
+  }, [sess.playerId, presenceWs])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -367,6 +396,95 @@ export default function Layout() {
       <main style={{ flex: 1, padding: '5px', overflow: 'hidden' }}>
         <Outlet />
       </main>
+
+      {/* 结算通知 Overlay */}
+      {settlementInfo && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.95)',
+          zIndex: 1000,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          backdropFilter: 'blur(10px)',
+          animation: 'fadeIn 1s ease-out'
+        }}>
+          <div className="cyber-card" style={{ 
+            width: '500px', 
+            padding: '40px', 
+            textAlign: 'center',
+            borderColor: playerStatus === 'BANKRUPT' ? 'var(--terminal-error)' : 'var(--terminal-success)',
+            boxShadow: playerStatus === 'BANKRUPT' ? '0 0 30px rgba(239, 68, 68, 0.3)' : '0 0 30px rgba(34, 197, 94, 0.3)'
+          }}>
+            <h1 style={{ 
+              fontSize: '32px', 
+              margin: '0 0 10px 0',
+              color: playerStatus === 'BANKRUPT' ? 'var(--terminal-error)' : 'var(--terminal-success)',
+              letterSpacing: '4px'
+            }}>
+              {playerStatus === 'BANKRUPT' ? 'TERMINATED' : 'STABILIZED'}
+            </h1>
+            
+            {settlementInfo.achievement && (
+              <div style={{ 
+                fontSize: '14px', 
+                color: 'var(--terminal-info)', 
+                marginBottom: '20px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase'
+              }}>
+                [ ACHV_UNLOCKED: {settlementInfo.achievement} ]
+              </div>
+            )}
+
+            <div style={{ 
+              fontSize: '18px', 
+              lineHeight: '1.6', 
+              color: '#fff', 
+              marginBottom: '40px',
+              fontFamily: 'monospace'
+            }}>
+              {settlementInfo.message}
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '12px' 
+            }}>
+              <button 
+                onClick={handleReAuth}
+                className="cyber-button"
+                style={{ 
+                  height: '50px', 
+                  fontSize: '16px',
+                  background: playerStatus === 'BANKRUPT' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                  borderColor: playerStatus === 'BANKRUPT' ? 'var(--terminal-error)' : 'var(--terminal-success)'
+                }}
+              >
+                DISCONNECT_AND_FINALIZE
+              </button>
+              
+              {playerStatus !== 'BANKRUPT' && (
+                <button 
+                  onClick={() => setSettlementInfo(null)}
+                  className="cyber-button"
+                  style={{ height: '40px', fontSize: '12px', opacity: 0.6 }}
+                >
+                  STAY_IN_SPECTATOR_MODE
+                </button>
+              )}
+            </div>
+          </div>
+          <style>{`
+            @keyframes fadeIn {
+              from { opacity: 0; transform: scale(0.95); }
+              to { opacity: 1; transform: scale(1); }
+            }
+          `}</style>
+        </div>
+      )}
 
       {sess.playerId && (
         <SettingsModal actorId={`user:${sess.playerId}`} open={settingsOpen} onClose={() => setSettingsOpen(false)} />

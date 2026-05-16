@@ -191,8 +191,9 @@ export const Api = {
   marketSummary: () => getWithBootstrapCache<MarketSummaryResponse>('marketSummary', 8000, () => api.get<MarketSummaryResponse>('/market/summary', undefined, roomRequest)),
 
   listPlayers: (limit = 100) => getWithBootstrapCache<PlayerListResponse>(`listPlayers:${limit}`, 8000, () => api.get<PlayerListResponse>('/players', { limit }, roomRequest)),
+  // 合约引用列表必须实时反映最新状态，因此不使用 bootstrap cache。
   listContracts: (actor_id?: string, limit = 50, status?: string) =>
-    getWithBootstrapCache<ContractListResponse>(`listContracts:${actor_id || 'all'}:${limit}:${status || 'all'}`, 8000, () => api.get<ContractListResponse>('/contracts/list', { actor_id, limit, status }, roomRequest)),
+    api.get<ContractListResponse>('/contracts/list', { actor_id, limit, status }, roomRequest),
 
   submitLimitOrder: (req: PlayerLimitOrderRequest) => api.post<PlayerOrderResponse>('/orders/limit', req, roomRequest),
   submitMarketOrder: async (req: PlayerMarketOrderRequest) => {

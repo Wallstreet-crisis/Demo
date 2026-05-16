@@ -199,11 +199,11 @@ class ContractService:
                 "status": r.status,
                 "parties": r.parties,
                 "required_signers": r.required_signers,
-                "signatures": [],
-                "participation_mode": "ALL_SIGNERS",
+                "signatures": r.signed_parties,  # 正确返回已签署者
+                "participation_mode": r.participation_mode or "ALL_SIGNERS",
                 "invited_parties": r.invited_parties,
                 "created_at": r.created_at,
-                "updated_at": r.created_at,
+                "updated_at": r.updated_at,
             }
             try:
                 d["terms"] = json.loads(d.get("terms_json") or "{}")
@@ -246,6 +246,7 @@ class ContractService:
             parties=parties,
             required_signers=required_signers,
             invited_parties=invited,
+            creator_id=aid,  # 正确记录创建者
         )
 
         payload = ContractCreatedPayload(
@@ -280,10 +281,10 @@ class ContractService:
             kind = str(c["kind"])
             title = str(c["title"])
             terms = dict(c.get("terms") or {})
-            parties = list(c.get("parties") or [])
-            required_signers = list(c.get("required_signers") or [])
+            parties = [str(p).lower() for p in list(c.get("parties") or [])]
+            required_signers = [str(s).lower() for s in list(c.get("required_signers") or [])]
             participation_mode = (c.get("participation_mode") or ParticipationMode.ALL_SIGNERS.value).upper()
-            invited_parties = list(c.get("invited_parties") or [])
+            invited_parties = [str(i).lower() for i in list(c.get("invited_parties") or [])]
 
             rules_raw = terms.get("rules") if isinstance(terms, dict) else None
             has_rules = isinstance(rules_raw, list) and any(isinstance(x, dict) for x in rules_raw)
@@ -316,6 +317,7 @@ class ContractService:
                 parties=spec["parties"],
                 required_signers=spec["required_signers"],
                 invited_parties=spec["invited_parties"],
+                creator_id=str(actor_id).lower(),
             )
 
         for spec in specs:
