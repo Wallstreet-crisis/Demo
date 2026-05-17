@@ -51,6 +51,36 @@ export default function ContractDetailPage() {
     return actorId
   }, [actorId, detail])
 
+  const triggerPolicy = useMemo(() => {
+    return detail && detail.trigger_policy && typeof detail.trigger_policy === 'object' ? detail.trigger_policy as Record<string, any> : {}
+  }, [detail])
+
+  const normalizeId = useCallback((value: unknown) => String(value || '').trim().toLowerCase(), [])
+
+  const getTriggerActionPolicy = useCallback((action: 'activate' | 'settle' | 'run_rules') => {
+    const raw = triggerPolicy?.[action]
+    const obj = raw && typeof raw === 'object' ? raw as Record<string, any> : {}
+    return {
+      actor_scope: String(obj.actor_scope || obj.scope || (action === 'run_rules' ? 'MANUAL_OR_SCHEDULED' : 'ANY_PARTY')).toUpperCase(),
+      execution_mode: String(obj.execution_mode || obj.mode || '').toUpperCase(),
+    }
+  }, [triggerPolicy])
+
+  const canTriggerWithScope = useCallback((scope: string) => {
+    if (!detail) return false
+    const me = normalizeId(resolvedActorId || actorId)
+    const creator = normalizeId(detail.creator_id)
+    const parties = new Set([...(detail.parties || []), ...(detail.invited_parties || [])].map(normalizeId))
+    const required = new Set((detail.required_signers || []).map(normalizeId))
+    const signed = new Set(Object.keys(detail.signatures || {}).map(normalizeId))
+
+    if (!me) return false
+    if (scope === 'SYSTEM_ONLY') return false
+    if (scope === 'CREATOR_ONLY') return me === creator
+    if (scope === 'ANY_SIGNER') return me === creator || required.has(me) || signed.has(me)
+    return me === creator || parties.has(me)
+  }, [actorId, detail, normalizeId, resolvedActorId])
+
   const signDisabledReason = useMemo(() => {
     if (!playerId) return '当前未登录：请先 RE_AUTH / onboarding'
     if (!detail) return '合约未加载'
@@ -96,6 +126,45 @@ export default function ContractDetailPage() {
     return !joinDisabledReason
   }, [joinDisabledReason])
 
+  const executeDisabledReason = useMemo(() => {
+    if (!playerId) return '当前未登录：请先 RE_AUTH / onboarding'
+    if (!detail) return '合约未加载'
+    if (detail.status === 'SETTLED') return '合约已结算'
+    if (detail.status === 'DEFAULTED') return '合约已违约，无法执行'
+    if (!['SIGNED', 'ACTIVE'].includes(detail.status)) return `当前状态不可执行: ${detail.status}`
+
+    const activatePolicy = getTriggerActionPolicy('activate')
+    if (detail.status === 'SIGNED' && !canTriggerWithScope(activatePolicy.actor_scope)) {
+      return activatePolicy.actor_scope === 'CREATOR_ONLY'
+        ? '激活需由发起人触发'
+        : '你无权触发激活'
+    }
+
+    const hasRules = Array.isArray(detail.terms?.rules) && detail.terms.rules.length > 0
+    if (hasRules) {
+      const runPolicy = getTriggerActionPolicy('run_rules')
+      if (runPolicy.execution_mode === 'SCHEDULED') return '该合约由系统定时执行，不支持手动触发'
+      if (!canTriggerWithScope(runPolicy.actor_scope)) {
+        return runPolicy.actor_scope === 'CREATOR_ONLY'
+          ? '规则执行需由发起人触发'
+          : '你无权触发规则执行'
+      }
+      return ''
+    }
+
+    const settlePolicy = getTriggerActionPolicy('settle')
+    if (!canTriggerWithScope(settlePolicy.actor_scope)) {
+      return settlePolicy.actor_scope === 'CREATOR_ONLY'
+        ? '结算需由发起人触发'
+        : '你无权触发结算'
+    }
+    return ''
+  }, [canTriggerWithScope, detail, getTriggerActionPolicy, playerId])
+
+  const canExecute = useMemo(() => {
+    return !executeDisabledReason
+  }, [executeDisabledReason])
+
   const refreshAudit = useCallback(async (force: boolean) => {
     if (!playerId || !contractId) return
     setAuditLoading(true)
@@ -138,6 +207,40 @@ export default function ContractDetailPage() {
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
       notify('error', `签署失败: ${msg}`)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleExecute = async () => {
+    if (!contractId || !actorId || !detail) return
+    if (!canExecute) {
+      notify('info', executeDisabledReason || '当前不可执行')
+      return
+    }
+
+    setActionLoading(true)
+    try {
+      const execActorId = resolvedActorId || actorId
+      const hasRules = Array.isArray(detail.terms?.rules) && detail.terms.rules.length > 0
+
+      if (detail.status === 'SIGNED') {
+        await Api.contractActivate(contractId, { actor_id: execActorId })
+      }
+
+      if (hasRules) {
+        await Api.contractRunRules(contractId, { actor_id: execActorId })
+        notify('success', '合约规则已执行')
+      } else {
+        await Api.contractSettle(contractId, { actor_id: execActorId })
+        notify('success', '合约已执行并结算')
+      }
+
+      await refresh()
+      await refreshAudit(true).catch(() => {})
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
+      notify('error', `执行失败: ${msg}`)
     } finally {
       setActionLoading(false)
     }
@@ -198,6 +301,24 @@ export default function ContractDetailPage() {
             </div>
           </div>
 
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <div style={{ fontSize: '10px', color: '#64748b' }}>CREATOR</div>
+              <div style={{ fontFamily: 'monospace', color: '#cbd5e1' }}>{detail.creator_id || '--'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '10px', color: '#64748b' }}>TRIGGER_POLICY</div>
+              <div style={{ fontSize: 12, color: '#cbd5e1' }}>
+                激活：{String(getTriggerActionPolicy('activate').actor_scope || 'ANY_PARTY')}
+                {' · '}
+                结算：{String(getTriggerActionPolicy('settle').actor_scope || 'ANY_PARTY')}
+                {' · '}
+                规则：{String(getTriggerActionPolicy('run_rules').actor_scope || 'ANY_PARTY')}
+                {getTriggerActionPolicy('run_rules').execution_mode ? ` / ${getTriggerActionPolicy('run_rules').execution_mode}` : ''}
+              </div>
+            </div>
+          </div>
+
           <div style={{ display: 'grid', gap: 6 }}>
             <div style={{ fontSize: '10px', color: '#64748b' }}>REQUIRED_SIGNERS</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -254,6 +375,22 @@ export default function ContractDetailPage() {
               >
                 响应加入
               </button>
+
+              <button
+                className="cyber-button"
+                onClick={handleExecute}
+                style={{
+                  fontSize: '11px',
+                  padding: '4px 12px',
+                  background: canExecute ? 'var(--terminal-info)' : 'transparent',
+                  borderColor: canExecute ? 'var(--terminal-info)' : 'var(--terminal-border)',
+                  color: canExecute ? '#fff' : '#94a3b8',
+                  opacity: actionLoading ? 0.6 : (canExecute ? 1 : 0.6),
+                  cursor: canExecute ? 'pointer' : 'not-allowed',
+                }}
+              >
+                执行合约
+              </button>
             </div>
 
             {signDisabledReason ? (
@@ -264,6 +401,11 @@ export default function ContractDetailPage() {
             {joinDisabledReason ? (
               <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: 4 }}>
                 响应不可用：{joinDisabledReason}
+              </div>
+            ) : null}
+            {executeDisabledReason ? (
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: 4 }}>
+                执行不可用：{executeDisabledReason}
               </div>
             ) : null}
           </div>

@@ -64,6 +64,92 @@ def test_contract_create_sign_activate_flow() -> None:
     assert resp.status_code == 200
 
 
+def test_contract_creator_only_trigger_policy_blocks_non_creator_activation() -> None:
+    _reset_sqlite()
+
+    create_account("user:alice", owner_type="user", initial_cash=100.0)
+    create_account("user:bob", owner_type="user", initial_cash=100.0)
+
+    resp = client.post(
+        "/contracts/create",
+        json={
+            "actor_id": "user:alice",
+            "kind": "CUSTOM",
+            "title": "creator-only trigger",
+            "terms": {"transfers": [{"from": "user:alice", "to": "user:bob", "asset_type": "CASH", "symbol": "CASH", "quantity": 10}]},
+            "parties": ["user:alice", "user:bob"],
+            "required_signers": ["user:alice", "user:bob"],
+            "trigger_policy": {
+                "activate": {"actor_scope": "CREATOR_ONLY"},
+                "settle": {"actor_scope": "ANY_PARTY"},
+                "run_rules": {"actor_scope": "ANY_PARTY", "execution_mode": "MANUAL"},
+            },
+        },
+    )
+    assert resp.status_code == 200
+    contract_id = resp.json()["contract_id"]
+
+    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
+    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
+
+    resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:bob"})
+    assert resp.status_code == 400
+
+    resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    assert resp.status_code == 200
+
+
+def test_contract_scheduled_rule_execution_blocks_manual_trigger_but_allows_system_tick() -> None:
+    _reset_sqlite()
+
+    create_account("user:alice", owner_type="user", initial_cash=100.0)
+    create_account("user:bob", owner_type="user", initial_cash=0.0)
+
+    resp = client.post(
+        "/contracts/create",
+        json={
+            "actor_id": "user:alice",
+            "kind": "RULES",
+            "title": "scheduled rules",
+            "terms": {
+                "rules": [
+                    {
+                        "rule_id": "r1",
+                        "schedule": {"type": "once"},
+                        "condition": True,
+                        "actions": {
+                            "transfers": [
+                                {"from": "user:alice", "to": "user:bob", "asset_type": "CASH", "symbol": "CASH", "quantity": 10},
+                            ]
+                        },
+                    }
+                ]
+            },
+            "parties": ["user:alice", "user:bob"],
+            "required_signers": ["user:alice", "user:bob"],
+            "trigger_policy": {
+                "activate": {"actor_scope": "ANY_PARTY"},
+                "settle": {"actor_scope": "ANY_PARTY"},
+                "run_rules": {"actor_scope": "ANY_PARTY", "execution_mode": "SCHEDULED"},
+            },
+        },
+    )
+    assert resp.status_code == 200
+    contract_id = resp.json()["contract_id"]
+
+    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
+    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
+    client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+
+    resp = client.post(f"/contracts/{contract_id}/run_rules", json={"actor_id": "user:alice"})
+    assert resp.status_code == 400
+
+    resp = client.post(f"/contracts/{contract_id}/run_rules", json={"actor_id": "system:tick"})
+    assert resp.status_code == 200
+    assert get_snapshot("user:alice").cash == 90.0
+    assert get_snapshot("user:bob").cash == 10.0
+
+
 def test_contract_sign_nonexistent_returns_400() -> None:
     resp = client.post(
         "/contracts/00000000-0000-0000-0000-000000000000/sign",

@@ -466,6 +466,7 @@ export default function ContractsPage() {
         required_signers: finalContractCreate.required_signers as string[],
         participation_mode: finalContractCreate.participation_mode as string || null,
         invited_parties: finalContractCreate.invited_parties as string[] || null,
+        trigger_policy: finalContractCreate.trigger_policy as Record<string, unknown> || null,
       })
       notify('success', `合约创建成功: ${res.contract_id}`)
 

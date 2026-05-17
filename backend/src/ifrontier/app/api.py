@@ -1820,6 +1820,7 @@ class ContractCreateRequest(BaseModel):
     required_signers: list[str]
     participation_mode: str | None = None
     invited_parties: list[str] | None = None
+    trigger_policy: Dict[str, Any] | None = None
 
 
 class ContractCreateResponse(BaseModel):
@@ -2214,6 +2215,7 @@ async def contract_create(req: ContractCreateRequest) -> ContractCreateResponse:
             required_signers=req.required_signers,
             participation_mode=req.participation_mode,
             invited_parties=req.invited_parties,
+            trigger_policy=req.trigger_policy,
             actor_id=req.actor_id,
         )
     except ValueError as exc:
@@ -2266,6 +2268,7 @@ class ContractBriefResponse(BaseModel):
     parties: List[str] = []
     required_signers: List[str] = []
     signatures: List[str] = []
+    trigger_policy: Dict[str, Any] = {}
 
 
 class ContractListResponse(BaseModel):
@@ -2317,6 +2320,7 @@ async def list_contracts(
                 parties=list(r.get("parties") or []),
                 required_signers=list(r.get("required_signers") or []),
                 signatures=list(r.get("signatures") or []),
+                trigger_policy=dict(r.get("trigger_policy") or {}),
             )
             for r in records
             if (r.get("contract_id") is not None)
@@ -2370,6 +2374,7 @@ class ContractBatchItem(BaseModel):
     required_signers: List[str]
     participation_mode: str | None = None
     invited_parties: List[str] | None = None
+    trigger_policy: Dict[str, Any] | None = None
 
 
 class ContractBatchCreateRequest(BaseModel):
@@ -2398,6 +2403,7 @@ async def contract_batch_create(req: ContractBatchCreateRequest) -> ContractBatc
                 "required_signers": c.required_signers,
                 "participation_mode": c.participation_mode,
                 "invited_parties": c.invited_parties,
+                "trigger_policy": c.trigger_policy,
             }
             for c in req.contracts
         ]
@@ -2426,6 +2432,8 @@ class ContractResponse(BaseModel):
     signatures: Dict[str, str]  # signer -> signed_at
     participation_mode: str
     invited_parties: List[str]
+    creator_id: str | None = None
+    trigger_policy: Dict[str, Any]
     created_at: str
     updated_at: str
     activated_at: str | None = None
@@ -2456,6 +2464,8 @@ async def contract_get(contract_id: str) -> ContractResponse:
             signatures=sigs_dict,
             participation_mode=record["participation_mode"] or "ALL_SIGNERS",
             invited_parties=json.loads(record["invited_parties_json"] or "[]"),
+            creator_id=str(record.get("creator_id") or "") or None,
+            trigger_policy=json.loads(record.get("trigger_policy_json") or "{}"),
             created_at=record["created_at"],
             updated_at=record["updated_at"],
             activated_at=record.get("activated_at"),

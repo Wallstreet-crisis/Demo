@@ -42,6 +42,138 @@ from ifrontier.services.contract_rules import eval_condition, parse_transfers, s
 
 
 class ContractService:
+    _VALID_TRIGGER_SCOPES = {"ANY_PARTY", "ANY_SIGNER", "CREATOR_ONLY", "SYSTEM_ONLY"}
+    _VALID_TRIGGER_EXECUTION_MODES = {"MANUAL", "SCHEDULED", "MANUAL_OR_SCHEDULED"}
+    _TRIGGER_ACTIONS = ("activate", "settle", "run_rules")
+    _SYSTEM_ACTORS = {"system", "system:tick"}
+
+    @staticmethod
+    def _normalize_account_id(value: str) -> str:
+        return str(value or "").strip().lower()
+
+    @classmethod
+    def _default_trigger_policy(cls, *, kind: str, has_rules: bool) -> Dict[str, Dict[str, str]]:
+        kind_u = str(kind or "").upper()
+        return {
+            "activate": {"actor_scope": "CREATOR_ONLY" if kind_u == "CALL" else "ANY_PARTY"},
+            "settle": {"actor_scope": "ANY_PARTY"},
+            "run_rules": {
+                "actor_scope": "ANY_PARTY",
+                "execution_mode": "MANUAL_OR_SCHEDULED" if has_rules else "MANUAL",
+            },
+        }
+
+    @classmethod
+    def _normalize_trigger_policy(
+        cls,
+        *,
+        kind: str,
+        has_rules: bool,
+        trigger_policy: Any | None,
+    ) -> Dict[str, Dict[str, str]]:
+        policy = cls._default_trigger_policy(kind=kind, has_rules=has_rules)
+        if trigger_policy is None:
+            return policy
+
+        if isinstance(trigger_policy, str):
+            scope = str(trigger_policy or "").upper()
+            if scope in cls._VALID_TRIGGER_SCOPES:
+                for action in cls._TRIGGER_ACTIONS:
+                    policy[action]["actor_scope"] = scope
+                if scope == "SYSTEM_ONLY":
+                    policy["run_rules"]["execution_mode"] = "SCHEDULED"
+                elif scope:
+                    policy["run_rules"]["execution_mode"] = "MANUAL"
+            return policy
+
+        if not isinstance(trigger_policy, dict):
+            return policy
+
+        for action in cls._TRIGGER_ACTIONS:
+            raw_action = trigger_policy.get(action)
+            if isinstance(raw_action, str):
+                scope = str(raw_action or "").upper()
+                if scope in cls._VALID_TRIGGER_SCOPES:
+                    policy[action]["actor_scope"] = scope
+            elif isinstance(raw_action, dict):
+                scope = str(raw_action.get("actor_scope") or raw_action.get("scope") or "").upper()
+                if action == "run_rules":
+                    mode = str(raw_action.get("execution_mode") or raw_action.get("mode") or "").upper()
+                    if mode in cls._VALID_TRIGGER_EXECUTION_MODES:
+                        policy[action]["execution_mode"] = mode
+                    elif scope == "SYSTEM_ONLY":
+                        policy[action]["execution_mode"] = "SCHEDULED"
+                    elif scope:
+                        policy[action]["execution_mode"] = "MANUAL"
+                if scope in cls._VALID_TRIGGER_SCOPES:
+                    policy[action]["actor_scope"] = scope
+
+        return policy
+
+    @classmethod
+    def _normalize_trigger_policy_from_record(cls, contract: ContractRecord) -> Dict[str, Dict[str, str]]:
+        raw = contract.trigger_policy
+        if raw:
+            return cls._normalize_trigger_policy(kind=contract.kind, has_rules=contract.has_rules, trigger_policy=raw)
+        return cls._default_trigger_policy(kind=contract.kind, has_rules=contract.has_rules)
+
+    def _actor_matches_scope(self, *, actor_id: str, contract: ContractRecord, scope: str) -> bool:
+        actor_norm = self._normalize_account_id(actor_id)
+        creator_norm = self._normalize_account_id(contract.creator_id or "")
+
+        if scope == "SYSTEM_ONLY":
+            return actor_norm in self._SYSTEM_ACTORS or actor_norm.startswith("system:")
+
+        if scope == "CREATOR_ONLY":
+            return bool(actor_norm) and bool(creator_norm) and actor_norm == creator_norm
+
+        if scope == "ANY_SIGNER":
+            signed = {self._normalize_account_id(x) for x in (contract.signed_parties or [])}
+            required = {self._normalize_account_id(x) for x in (contract.required_signers or [])}
+            return bool(actor_norm) and (actor_norm in signed or actor_norm in required or actor_norm == creator_norm)
+
+        # ANY_PARTY
+        parties = {self._normalize_account_id(x) for x in (contract.parties or [])}
+        invited = {self._normalize_account_id(x) for x in (contract.invited_parties or [])}
+        required = {self._normalize_account_id(x) for x in (contract.required_signers or [])}
+        return bool(actor_norm) and (actor_norm in parties or actor_norm in invited or actor_norm in required or actor_norm == creator_norm)
+
+    def _is_system_actor(self, actor_id: str) -> bool:
+        actor_norm = self._normalize_account_id(actor_id)
+        return actor_norm in self._SYSTEM_ACTORS or actor_norm.startswith("system:")
+
+    def _assert_trigger_authorized(self, contract: ContractRecord, *, actor_id: str, action: str) -> None:
+        policy = self._normalize_trigger_policy_from_record(contract)
+        action_key = str(action or "").strip().lower()
+        if action_key not in self._TRIGGER_ACTIONS:
+            raise ValueError("unsupported trigger action")
+
+        action_policy = policy.get(action_key, {}) if isinstance(policy, dict) else {}
+        scope = str(action_policy.get("actor_scope") or "ANY_PARTY").upper()
+        if scope not in self._VALID_TRIGGER_SCOPES:
+            scope = "ANY_PARTY"
+
+        if action_key == "run_rules":
+            execution_mode = str(action_policy.get("execution_mode") or "MANUAL_OR_SCHEDULED").upper()
+            if execution_mode not in self._VALID_TRIGGER_EXECUTION_MODES:
+                execution_mode = "MANUAL_OR_SCHEDULED"
+
+            if self._is_system_actor(actor_id):
+                if execution_mode in {"SCHEDULED", "MANUAL_OR_SCHEDULED"}:
+                    return
+                raise ValueError("this contract is not scheduled for automatic execution")
+
+            if execution_mode == "SCHEDULED":
+                raise ValueError("this contract is scheduled-only")
+
+        if not self._actor_matches_scope(actor_id=actor_id, contract=contract, scope=scope):
+            if scope == "SYSTEM_ONLY":
+                raise ValueError("this action is reserved for the scheduler")
+            if scope == "CREATOR_ONLY":
+                raise ValueError("only contract creator can trigger this action")
+            if scope == "ANY_SIGNER":
+                raise ValueError("only a required signer can trigger this action")
+            raise ValueError("you are not allowed to trigger this action")
 
     @staticmethod
     def _normalize_var_in_expr(v: Any, *, contract_id: str) -> Any:
@@ -222,6 +354,7 @@ class ContractService:
         required_signers: List[str],
         participation_mode: str | None = None,
         invited_parties: List[str] | None = None,
+        trigger_policy: Any | None = None,
         actor_id: str,
     ) -> str:
         now = datetime.now(timezone.utc)
@@ -231,6 +364,11 @@ class ContractService:
         has_rules = isinstance(rules_raw, list) and any(isinstance(x, dict) for x in rules_raw)
 
         mode = (participation_mode or ParticipationMode.ALL_SIGNERS.value).upper()
+        normalized_trigger_policy = self._normalize_trigger_policy(
+            kind=kind,
+            has_rules=has_rules,
+            trigger_policy=trigger_policy,
+        )
 
         # ID 归一化
         parties = [str(p).lower() for p in (parties or [])]
@@ -247,6 +385,9 @@ class ContractService:
             required_signers=required_signers,
             invited_parties=invited,
             creator_id=aid,  # 正确记录创建者
+            participation_mode=mode,
+            has_rules=has_rules,
+            trigger_policy=normalized_trigger_policy,
         )
 
         payload = ContractCreatedPayload(
@@ -288,6 +429,11 @@ class ContractService:
 
             rules_raw = terms.get("rules") if isinstance(terms, dict) else None
             has_rules = isinstance(rules_raw, list) and any(isinstance(x, dict) for x in rules_raw)
+            normalized_trigger_policy = self._normalize_trigger_policy(
+                kind=kind,
+                has_rules=has_rules,
+                trigger_policy=c.get("trigger_policy"),
+            )
 
             specs.append(
                 {
@@ -298,6 +444,7 @@ class ContractService:
                     "terms_json": json.dumps(terms, ensure_ascii=False),
                     "status": ContractStatus.DRAFT.value,
                     "has_rules": bool(has_rules),
+                    "trigger_policy": normalized_trigger_policy,
                     "parties": parties,
                     "required_signers": required_signers,
                     "signatures": [],
@@ -318,6 +465,9 @@ class ContractService:
                 required_signers=spec["required_signers"],
                 invited_parties=spec["invited_parties"],
                 creator_id=str(actor_id).lower(),
+                participation_mode=spec["participation_mode"],
+                has_rules=bool(spec["has_rules"]),
+                trigger_policy=spec["trigger_policy"],
             )
 
         for spec in specs:
@@ -500,6 +650,7 @@ class ContractService:
         contract = sqlite_get_contract(contract_id)
         if contract is None or contract.status != "SIGNED":
             raise ValueError("contract not found or not signed")
+        self._assert_trigger_authorized(contract, actor_id=actor_id, action="activate")
 
         sqlite_update_contract_status(contract_id, "ACTIVE")
 
@@ -518,6 +669,7 @@ class ContractService:
         contract = sqlite_get_contract(contract_id)
         if contract is None:
             raise ValueError("contract not found")
+        self._assert_trigger_authorized(contract, actor_id=actor_id, action="settle")
 
         status = contract.status
         if status == ContractStatus.SETTLED.value:
@@ -583,6 +735,7 @@ class ContractService:
         contract = sqlite_get_contract(contract_id)
         if contract is None:
             raise ValueError("contract not found")
+        self._assert_trigger_authorized(contract, actor_id=actor_id, action="run_rules")
 
         status = contract.status
         if status == ContractStatus.SETTLED.value:

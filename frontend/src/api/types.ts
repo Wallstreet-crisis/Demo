@@ -80,6 +80,7 @@ export type ContractBriefResponse = {
   parties?: string[]
   required_signers?: string[]
   signatures?: string[]
+  trigger_policy?: Record<string, unknown>
 }
 
 export type ContractListResponse = {
@@ -695,6 +696,7 @@ export type ContractCreateRequest = {
   required_signers: string[]
   participation_mode?: string | null
   invited_parties?: string[] | null
+  trigger_policy?: Record<string, unknown> | null
 }
 
 export type ContractCreateResponse = {
@@ -709,6 +711,7 @@ export type ContractBatchItem = {
   required_signers: string[]
   participation_mode?: string | null
   invited_parties?: string[] | null
+  trigger_policy?: Record<string, unknown> | null
 }
 
 export type ContractBatchCreateRequest = {
@@ -780,6 +783,8 @@ export type ContractResponse = {
   signatures: Record<string, string>
   participation_mode: string
   invited_parties: string[]
+  creator_id?: string | null
+  trigger_policy?: Record<string, unknown>
   created_at: string
   updated_at: string
   proposals: unknown[]

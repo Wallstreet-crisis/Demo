@@ -198,6 +198,7 @@ def default_skills_registry() -> SkillsRegistry:
                 "required_signers": {"type": "array"},
                 "participation_mode": {"type": ["string", "null"]},
                 "invited_parties": {"type": ["array", "null"]},
+                "trigger_policy": {"type": ["object", "string", "null"]},
             },
             "required": ["kind", "title", "terms", "parties", "required_signers"],
         },
@@ -211,6 +212,7 @@ def default_skills_registry() -> SkillsRegistry:
             invited_parties=[str(x) for x in (a.get("invited_parties") or []) if x]
             if isinstance(a.get("invited_parties"), list)
             else None,
+            trigger_policy=a.get("trigger_policy") if isinstance(a.get("trigger_policy"), (dict, str)) else None,
         ),
     )
 

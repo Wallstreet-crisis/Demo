@@ -22,6 +22,7 @@ class ContractRecord:
     required_signers_json: str
     participation_mode: str
     has_rules: bool
+    trigger_policy_json: str
     rule_state_json: str
     signed_parties_json: str
     invited_parties_json: str
@@ -65,6 +66,13 @@ class ContractRecord:
     def rule_state(self) -> Dict[str, Any]:
         try:
             return json.loads(self.rule_state_json) if self.rule_state_json else {}
+        except json.JSONDecodeError:
+            return {}
+
+    @property
+    def trigger_policy(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.trigger_policy_json) if self.trigger_policy_json else {}
         except json.JSONDecodeError:
             return {}
 
@@ -112,6 +120,7 @@ def init_contracts_schema() -> None:
             required_signers_json TEXT,
             participation_mode TEXT,
             has_rules INTEGER NOT NULL DEFAULT 0,
+            trigger_policy_json TEXT,
             rule_state_json TEXT,
             signed_parties_json TEXT,
             invited_parties_json TEXT,
@@ -143,6 +152,15 @@ def init_contracts_schema() -> None:
 
     conn.commit()
 
+    cur.execute("PRAGMA table_info(contracts)")
+    columns = [row[1] for row in cur.fetchall()]
+    if "trigger_policy_json" not in columns:
+        try:
+            cur.execute("ALTER TABLE contracts ADD COLUMN trigger_policy_json TEXT")
+            conn.commit()
+        except Exception:
+            pass
+
 
 def create_contract(
     contract_id: str,
@@ -153,6 +171,9 @@ def create_contract(
     required_signers: List[str],
     invited_parties: List[str] = None,
     creator_id: str = None,
+    participation_mode: str = "ALL_SIGNERS",
+    has_rules: bool = False,
+    trigger_policy: Dict[str, Any] | None = None,
 ) -> None:
     conn = get_connection()
     now = datetime.now(timezone.utc).isoformat()
@@ -161,6 +182,7 @@ def create_contract(
     parties_json = json.dumps(parties, ensure_ascii=False)
     required_signers_json = json.dumps(required_signers, ensure_ascii=False)
     invited_parties_json = json.dumps(invited_parties or [], ensure_ascii=False)
+    trigger_policy_json = json.dumps(trigger_policy or {}, ensure_ascii=False)
     
     with conn:
         conn.execute(
@@ -168,14 +190,14 @@ def create_contract(
             INSERT INTO contracts (
                 contract_id, kind, title, terms_json, status, created_at, updated_at,
                 parties_json, required_signers_json, participation_mode, has_rules,
-                rule_state_json, signed_parties_json, invited_parties_json,
+                trigger_policy_json, rule_state_json, signed_parties_json, invited_parties_json,
                 creator_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 contract_id, kind, title, terms_json, "DRAFT", now, now,
-                parties_json, required_signers_json, "ALL_SIGNERS", 0,
-                "{}", "[]", invited_parties_json,
+                parties_json, required_signers_json, str(participation_mode or "ALL_SIGNERS").upper(), 1 if has_rules else 0,
+                trigger_policy_json, "{}", "[]", invited_parties_json,
                 creator_id
             ),
         )
@@ -199,6 +221,7 @@ def get_contract(contract_id: str) -> Optional[ContractRecord]:
         required_signers_json=row["required_signers_json"],
         participation_mode=row["participation_mode"],
         has_rules=bool(row["has_rules"]),
+        trigger_policy_json=row["trigger_policy_json"],
         rule_state_json=row["rule_state_json"],
         signed_parties_json=row["signed_parties_json"],
         invited_parties_json=row["invited_parties_json"],
@@ -249,6 +272,7 @@ def list_contracts_for_player(player_id: str, limit: int = 50) -> List[ContractR
             required_signers_json=r["required_signers_json"],
             participation_mode=r["participation_mode"],
             has_rules=bool(r["has_rules"]),
+            trigger_policy_json=r["trigger_policy_json"],
             rule_state_json=r["rule_state_json"],
             signed_parties_json=r["signed_parties_json"],
             invited_parties_json=r["invited_parties_json"],
@@ -385,6 +409,7 @@ def list_pending_contracts(limit: int = 50) -> List[ContractRecord]:
             required_signers_json=r["required_signers_json"],
             participation_mode=r["participation_mode"],
             has_rules=bool(r["has_rules"]),
+            trigger_policy_json=r["trigger_policy_json"],
             rule_state_json=r["rule_state_json"],
             signed_parties_json=r["signed_parties_json"],
             invited_parties_json=r["invited_parties_json"],
@@ -425,6 +450,7 @@ def list_contracts_with_rules(limit: int = 50) -> List[ContractRecord]:
             required_signers_json=r["required_signers_json"],
             participation_mode=r["participation_mode"],
             has_rules=bool(r["has_rules"]),
+            trigger_policy_json=r["trigger_policy_json"],
             rule_state_json=r["rule_state_json"],
             signed_parties_json=r["signed_parties_json"],
             invited_parties_json=r["invited_parties_json"],
@@ -539,7 +565,7 @@ def list_contracts_by_actor(
     rows = conn.execute(
         f"""
         SELECT contract_id, title, kind, status, created_at, creator_id,
-               parties_json, required_signers_json, signed_parties_json
+               parties_json, required_signers_json, signed_parties_json, trigger_policy_json
         FROM contracts
         WHERE {where_clause}
         ORDER BY created_at DESC
@@ -561,5 +587,6 @@ def list_contracts_by_actor(
             "parties": json.loads(r["parties_json"] or "[]"),
             "required_signers": json.loads(r["required_signers_json"] or "[]"),
             "signatures": json.loads(r["signed_parties_json"] or "[]"),
+            "trigger_policy": json.loads(r["trigger_policy_json"] or "{}"),
         })
     return result

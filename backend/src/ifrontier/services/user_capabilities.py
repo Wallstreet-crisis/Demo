@@ -135,6 +135,7 @@ class UserCapabilityFacade:
         required_signers: List[str],
         participation_mode: str | None = None,
         invited_parties: List[str] | None = None,
+        trigger_policy: Dict[str, Any] | None = None,
     ) -> str:
         return self.contract_service.create_contract(
             kind=kind,
@@ -144,6 +145,7 @@ class UserCapabilityFacade:
             required_signers=required_signers,
             participation_mode=participation_mode,
             invited_parties=invited_parties,
+            trigger_policy=trigger_policy,
             actor_id=self.user_id,
         )
 

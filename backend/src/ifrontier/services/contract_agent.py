@@ -495,6 +495,7 @@ class ContractAgent:
             "字段规范（强制严格执行）：",
             "1. 顶层结构固定：{\"template_id\":\"...\",\"contract_create\":{...},\"explanation\":\"...\",\"questions\":[],\"risk_rating\":\"LOW|MEDIUM|HIGH\"}",
             "2. contract_create必填：kind/title/terms/parties/required_signers/participation_mode/invited_parties",
+            "   可选：trigger_policy。用于显式配置执行策略；格式示例：{\"activate\":{\"actor_scope\":\"CREATOR_ONLY\"},\"settle\":{\"actor_scope\":\"ANY_PARTY\"},\"run_rules\":{\"actor_scope\":\"ANY_PARTY\",\"execution_mode\":\"MANUAL_OR_SCHEDULED\"}}。",
             "3. terms 必填结构：clauses/rules/transfers/default_policy/reserved_default_policies",
             "   3.1 clauses: 人类可读条款文本数组(list[str])，用于展示与审计，不参与机器执行。",
             "   3.2 rules: 可执行规则数组(list[object])。每条规则对象字段：",

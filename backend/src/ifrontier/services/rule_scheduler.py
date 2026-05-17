@@ -92,4 +92,11 @@ class ContractRuleScheduler:
 
     def _fetch_active_contracts_with_rules(self, *, limit: int) -> List[str]:
         contracts = list_contracts_with_rules(limit=int(limit))
-        return [c.contract_id for c in contracts]
+        contract_ids: List[str] = []
+        for contract in contracts:
+            policy = contract.trigger_policy if isinstance(contract.trigger_policy, dict) else {}
+            run_rules = policy.get("run_rules") if isinstance(policy, dict) else {}
+            mode = str(run_rules.get("execution_mode") or "MANUAL_OR_SCHEDULED").upper() if isinstance(run_rules, dict) else "MANUAL_OR_SCHEDULED"
+            if mode in {"SCHEDULED", "MANUAL_OR_SCHEDULED"}:
+                contract_ids.append(contract.contract_id)
+        return contract_ids
