@@ -111,12 +111,13 @@ def _news_debug_enabled() -> bool:
 # ==========================================
 
 from ifrontier.app.room_engine import room_manager
-from ifrontier.app.room_meta import get_local_rooms, create_or_update_room_meta, room_exists
+from ifrontier.app.room_meta import RoomGameSettings, get_local_rooms, create_or_update_room_meta, room_exists
 
 class CreateRoomRequest(BaseModel):
     room_id: Optional[str] = None
     player_id: str
     name: Optional[str] = None
+    game_settings: Optional[RoomGameSettings] = None
 
 @router.post("/rooms")
 async def create_room(req: CreateRoomRequest) -> Dict[str, Any]:
@@ -125,9 +126,15 @@ async def create_room(req: CreateRoomRequest) -> Dict[str, Any]:
     if not new_room_id:
         import uuid
         new_room_id = f"room_{uuid.uuid4().hex[:8]}"
-        
+
+    create_or_update_room_meta(
+        room_id=new_room_id,
+        player_id=req.player_id,
+        name=req.name,
+        game_settings=req.game_settings,
+        ensure_game_started=True,
+    )
     await room_manager.start_room(new_room_id)
-    create_or_update_room_meta(room_id=new_room_id, player_id=req.player_id, name=req.name)
     return {"ok": True, "room_id": new_room_id}
 
 @router.get("/rooms")
@@ -142,11 +149,17 @@ async def list_local_rooms() -> Dict[str, Any]:
 
 class UpdateRoomMetaRequest(BaseModel):
     name: str
+    game_settings: Optional[RoomGameSettings] = None
 
 @router.post("/rooms/{room_id}/meta")
 async def update_room_meta(room_id: str, req: UpdateRoomMetaRequest) -> Dict[str, Any]:
     # player_id 不重要，仅用于更新名称
-    meta = create_or_update_room_meta(room_id=room_id, player_id="UNKNOWN", name=req.name)
+    meta = create_or_update_room_meta(
+        room_id=room_id,
+        player_id="UNKNOWN",
+        name=req.name,
+        game_settings=req.game_settings,
+    )
     return {"ok": True, "meta": meta.model_dump()}
 
 @router.post("/rooms/{room_id}/close")
@@ -160,6 +173,7 @@ async def activate_room(room_id: str) -> Dict[str, Any]:
     """仅供房主本地恢复存档时显式激活房间引擎。"""
     if room_id != "default" and not room_exists(room_id):
         raise HTTPException(status_code=404, detail="room does not exist")
+    create_or_update_room_meta(room_id=room_id, player_id="UNKNOWN", ensure_game_started=True)
     await room_manager.start_room(room_id)
     return {"ok": True, "room_id": room_id}
 

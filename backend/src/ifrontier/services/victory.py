@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from ifrontier.infra.sqlite.ledger import get_snapshot, AccountSnapshot
 from ifrontier.infra.sqlite.market import get_last_price
@@ -134,6 +135,31 @@ class VictoryService:
         
         if not players:
             return None
+
+        # 时间结算：到点后按当前总估值最高者结算
+        time_limit_seconds = settings.get("time_limit_seconds")
+        started_at = settings.get("game_started_at") or settings.get("game_started_at_utc")
+        if time_limit_seconds:
+            try:
+                started_dt = datetime.fromisoformat(str(started_at)) if started_at else None
+                if started_dt is not None and started_dt.tzinfo is None:
+                    started_dt = started_dt.replace(tzinfo=timezone.utc)
+                if started_dt is not None:
+                    now = datetime.now(timezone.utc)
+                    elapsed_seconds = (now - started_dt.astimezone(timezone.utc)).total_seconds()
+                    if elapsed_seconds >= float(time_limit_seconds):
+                        winner = max(
+                            players,
+                            key=lambda p: (float(p["total_valuation"]), str(p["account_id"])),
+                        )
+                        return {
+                            "type": VictoryConditionType.TIME_LIMIT,
+                            "winner": winner["account_id"],
+                            "reason": f"时间结算已到达。房间已运行 {int(elapsed_seconds)} 秒，系统按当前总估值最高者结算。",
+                            "achievement": "TIME_LIMIT_SETTLEMENT",
+                        }
+            except Exception as e:
+                _log.warning(f"Failed to evaluate time-limit victory: {e}")
 
         # 终产者模式
         threshold = settings.get("ultimate_owner_threshold", self.mm_baseline * 1.5)

@@ -15,6 +15,7 @@ class VictoryScheduler:
         tick_interval_seconds: float = 5.0,
         broadcaster: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
         get_channel_size: Optional[Callable[[str], Awaitable[int]]] = None,
+        room_settings: Optional[Dict[str, Any]] = None,
     ) -> None:
         self._tick_interval_seconds = float(tick_interval_seconds)
         self._broadcaster = broadcaster
@@ -24,13 +25,15 @@ class VictoryScheduler:
         self._task: Optional[asyncio.Task[None]] = None
         self._victory_service = VictoryService()
         
-        # 默认设置，实际可以从 room_meta 或 settings 数据库读取
+        # 默认设置，房间级配置会在这里覆盖，避免影响全局默认值
         self.settings = {
             "ultimate_owner_threshold": 1_500_000_000.0, # 15亿
             "mass_bankruptcy_mode": True,
             "min_active_players": 1,
             "time_limit_seconds": None, # 无限时
         }
+        if room_settings:
+            self.settings.update({k: v for k, v in room_settings.items() if v is not None})
 
     def start(self) -> None:
         if self._task is not None:
@@ -49,19 +52,28 @@ class VictoryScheduler:
     async def _run_loop(self) -> None:
         _log.info("VictoryScheduler started")
         while not self._stop.is_set():
+            has_time_limit = bool(self.settings.get("time_limit_seconds"))
             # 检查是否有在线玩家，如果没有则跳过以节省 CPU
             if self._get_channel_size:
                 try:
                     online = await self._get_channel_size("presence")
                 except Exception:
                     online = 0
-                if online <= 0:
+                if online <= 0 and not has_time_limit:
                     await asyncio.sleep(self._tick_interval_seconds)
                     continue
 
             try:
                 # 1. 玩家个人结算更新 (在线程池中运行同步 DB 操作)
-                await self._process_player_settlements()
+                if has_time_limit or (self._get_channel_size is None):
+                    await self._process_player_settlements()
+                elif self._get_channel_size:
+                    try:
+                        online = await self._get_channel_size("presence")
+                    except Exception:
+                        online = 0
+                    if online > 0:
+                        await self._process_player_settlements()
                 
                 # 2. 全局胜利条件检测
                 result = await asyncio.to_thread(self._victory_service.check_global_victory, self.settings)

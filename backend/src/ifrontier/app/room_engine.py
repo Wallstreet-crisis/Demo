@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 from ifrontier.infra.sqlite.db import room_id_var
 from ifrontier.infra.sqlite.schema import init_schema
 from ifrontier.app.ws import hub
+from ifrontier.app.room_meta import load_room_meta
 
 from ifrontier.services.rule_scheduler import ContractRuleScheduler
 from ifrontier.services.news_tick_scheduler import NewsTickScheduler
@@ -65,6 +66,11 @@ class RoomEngine:
         broadcaster = self._make_broadcaster()
         get_size = self._get_room_channel_size()
 
+        room_meta = load_room_meta(self.room_id)
+        game_settings = room_meta.game_settings.model_dump(exclude_none=True) if room_meta else {}
+        if room_meta:
+            game_settings.setdefault("game_started_at", room_meta.game_started_at or room_meta.created_at)
+
         from ifrontier.app.api import (
             _contract_service,
             _news_service,
@@ -123,6 +129,7 @@ class RoomEngine:
             tick_interval_seconds=5.0,
             broadcaster=broadcaster,
             get_channel_size=get_size,
+            room_settings=game_settings,
         )
 
         token = room_id_var.set(self.room_id)

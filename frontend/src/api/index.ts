@@ -101,6 +101,14 @@ export type CreateRoomRequest = {
   room_id?: string
   player_id: string
   name?: string
+  game_settings?: RoomGameSettings
+}
+
+export type RoomGameSettings = {
+  time_limit_seconds?: number | null
+  ultimate_owner_threshold?: number | null
+  mass_bankruptcy_mode?: boolean | null
+  min_active_players?: number | null
 }
 
 export type CreateRoomResponse = {
@@ -114,6 +122,8 @@ export type RoomMeta = {
   player_id: string
   created_at: string
   updated_at: string
+  game_started_at?: string | null
+  game_settings?: RoomGameSettings | null
 }
 
 export type LocalRoomsResponse = {

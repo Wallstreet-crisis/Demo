@@ -19,6 +19,8 @@ export default function MainMenuPage() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [networkScanning, setNetworkScanning] = useState(false)
+  const [roomTimeLimitEnabled, setRoomTimeLimitEnabled] = useState(false)
+  const [roomTimeLimitMinutes, setRoomTimeLimitMinutes] = useState('30')
 
   const isInputValid = inputPlayerId.length >= 3 && inputPlayerId.length <= 20
 
@@ -94,7 +96,11 @@ export default function MainMenuPage() {
     // 我们并发启动建房请求和倒计时，等两者都完成了再跳转
     const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
     localStorage.removeItem('if_network_target') // Reset network target to default
-    const createRoomPromise = Api.createRoom({ player_id: inputPlayerId })
+    const minutes = Number(roomTimeLimitMinutes)
+    const game_settings = roomTimeLimitEnabled && Number.isFinite(minutes) && minutes > 0
+      ? { time_limit_seconds: Math.round(minutes * 60) }
+      : undefined
+    const createRoomPromise = Api.createRoom({ player_id: inputPlayerId, game_settings })
 
     try {
       const [, res] = await Promise.all([animationPromise, createRoomPromise])
@@ -312,6 +318,41 @@ export default function MainMenuPage() {
                     letterSpacing: '2px'
                   }}
                 />
+              </div>
+
+              <div style={{ marginBottom: '18px', padding: '12px', border: '1px solid rgba(148,163,184,0.18)', background: 'rgba(15, 23, 42, 0.45)' }}>
+                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>ROOM GAME SETTINGS</div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1', marginBottom: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={roomTimeLimitEnabled}
+                    onChange={(e) => setRoomTimeLimitEnabled(e.target.checked)}
+                  />
+                  ENABLE TIME SETTLEMENT
+                </label>
+                <div style={{ opacity: roomTimeLimitEnabled ? 1 : 0.45, transition: 'opacity 0.2s ease' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>TIME LIMIT (MINUTES)</div>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    disabled={!roomTimeLimitEnabled}
+                    value={roomTimeLimitMinutes}
+                    onChange={(e) => setRoomTimeLimitMinutes(e.target.value)}
+                    className="cyber-input"
+                    style={{
+                      width: '100%',
+                      height: '44px',
+                      background: 'var(--panel-bg)',
+                      border: '1px solid var(--terminal-border)',
+                      color: 'var(--terminal-text)',
+                      padding: '0 16px',
+                      fontFamily: 'monospace',
+                      fontSize: '16px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
               </div>
 
               <MenuButton 
@@ -569,6 +610,12 @@ export default function MainMenuPage() {
                     <span style={{ color: '#94a3b8' }}>{room.player_id}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>TIME LIMIT:</span>
+                    <span style={{ color: '#94a3b8' }}>
+                      {room.game_settings?.time_limit_seconds ? `${Math.round(room.game_settings.time_limit_seconds / 60)} MIN` : 'OFF'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>LAST SYNC:</span>
                     <span style={{ color: '#94a3b8' }}>{room.updated_at ? new Date(room.updated_at).toLocaleString() : '--'}</span>
                   </div>
@@ -629,6 +676,12 @@ export default function MainMenuPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>CREATOR:</span>
                     <span style={{ color: '#94a3b8' }}>{room.player_id}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>TIME LIMIT:</span>
+                    <span style={{ color: '#94a3b8' }}>
+                      {room.game_settings?.time_limit_seconds ? `${Math.round(room.game_settings.time_limit_seconds / 60)} MIN` : 'OFF'}
+                    </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>LAST SYNC:</span>
