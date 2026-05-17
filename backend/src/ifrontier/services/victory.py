@@ -12,6 +12,8 @@ _log = get_logger(__name__)
 
 # 破产阈值
 BANKRUPTCY_THRESHOLD = 2720.0
+# 复活线：为破产状态提供一个滞回区间，避免在阈值附近来回抖动。
+BANKRUPTCY_REVIVAL_THRESHOLD = 3000.0
 
 class PlayerStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
@@ -53,62 +55,73 @@ class VictoryService:
         """单人结算：更新估值，检查多元终局。"""
         total = self.compute_total_valuation(account_id)
         snap = get_snapshot(account_id)
-        
-        if snap.status in {PlayerStatus.BANKRUPT, PlayerStatus.SPECTATOR, PlayerStatus.WINNER, PlayerStatus.RETIRED}:
-            return {"status": snap.status, "achievement": None}
 
-        new_status = PlayerStatus.ACTIVE
+        locked_statuses = {PlayerStatus.SPECTATOR, PlayerStatus.WINNER, PlayerStatus.RETIRED}
+        current_status = PlayerStatus(str(snap.status).upper()) if str(snap.status).upper() in PlayerStatus.__members__ else PlayerStatus.ACTIVE
+
+        new_status = current_status
         achievement = None
         message = ""
-        
-        # 1. 破产判定
-        if total < BANKRUPTCY_THRESHOLD:
-            new_status = PlayerStatus.BANKRUPT
-            message = "您的资金已跌破生存线。根据《市场避难所协议》，您已被剥夺操作权，转为观战模式。"
-        
-        # 2. 阶级专属终局逻辑
-        # - WORKING (平民): 白手起家
-        elif snap.caste_id == "WORKING" and total >= 1_000_000.0:
-            new_status = PlayerStatus.WINNER
-            achievement = VictoryConditionType.SELF_MADE
-            message = "从一贫如洗到百万身家，你证明了资本神话的存在。你已出人头地！"
 
-        # - MIDDLE (中产): 财务自由 (10倍初始资金且轻仓)
-        elif snap.caste_id == "MIDDLE":
-            # 计算总仓位占比
-            stock_value = total - float(snap.cash)
-            stock_ratio = stock_value / total if total > 0 else 0
-            if total >= 2_000_000.0 and stock_ratio < 0.05:
-                new_status = PlayerStatus.RETIRED
-                achievement = VictoryConditionType.FINANCIAL_FREEDOM
-                message = "你已达成财务自由并成功空仓避险。你决定在塞浦路斯买个海滩退休，不再参与这该死的市场。"
+        if current_status in locked_statuses:
+            # 终局/观战状态保持粘性，但仍然刷新总资产快照。
+            pass
+        else:
+            # 1. 破产与复活判定（带滞回区间）
+            if current_status == PlayerStatus.BANKRUPT:
+                if total >= BANKRUPTCY_REVIVAL_THRESHOLD:
+                    new_status = PlayerStatus.ACTIVE
+                    message = "资金已回升，破产封锁解除。你重新获得了操作权。"
+                else:
+                    new_status = PlayerStatus.BANKRUPT
+                    message = "资产仍低于复活线。你继续处于观战模式。"
+            elif total < BANKRUPTCY_THRESHOLD:
+                new_status = PlayerStatus.BANKRUPT
+                message = "您的资金已跌破生存线。根据《市场避难所协议》，您已被剥夺操作权，转为观战模式。"
+            else:
+                new_status = PlayerStatus.ACTIVE
 
-        # - ELITE (精英): 黑色幽默 [归于平凡] (赔光但活着)
-        elif snap.caste_id == "ELITE" and BANKRUPTCY_THRESHOLD < total < 5000.0:
-            # 这里可以设定为一个特殊胜利条件：体验过巅峰后的坦然
-            new_status = PlayerStatus.WINNER
-            achievement = VictoryConditionType.PHILOSOPHER
-            message = "从亿万富豪到一文不名，你在破产边缘感受到了久违的宁静。你赢得了'哲学大师'成就。"
+            # 2. 阶级专属终局逻辑（仅在未锁定状态下评估）
+            if new_status == PlayerStatus.ACTIVE:
+                # - WORKING (平民): 白手起家
+                if snap.caste_id == "WORKING" and total >= 1_000_000.0:
+                    new_status = PlayerStatus.WINNER
+                    achievement = VictoryConditionType.SELF_MADE
+                    message = "从一贫如洗到百万身家，你证明了资本神话的存在。你已出人头地！"
 
-        # 3. 绝对支配 (支配做市商)
-        if total >= self.mm_baseline * 1.1:
-            new_status = PlayerStatus.WINNER
-            achievement = VictoryConditionType.MM_DOMINATION
-            message = f"你的财富已经超越了做市商的承载极限。你不是在交易，你就是市场本身。"
+                # - MIDDLE (中产): 财务自由 (10倍初始资金且轻仓)
+                elif snap.caste_id == "MIDDLE":
+                    stock_value = total - float(snap.cash)
+                    stock_ratio = stock_value / total if total > 0 else 0
+                    if total >= 2_000_000.0 and stock_ratio < 0.05:
+                        new_status = PlayerStatus.RETIRED
+                        achievement = VictoryConditionType.FINANCIAL_FREEDOM
+                        message = "你已达成财务自由并成功空仓避险。你决定在塞浦路斯买个海滩退休，不再参与这该死的市场。"
 
-        if new_status != snap.status:
-            conn = get_connection()
-            with conn:
-                conn.execute(
-                    "UPDATE accounts SET total_valuation = ?, status = ? WHERE account_id = ?",
-                    (total, new_status.value, account_id),
-                )
-        
+                # - ELITE (精英): 黑色幽默 [归于平凡] (赔光但活着)
+                elif snap.caste_id == "ELITE" and BANKRUPTCY_THRESHOLD < total < 5000.0:
+                    new_status = PlayerStatus.WINNER
+                    achievement = VictoryConditionType.PHILOSOPHER
+                    message = "从亿万富豪到一文不名，你在破产边缘感受到了久违的宁静。你赢得了'哲学大师'成就。"
+
+                # 3. 绝对支配 (支配做市商)
+                if total >= self.mm_baseline * 1.1:
+                    new_status = PlayerStatus.WINNER
+                    achievement = VictoryConditionType.MM_DOMINATION
+                    message = f"你的财富已经超越了做市商的承载极限。你不是在交易，你就是市场本身。"
+
+        conn = get_connection()
+        with conn:
+            conn.execute(
+                "UPDATE accounts SET total_valuation = ?, status = ? WHERE account_id = ?",
+                (total, new_status.value, account_id),
+            )
+
         return {
             "status": new_status.value,
             "achievement": achievement,
             "message": message,
-            "valuation": total
+            "valuation": total,
         }
 
     def check_global_victory(self, settings: Dict[str, Any]) -> Optional[Dict[str, Any]]:

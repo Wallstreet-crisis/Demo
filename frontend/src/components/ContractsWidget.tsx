@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Api, ApiError, type ContractAgentDraftResponse, type ContractParty, type ContractBriefResponse } from '../api'
 import { useAppSession } from '../app/context'
 import { useNotification } from '../app/NotificationContext'
@@ -6,6 +7,7 @@ import CyberWidget from './CyberWidget'
 
 export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) {
   const { playerId } = useAppSession()
+  const navigate = useNavigate()
   const { notify } = useNotification()
   const [loading, setLoading] = useState(false)
   const [naturalLanguage, setNaturalLanguage] = useState('')
@@ -125,6 +127,11 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
         return required.has(myId) && !signed.has(myId)
       })
   }, [contracts, actorId])
+
+  const openContractDetail = (contractId: string) => {
+    if (!contractId) return
+    navigate(`/contracts/${contractId}`)
+  }
 
   const signedContracts = useMemo(() => {
     if (!actorId) return []
@@ -435,7 +442,22 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
                   const total = (c.required_signers || []).length
                   const signed = (c.signatures || []).length
                   return (
-                    <div key={`pending-${c.contract_id}`} style={{ border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '4px', padding: '6px 8px', background: 'rgba(30, 41, 59, 0.35)' }}>
+                    <div
+                      key={`pending-${c.contract_id}`}
+                      onClick={() => openContractDetail(c.contract_id)}
+                      role="button"
+                      tabIndex={0}
+                      title="打开签署界面"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          openContractDetail(c.contract_id)
+                        }
+                      }}
+                      style={{ border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '4px', padding: '6px 8px', background: 'rgba(30, 41, 59, 0.35)', cursor: 'pointer', transition: 'all 0.15s ease' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.6)'; e.currentTarget.style.background = 'rgba(30, 41, 59, 0.55)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.25)'; e.currentTarget.style.background = 'rgba(30, 41, 59, 0.35)' }}
+                    >
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                         <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600 }}>{c.title || c.contract_id}</span>
                         <span style={{ fontSize: '10px', color: statusColor(c.status) }}>{c.status}</span>
@@ -461,7 +483,22 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
                   const total = (c.required_signers || []).length
                   const signed = (c.signatures || []).length
                   return (
-                    <div key={`other-${c.contract_id}`} style={{ border: '1px solid rgba(148, 163, 184, 0.15)', borderRadius: '4px', padding: '6px 8px', background: 'rgba(15, 23, 42, 0.25)' }}>
+                    <div
+                      key={`other-${c.contract_id}`}
+                      onClick={() => openContractDetail(c.contract_id)}
+                      role="button"
+                      tabIndex={0}
+                      title="打开签署界面"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          openContractDetail(c.contract_id)
+                        }
+                      }}
+                      style={{ border: '1px solid rgba(148, 163, 184, 0.15)', borderRadius: '4px', padding: '6px 8px', background: 'rgba(15, 23, 42, 0.25)', cursor: 'pointer', transition: 'all 0.15s ease' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)'; e.currentTarget.style.background = 'rgba(15, 23, 42, 0.4)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.15)'; e.currentTarget.style.background = 'rgba(15, 23, 42, 0.25)' }}
+                    >
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                         <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600 }}>{c.title || c.contract_id}</span>
                         <span style={{ fontSize: '10px', color: statusColor(c.status) }}>{c.status}</span>
@@ -487,7 +524,22 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
                   const total = (c.required_signers || []).length
                   const signed = (c.signatures || []).length
                   return (
-                    <div key={`signed-${c.contract_id}`} style={{ border: '1px solid rgba(16, 185, 129, 0.28)', borderRadius: '4px', padding: '6px 8px', background: 'rgba(15, 23, 42, 0.45)' }}>
+                    <div
+                      key={`signed-${c.contract_id}`}
+                      onClick={() => openContractDetail(c.contract_id)}
+                      role="button"
+                      tabIndex={0}
+                      title="打开签署界面"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          openContractDetail(c.contract_id)
+                        }
+                      }}
+                      style={{ border: '1px solid rgba(16, 185, 129, 0.28)', borderRadius: '4px', padding: '6px 8px', background: 'rgba(15, 23, 42, 0.45)', cursor: 'pointer', transition: 'all 0.15s ease' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.6)'; e.currentTarget.style.background = 'rgba(15, 23, 42, 0.62)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.28)'; e.currentTarget.style.background = 'rgba(15, 23, 42, 0.45)' }}
+                    >
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                         <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600 }}>{c.title || c.contract_id}</span>
                         <span style={{ fontSize: '10px', color: statusColor(c.status) }}>{c.status}</span>

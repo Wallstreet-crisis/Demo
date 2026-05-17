@@ -67,11 +67,17 @@ def _make_broadcaster_for_events():
 
     return _broadcast
 
-from ifrontier.services.victory import PlayerStatus
+from ifrontier.services.victory import PlayerStatus, VictoryService
+
+_victory_service = VictoryService()
 
 def assert_player_can_act(player_id: str):
     """检查玩家是否可以进行操作（未破产且未出局）。"""
     try:
+        try:
+            _victory_service.update_player_settlement(player_id)
+        except Exception:
+            pass
         snap = get_snapshot(player_id)
         if snap.status == PlayerStatus.BANKRUPT:
             raise HTTPException(status_code=403, detail="PLAYER_BANKRUPT: You have gone bankrupt and can only spectate.")
@@ -2436,9 +2442,7 @@ async def contract_get(contract_id: str) -> ContractResponse:
             raise HTTPException(status_code=404, detail="contract not found")
         
         terms = json.loads(record["terms_json"] or "{}")
-        
-        import json
-        sigs_raw = json.loads(record["signatures_json"] or "[]")
+        sigs_raw = json.loads(record["signed_parties_json"] or "[]")
         sigs_dict = {s: "SIGNED" for s in sigs_raw}
 
         return ContractResponse(
