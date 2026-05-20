@@ -5,6 +5,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 from ifrontier.core.logger import get_logger
 from ifrontier.services.victory import VictoryService
 from ifrontier.infra.sqlite.db import room_id_var
+from ifrontier.services.news import NewsService
 
 _log = get_logger(__name__)
 
@@ -16,6 +17,7 @@ class VictoryScheduler:
         broadcaster: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
         get_channel_size: Optional[Callable[[str], Awaitable[int]]] = None,
         room_settings: Optional[Dict[str, Any]] = None,
+        news_service: Optional[NewsService] = None,
     ) -> None:
         self._tick_interval_seconds = float(tick_interval_seconds)
         self._broadcaster = broadcaster
@@ -24,6 +26,7 @@ class VictoryScheduler:
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task[None]] = None
         self._victory_service = VictoryService()
+        self._news_service = news_service
         
         # 默认设置，房间级配置会在这里覆盖，避免影响全局默认值
         self.settings = {
@@ -83,6 +86,7 @@ class VictoryScheduler:
                         "event_type": "game.victory",
                         **result
                     })
+                    await self._publish_victory_news(result)
                     # 这里可以选择停止游戏，但目前先只广播
 
             except Exception as e:
@@ -118,6 +122,49 @@ class VictoryScheduler:
                     "message": res["message"],
                     "valuation": res["valuation"]
                 })
+                await self._publish_status_news(pid, old_status, new_status, res)
+
+    async def _publish_status_news(self, player_id: str, old_status: str, new_status: str, result: Dict[str, Any]) -> None:
+        if not self._news_service:
+            return
+        try:
+            delivered, ev = self._news_service.broadcast_system_news(
+                kind="MAJOR_EVENT",
+                actor_id="system",
+                channel="game",
+                visibility_level="PUBLIC",
+                truth_payload={
+                    "event": "player.status_changed",
+                    "player_id": player_id,
+                    "old_status": old_status,
+                    "new_status": new_status,
+                    "achievement": result.get("achievement"),
+                    "message": result.get("message"),
+                    "valuation": result.get("valuation"),
+                },
+                symbols=[player_id],
+            )
+            if self._broadcaster:
+                await self._broadcaster(ev.model_dump())
+        except Exception as exc:
+            _log.exception(f"Failed to publish status news for {player_id}: {exc}")
+
+    async def _publish_victory_news(self, result: Dict[str, Any]) -> None:
+        if not self._news_service:
+            return
+        try:
+            delivered, ev = self._news_service.broadcast_system_news(
+                kind="WORLD_EVENT",
+                actor_id="system",
+                channel="game",
+                visibility_level="PUBLIC",
+                truth_payload=result,
+                symbols=[str(result.get("winner") or "NONE")],
+            )
+            if self._broadcaster:
+                await self._broadcaster(ev.model_dump())
+        except Exception as exc:
+            _log.exception(f"Failed to publish victory news: {exc}")
 
     def _get_all_player_ids(self, conn) -> list[str]:
         rows = conn.execute("SELECT account_id FROM accounts WHERE owner_type = 'user'").fetchall()

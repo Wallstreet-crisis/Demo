@@ -111,7 +111,7 @@ def test_contract_scheduled_rule_execution_blocks_manual_trigger_but_allows_syst
     _reset_sqlite()
 
     create_account("user:alice", owner_type="user", initial_cash=100.0)
-    create_account("user:bob", owner_type="user", initial_cash=0.0)
+    create_account("user:bob", owner_type="user", initial_cash=100.0)
 
     resp = client.post(
         "/contracts/create",
@@ -217,8 +217,10 @@ def test_contract_proposal_suspend_requires_all_parties_approval() -> None:
     assert resp.status_code == 200
     contract_id = resp.json()["contract_id"]
 
-    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
-    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
+    resp = client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
+    assert resp.status_code == 200, resp.text
+    resp = client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
+    assert resp.status_code == 200, resp.text
     resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
     assert resp.status_code == 200, resp.text
     assert client.get(f"/contracts/{contract_id}").json()["status"] == "ACTIVE"
@@ -347,7 +349,7 @@ def test_contract_settle_fails_and_rolls_back_on_insufficient_assets() -> None:
     _reset_sqlite()
 
     create_account("user:alice", owner_type="user", initial_cash=50.0)
-    create_account("user:bob", owner_type="user", initial_cash=0.0)
+    create_account("user:bob", owner_type="user", initial_cash=100.0)
 
     # create contract that would require alice to pay 100 cash (insufficient)
     resp = client.post(

@@ -120,6 +120,49 @@ class NewsService:
         symbol_str = ", ".join(symbols) if symbols else "某知名企业"
         return [str(t).format(symbol=symbol_str) for t in bp.templates]
 
+    def broadcast_system_news(
+        self,
+        *,
+        kind: str,
+        actor_id: str,
+        channel: str,
+        visibility_level: str,
+        truth_payload: Dict[str, Any] | None = None,
+        symbols: List[str] | None = None,
+        tags: List[str] | None = None,
+        correlation_id: UUID | None = None,
+        limit_users: int = 5000,
+    ) -> tuple[int, EventEnvelopeJson]:
+        """将系统事件发布为新闻卡片并广播给全体用户。"""
+        card_id, _ = self.create_card(
+            kind=kind,
+            image_anchor_id=None,
+            image_uri=None,
+            truth_payload=truth_payload or {},
+            symbols=symbols or [],
+            tags=tags or [],
+            actor_id=actor_id,
+            correlation_id=correlation_id,
+        )
+        template = self.get_preset_template(kind, symbols or [])
+        variant_id, _ = self.emit_variant(
+            card_id=card_id,
+            author_id=actor_id,
+            text=template,
+            parent_variant_id=None,
+            influence_cost=0.0,
+            risk_roll=None,
+            correlation_id=correlation_id,
+        )
+        return self.broadcast_variant(
+            variant_id=variant_id,
+            channel=channel,
+            visibility_level=visibility_level,
+            actor_id=actor_id,
+            limit_users=limit_users,
+            correlation_id=correlation_id,
+        )
+
     def generate_market_shelf(
         self, 
         *, 
@@ -284,6 +327,7 @@ class NewsService:
         correlation_id: UUID | None = None,
     ) -> tuple[str, EventEnvelopeJson]:
         now = datetime.now(timezone.utc)
+        variant_id = str(uuid4())
 
         card = news_db.get_news(card_id=card_id, variant_id=None)
         if card is None:

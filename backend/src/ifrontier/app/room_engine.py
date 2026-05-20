@@ -130,6 +130,7 @@ class RoomEngine:
             broadcaster=broadcaster,
             get_channel_size=get_size,
             room_settings=game_settings,
+            news_service=_news_service,
         )
 
         token = room_id_var.set(self.room_id)
