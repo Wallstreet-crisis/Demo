@@ -54807,3 +54807,607 @@
 2026-05-17 13:03:51,640 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: True
 2026-05-17 13:03:51,661 [INFO] <hosting:bot:ret:6> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
 2026-05-17 13:03:52,145 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:25:24,201 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:25:24,260 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:25:27,733 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:25:30,320 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:25:32,183 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 7922.16, 'success': True, 'prompt_chars': 11189, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1168}
+2026-05-20 16:25:32,183 [INFO] 🧠 <hosting:bot:inst:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'sell', 'price': 0.000176, 'quantity': 323159}}]}
+2026-05-20 16:25:32,185 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'sell', 'price': 0.000176, 'quantity': 323159} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:25:32,217 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:25:32,244 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:25:32,843 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:25:35,475 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3230.83, 'success': False, 'prompt_chars': 11528, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:25:35,476 [INFO] <hosting:bot:inst:2> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:25:35,766 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:25:36,522 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:25:36,550 [INFO] <hosting:bot:inst:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:25:38,513 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:25:39,110 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2559.57, 'success': True, 'prompt_chars': 11218, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1011}
+2026-05-20 16:25:39,110 [INFO] 🧠 <hosting:bot:inst:3> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 3e-05, 'quantity': 838}}]}
+2026-05-20 16:25:39,241 [INFO] <hosting:bot:inst:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 3e-05, 'quantity': 838} | RES: True
+2026-05-20 16:25:39,259 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:25:39,288 [INFO] <hosting:bot:ret:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:25:41,008 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:25:41,440 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2151.71, 'success': True, 'prompt_chars': 10399, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1194}
+2026-05-20 16:25:41,440 [INFO] 🧠 <hosting:bot:ret:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000176, 'quantity': 14.839971914473388}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000176! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:25:41,517 [INFO] <hosting:bot:ret:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000176, 'quantity': 14.839971914473388} | RES: True
+2026-05-20 16:25:41,530 [INFO] <hosting:bot:ret:1> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000176! Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:25:42,544 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:25:42,573 [INFO] <hosting:bot:ret:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:25:43,810 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:25:45,125 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2551.26, 'success': True, 'prompt_chars': 11341, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1378}
+2026-05-20 16:25:45,125 [INFO] 🧠 <hosting:bot:ret:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 2.6e-05, 'quantity': 5000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 55.83874890841643}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling CIVILBANK at 0.000026 and NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:25:45,277 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 2.6e-05, 'quantity': 5000} | RES: True
+2026-05-20 16:25:45,388 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 55.83874890841643} | RES: True
+2026-05-20 16:25:45,400 [INFO] <hosting:bot:ret:2> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling CIVILBANK at 0.000026 and NEURALINK at 0.000178! Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:25:45,418 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:25:45,458 [INFO] <hosting:bot:ret:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:25:46,559 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:25:48,724 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3265.39, 'success': False, 'prompt_chars': 11500, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:25:48,724 [INFO] <hosting:bot:ret:3> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:25:49,061 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:25:49,747 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:25:49,772 [INFO] <hosting:bot:ret:4> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:25:51,915 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:25:52,999 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3227.14, 'success': False, 'prompt_chars': 10506, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:25:53,000 [INFO] <hosting:bot:ret:4> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:25:53,015 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:25:53,047 [INFO] <hosting:bot:ret:5> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:25:53,862 [INFO] [LLM_METRIC] {'task': 'contract_audit', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3960.55, 'success': True, 'prompt_chars': 2963, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1293}
+2026-05-20 16:25:54,632 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:25:55,251 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2203.86, 'success': True, 'prompt_chars': 10459, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1192}
+2026-05-20 16:25:55,252 [INFO] 🧠 <hosting:bot:ret:5> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 20000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:25:55,380 [INFO] <hosting:bot:ret:5> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 20000} | RES: True
+2026-05-20 16:25:55,380 [INFO] <hosting:bot:ret:5> [SKIP_SPAM_PUBLIC_MESSAGE] type=TEXT duplicate=True
+2026-05-20 16:26:07,561 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:07,626 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:07,655 [INFO] <hosting:bot:ret:6> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:10,406 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2750.66, 'success': True, 'prompt_chars': 11764, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1416}
+2026-05-20 16:26:10,406 [INFO] 🧠 <hosting:bot:ret:6> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 0.000195, 'quantity': 10003.604507006308}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 0.06625897489004628}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling CIVILBANK at 0.000195 and NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:26:10,471 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:10,586 [INFO] <hosting:bot:ret:6> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 0.000195, 'quantity': 10003.604507006308} | RES: True
+2026-05-20 16:26:10,706 [INFO] <hosting:bot:ret:6> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 0.06625897489004628} | RES: True
+2026-05-20 16:26:10,722 [INFO] <hosting:bot:ret:6> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling CIVILBANK at 0.000195 and NEURALINK at 0.000178! Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:26:10,743 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:10,784 [INFO] <hosting:bot:ret:7> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:13,583 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:14,060 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3274.94, 'success': False, 'prompt_chars': 11178, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:26:14,060 [INFO] <hosting:bot:ret:7> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:26:15,082 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:15,101 [INFO] <hosting:bot:ret:8> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:16,373 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:17,394 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2292.41, 'success': True, 'prompt_chars': 10478, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1014}
+2026-05-20 16:26:17,394 [INFO] 🧠 <hosting:bot:ret:8> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 10000}}]}
+2026-05-20 16:26:17,492 [INFO] <hosting:bot:ret:8> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 10000} | RES: True
+2026-05-20 16:26:17,516 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:17,537 [INFO] <hosting:bot:ret:9> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:18,735 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:19,479 [INFO] [LLM_METRIC] {'task': 'contract_audit', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 4849.2, 'success': True, 'prompt_chars': 3014, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1603}
+2026-05-20 16:26:20,889 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3351.2, 'success': False, 'prompt_chars': 11426, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:26:20,889 [INFO] <hosting:bot:ret:9> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:26:21,130 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:21,925 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:21,946 [INFO] <hosting:bot:ret:10> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:23,330 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:25,181 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3234.55, 'success': False, 'prompt_chars': 11360, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:26:25,181 [INFO] <hosting:bot:ret:10> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:26:25,198 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:25,219 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:25,847 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:28,452 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3232.49, 'success': False, 'prompt_chars': 10413, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:26:28,452 [INFO] <hosting:bot:inst:1> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:26:34,559 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:34,594 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:35,170 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:37,778 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:39,240 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 4645.28, 'success': False, 'prompt_chars': 11550, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:26:39,240 [INFO] <hosting:bot:inst:2> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:26:39,255 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:39,281 [INFO] <hosting:bot:inst:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:40,383 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:42,779 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3497.43, 'success': False, 'prompt_chars': 10831, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:26:42,780 [INFO] <hosting:bot:inst:3> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:26:42,821 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:43,865 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:43,896 [INFO] <hosting:bot:ret:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:45,432 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:46,173 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2275.6, 'success': True, 'prompt_chars': 11226, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1215}
+2026-05-20 16:26:46,173 [INFO] 🧠 <hosting:bot:ret:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 14.839971914473388}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:26:46,273 [INFO] <hosting:bot:ret:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 14.839971914473388} | RES: True
+2026-05-20 16:26:46,283 [INFO] <hosting:bot:ret:1> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:26:46,301 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:46,327 [INFO] <hosting:bot:ret:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:46,556 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 227.01, 'success': False, 'prompt_chars': 11712, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:26:46,556 [INFO] <hosting:bot:ret:2> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:26:47,559 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:47,586 [INFO] <hosting:bot:ret:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:47,835 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:50,141 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:50,507 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2921.04, 'success': True, 'prompt_chars': 11456, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1363}
+2026-05-20 16:26:50,507 [INFO] 🧠 <hosting:bot:ret:3> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'sell', 'price': 0.000194, 'quantity': 560000.0}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'sell', 'price': 0.000177, 'quantity': 7.5501625592436055}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Dump CIVILBANK and NEURALINK! Get out while you can!', 'payload': {}}}]}
+2026-05-20 16:26:50,511 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'sell', 'price': 0.000194, 'quantity': 560000.0} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:26:50,511 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'sell', 'price': 0.000177, 'quantity': 7.5501625592436055} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:26:50,522 [INFO] <hosting:bot:ret:3> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Dump CIVILBANK and NEURALINK! Get out while you can!', 'payload': {}} | RES: True
+2026-05-20 16:26:50,541 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:50,571 [INFO] <hosting:bot:ret:4> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:52,677 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:52,930 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2357.47, 'success': True, 'prompt_chars': 10483, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1204}
+2026-05-20 16:26:52,930 [INFO] 🧠 <hosting:bot:ret:4> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'sell', 'price': 0.000178, 'quantity': 199.2037904377113}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:26:52,930 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'sell', 'price': 0.000178, 'quantity': 199.2037904377113} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:26:52,930 [INFO] <hosting:bot:ret:4> [SKIP_SPAM_PUBLIC_MESSAGE] type=TEXT duplicate=True
+2026-05-20 16:26:53,964 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:53,984 [INFO] <hosting:bot:ret:5> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:54,959 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:57,218 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:26:57,232 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3248.05, 'success': False, 'prompt_chars': 10451, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:26:57,232 [INFO] <hosting:bot:ret:5> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:26:57,246 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:26:57,273 [INFO] <hosting:bot:ret:6> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:26:59,850 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:00,526 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3251.77, 'success': False, 'prompt_chars': 11379, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:27:00,526 [INFO] <hosting:bot:ret:6> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:27:01,553 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:01,579 [INFO] <hosting:bot:ret:7> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:02,364 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:03,864 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2284.68, 'success': True, 'prompt_chars': 11161, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1191}
+2026-05-20 16:27:03,864 [INFO] 🧠 <hosting:bot:ret:7> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 20000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:27:03,955 [INFO] <hosting:bot:ret:7> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 20000} | RES: True
+2026-05-20 16:27:03,966 [INFO] <hosting:bot:ret:7> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:27:03,984 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:04,006 [INFO] <hosting:bot:ret:8> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:05,352 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:07,853 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:10,381 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:11,174 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 7166.79, 'success': True, 'prompt_chars': 10391, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1145}
+2026-05-20 16:27:11,174 [INFO] 🧠 <hosting:bot:ret:8> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 10000.0}}]}
+2026-05-20 16:27:11,272 [INFO] <hosting:bot:ret:8> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 10000.0} | RES: True
+2026-05-20 16:27:12,328 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:12,348 [INFO] <hosting:bot:ret:9> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:12,863 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:15,322 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2974.12, 'success': True, 'prompt_chars': 11397, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1404}
+2026-05-20 16:27:15,323 [INFO] 🧠 <hosting:bot:ret:9> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'sell', 'price': 0.000178, 'quantity': 1072557.8075039536}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'sell', 'price': 2.6e-05, 'quantity': 1.804157271177246}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178 and CIVILBANK at 0.000026! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:27:15,324 [INFO] <hosting:bot:ret:9> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'sell', 'price': 0.000178, 'quantity': 1072557.8075039536} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:27:15,325 [INFO] <hosting:bot:ret:9> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'sell', 'price': 2.6e-05, 'quantity': 1.804157271177246} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:27:15,422 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:15,440 [INFO] <hosting:bot:ret:9> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178 and CIVILBANK at 0.000026! Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:27:15,457 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:15,478 [INFO] <hosting:bot:ret:10> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:17,813 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:18,739 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3258.96, 'success': False, 'prompt_chars': 11321, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:27:18,739 [INFO] <hosting:bot:ret:10> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:27:19,790 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:19,813 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:20,056 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:22,615 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:23,082 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3267.4, 'success': False, 'prompt_chars': 10387, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:27:23,082 [INFO] <hosting:bot:inst:1> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:27:23,094 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:23,116 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:24,944 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:26,156 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3038.68, 'success': True, 'prompt_chars': 11517, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1364}
+2026-05-20 16:27:26,156 [INFO] 🧠 <hosting:bot:inst:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 2.4e-05, 'quantity': 5000000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 0.000171, 'quantity': 2000000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'CIVILBANK undervalued! Buying aggressively at 0.000024!', 'payload': {}}}]}
+2026-05-20 16:27:26,254 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 2.4e-05, 'quantity': 5000000} | RES: True
+2026-05-20 16:27:26,322 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 0.000171, 'quantity': 2000000} | RES: False | CTX: {'error': 'insufficient position for seller'}
+2026-05-20 16:27:26,331 [INFO] <hosting:bot:inst:2> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'CIVILBANK undervalued! Buying aggressively at 0.000024!', 'payload': {}} | RES: True
+2026-05-20 16:27:27,400 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:27,614 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:27,644 [INFO] <hosting:bot:inst:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:29,948 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:30,871 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3226.29, 'success': False, 'prompt_chars': 10830, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:27:30,871 [INFO] <hosting:bot:inst:3> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:27:30,875 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:30,897 [INFO] <hosting:bot:ret:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:32,323 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:34,505 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:36,682 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:38,859 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:39,557 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 8658.82, 'success': True, 'prompt_chars': 11243, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1370}
+2026-05-20 16:27:39,557 [INFO] 🧠 <hosting:bot:ret:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 14.839971914473388}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:27:39,676 [INFO] <hosting:bot:ret:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 14.839971914473388} | RES: True
+2026-05-20 16:27:39,676 [INFO] <hosting:bot:ret:1> [SKIP_SPAM_PUBLIC_MESSAGE] type=TEXT duplicate=True
+2026-05-20 16:27:40,706 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:40,730 [INFO] <hosting:bot:ret:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:41,772 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:43,721 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2990.45, 'success': True, 'prompt_chars': 11751, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1213}
+2026-05-20 16:27:43,721 [INFO] 🧠 <hosting:bot:ret:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 87.42912492011162}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:27:43,804 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 87.42912492011162} | RES: True
+2026-05-20 16:27:43,814 [INFO] <hosting:bot:ret:2> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:27:43,834 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:43,854 [INFO] <hosting:bot:ret:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:44,393 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:47,093 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3238.04, 'success': False, 'prompt_chars': 11435, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:27:47,093 [INFO] <hosting:bot:ret:3> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:27:47,116 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:48,144 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:48,164 [INFO] <hosting:bot:ret:4> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:49,501 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:51,916 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:52,419 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 4255.41, 'success': True, 'prompt_chars': 10462, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1248}
+2026-05-20 16:27:52,419 [INFO] 🧠 <hosting:bot:ret:4> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 199.2037904377113}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:27:52,505 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 199.2037904377113} | RES: True
+2026-05-20 16:27:52,505 [INFO] <hosting:bot:ret:4> [SKIP_SPAM_PUBLIC_MESSAGE] type=TEXT duplicate=True
+2026-05-20 16:27:52,524 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:52,558 [INFO] <hosting:bot:ret:5> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:54,420 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:56,465 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3907.6, 'success': True, 'prompt_chars': 10466, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1183}
+2026-05-20 16:27:56,466 [INFO] 🧠 <hosting:bot:ret:5> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 20000.0}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:27:56,552 [INFO] <hosting:bot:ret:5> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 20000.0} | RES: True
+2026-05-20 16:27:56,553 [INFO] <hosting:bot:ret:5> [SKIP_SPAM_PUBLIC_MESSAGE] type=TEXT duplicate=True
+2026-05-20 16:27:56,669 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:27:57,572 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:27:57,597 [INFO] <hosting:bot:ret:6> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:27:59,488 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:01,944 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:04,513 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:05,968 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 8370.57, 'success': True, 'prompt_chars': 11408, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1517}
+2026-05-20 16:28:05,968 [INFO] 🧠 <hosting:bot:ret:6> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 2.4e-05, 'quantity': 50000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 0.06625897489004628}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'CIVILBANK is the future! Buying at 0.000024!', 'payload': {}}}]}
+2026-05-20 16:28:06,062 [INFO] <hosting:bot:ret:6> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 2.4e-05, 'quantity': 50000} | RES: True
+2026-05-20 16:28:06,134 [INFO] <hosting:bot:ret:6> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 0.06625897489004628} | RES: True
+2026-05-20 16:28:06,145 [INFO] <hosting:bot:ret:6> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'CIVILBANK is the future! Buying at 0.000024!', 'payload': {}} | RES: True
+2026-05-20 16:28:06,162 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:06,180 [INFO] <hosting:bot:ret:7> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:06,758 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:09,422 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3241.25, 'success': False, 'prompt_chars': 11131, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:28:09,422 [INFO] <hosting:bot:ret:7> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:28:09,591 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:10,437 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:10,461 [INFO] <hosting:bot:ret:8> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:11,972 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:12,962 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2499.34, 'success': True, 'prompt_chars': 10316, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1024}
+2026-05-20 16:28:12,962 [INFO] 🧠 <hosting:bot:ret:8> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 10000.0}}]}
+2026-05-20 16:28:13,063 [INFO] <hosting:bot:ret:8> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 10000.0} | RES: True
+2026-05-20 16:28:13,081 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:13,109 [INFO] <hosting:bot:ret:9> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:14,821 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:16,363 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3253.63, 'success': True, 'prompt_chars': 11326, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1415}
+2026-05-20 16:28:16,364 [INFO] 🧠 <hosting:bot:ret:9> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 1072557.8075039536}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 2.6e-05, 'quantity': 1.804157271177246}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178 and CIVILBANK at 0.000026! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:28:16,447 [INFO] <hosting:bot:ret:9> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 1072557.8075039536} | RES: True
+2026-05-20 16:28:16,572 [INFO] <hosting:bot:ret:9> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 2.6e-05, 'quantity': 1.804157271177246} | RES: True
+2026-05-20 16:28:16,572 [INFO] <hosting:bot:ret:9> [SKIP_SPAM_PUBLIC_MESSAGE] type=TEXT duplicate=True
+2026-05-20 16:28:17,480 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:17,613 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:17,637 [INFO] <hosting:bot:ret:10> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:19,706 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:20,839 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3201.49, 'success': False, 'prompt_chars': 11290, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:28:20,839 [INFO] <hosting:bot:ret:10> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:28:20,853 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:20,867 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:21,900 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:23,049 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2181.46, 'success': True, 'prompt_chars': 10331, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1025}
+2026-05-20 16:28:23,050 [INFO] 🧠 <hosting:bot:inst:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 323159}}]}
+2026-05-20 16:28:23,109 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 323159} | RES: True
+2026-05-20 16:28:24,130 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:24,144 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:24,162 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:26,455 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:27,371 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3208.27, 'success': False, 'prompt_chars': 11484, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:28:27,371 [INFO] <hosting:bot:inst:2> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:28:27,381 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:27,400 [INFO] <hosting:bot:inst:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:28,893 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:30,318 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2917.87, 'success': True, 'prompt_chars': 10759, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1023}
+2026-05-20 16:28:30,318 [INFO] 🧠 <hosting:bot:inst:3> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 0.000195, 'quantity': 5278}}]}
+2026-05-20 16:28:30,397 [INFO] <hosting:bot:inst:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 0.000195, 'quantity': 5278} | RES: True
+2026-05-20 16:28:31,248 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:31,423 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:31,448 [INFO] <hosting:bot:ret:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:33,715 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:34,948 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3498.26, 'success': True, 'prompt_chars': 10422, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1194}
+2026-05-20 16:28:34,948 [INFO] 🧠 <hosting:bot:ret:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'sell', 'price': 0.000178, 'quantity': 14.839971914473388}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:28:34,949 [INFO] <hosting:bot:ret:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'sell', 'price': 0.000178, 'quantity': 14.839971914473388} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:28:34,949 [INFO] <hosting:bot:ret:1> [SKIP_SPAM_PUBLIC_MESSAGE] type=TEXT duplicate=True
+2026-05-20 16:28:34,967 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:34,993 [INFO] <hosting:bot:ret:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:36,227 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:38,248 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3253.85, 'success': False, 'prompt_chars': 11180, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:28:38,248 [INFO] <hosting:bot:ret:2> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:28:38,590 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:39,326 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:39,348 [INFO] <hosting:bot:ret:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:41,083 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:42,566 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3217.82, 'success': False, 'prompt_chars': 11386, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:28:42,566 [INFO] <hosting:bot:ret:3> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:28:42,588 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:42,617 [INFO] <hosting:bot:ret:4> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:44,034 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:44,422 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 1803.15, 'success': True, 'prompt_chars': 10442, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1022}
+2026-05-20 16:28:44,422 [INFO] 🧠 <hosting:bot:ret:4> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 199.2037904377113}}]}
+2026-05-20 16:28:44,517 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 199.2037904377113} | RES: True
+2026-05-20 16:28:45,551 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:45,585 [INFO] <hosting:bot:ret:5> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:47,105 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:47,705 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2120.94, 'success': True, 'prompt_chars': 10408, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1179}
+2026-05-20 16:28:47,706 [INFO] 🧠 <hosting:bot:ret:5> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 20000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:28:47,916 [INFO] <hosting:bot:ret:5> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 20000} | RES: True
+2026-05-20 16:28:47,917 [INFO] <hosting:bot:ret:5> [SKIP_SPAM_PUBLIC_MESSAGE] type=TEXT duplicate=True
+2026-05-20 16:28:47,934 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:47,966 [INFO] <hosting:bot:ret:6> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:50,377 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2409.62, 'success': True, 'prompt_chars': 11323, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1199}
+2026-05-20 16:28:50,377 [INFO] 🧠 <hosting:bot:ret:6> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 0.000195, 'quantity': 10003}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'CIVILBANK is going to the moon! Selling at 0.000195!', 'payload': {}}}]}
+2026-05-20 16:28:50,516 [INFO] <hosting:bot:ret:6> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 0.000195, 'quantity': 10003} | RES: True
+2026-05-20 16:28:50,529 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:50,547 [INFO] <hosting:bot:ret:6> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'CIVILBANK is going to the moon! Selling at 0.000195!', 'payload': {}} | RES: True
+2026-05-20 16:28:51,583 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:28:51,623 [INFO] <hosting:bot:ret:7> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:28:53,174 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:56,068 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:28:58,842 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:00,176 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 8553.04, 'success': True, 'prompt_chars': 11140, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1165}
+2026-05-20 16:29:00,176 [INFO] 🧠 <hosting:bot:ret:7> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 20000}}]}
+2026-05-20 16:29:00,242 [INFO] <hosting:bot:ret:7> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 20000} | RES: True
+2026-05-20 16:29:00,259 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:00,275 [INFO] <hosting:bot:ret:8> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:01,180 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:03,352 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:03,508 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3233.32, 'success': False, 'prompt_chars': 10340, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:29:03,508 [INFO] <hosting:bot:ret:8> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:29:04,515 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:04,537 [INFO] <hosting:bot:ret:9> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:05,959 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:07,792 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3254.07, 'success': False, 'prompt_chars': 10940, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:29:07,792 [INFO] <hosting:bot:ret:9> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:29:07,822 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:07,837 [INFO] <hosting:bot:ret:10> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:08,167 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:10,448 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:12,555 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:14,918 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:17,014 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:17,568 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 9729.36, 'success': True, 'prompt_chars': 11284, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1592}
+2026-05-20 16:29:17,568 [INFO] 🧠 <hosting:bot:ret:10> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 100054.49426666032}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 2.6e-05, 'quantity': 0.02183029601656017}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178 and CIVILBANK at 0.000026! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:29:17,672 [INFO] <hosting:bot:ret:10> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 100054.49426666032} | RES: True
+2026-05-20 16:29:17,802 [INFO] <hosting:bot:ret:10> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 2.6e-05, 'quantity': 0.02183029601656017} | RES: True
+2026-05-20 16:29:17,884 [INFO] <hosting:bot:ret:10> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178 and CIVILBANK at 0.000026! Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:29:18,899 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:18,918 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:19,244 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:21,628 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:22,161 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3243.56, 'success': False, 'prompt_chars': 10351, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:29:22,162 [INFO] <hosting:bot:inst:1> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:29:22,174 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:22,198 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:23,838 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:26,173 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:26,372 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 4173.15, 'success': True, 'prompt_chars': 11493, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1833}
+2026-05-20 16:29:26,372 [INFO] 🧠 <hosting:bot:inst:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 2.3e-05, 'quantity': 10000000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'FOODMART', 'side': 'BUY', 'price': 1.4e-05, 'quantity': 5000000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 9.4e-05, 'quantity': 5000000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 0.000171, 'quantity': 5000000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'ORBIT_LOG', 'side': 'BUY', 'price': 2.1e-05, 'quantity': 5000000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Buying CIVILBANK aggressively at 0.000023!', 'payload': {}}}]}
+2026-05-20 16:29:26,488 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 2.3e-05, 'quantity': 10000000} | RES: True
+2026-05-20 16:29:26,586 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'FOODMART', 'side': 'BUY', 'price': 1.4e-05, 'quantity': 5000000} | RES: True
+2026-05-20 16:29:26,698 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 9.4e-05, 'quantity': 5000000} | RES: True
+2026-05-20 16:29:26,812 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 0.000171, 'quantity': 5000000} | RES: False | CTX: {'error': 'insufficient position for seller'}
+2026-05-20 16:29:26,935 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'ORBIT_LOG', 'side': 'BUY', 'price': 2.1e-05, 'quantity': 5000000} | RES: True
+2026-05-20 16:29:27,988 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:28,007 [INFO] <hosting:bot:inst:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:29,023 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:31,238 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3231.19, 'success': False, 'prompt_chars': 10335, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:29:31,238 [INFO] <hosting:bot:inst:3> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:29:31,268 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:31,292 [INFO] <hosting:bot:ret:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:31,716 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:33,577 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2284.82, 'success': True, 'prompt_chars': 10384, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1215}
+2026-05-20 16:29:33,577 [INFO] 🧠 <hosting:bot:ret:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 14.839971914473388}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:29:33,677 [INFO] <hosting:bot:ret:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 14.839971914473388} | RES: True
+2026-05-20 16:29:33,677 [INFO] <hosting:bot:ret:1> [SKIP_SPAM_PUBLIC_MESSAGE] type=TEXT duplicate=True
+2026-05-20 16:29:34,144 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:34,719 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:34,740 [INFO] <hosting:bot:ret:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:36,598 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:36,995 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2253.69, 'success': True, 'prompt_chars': 11174, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1203}
+2026-05-20 16:29:36,995 [INFO] 🧠 <hosting:bot:ret:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 131.19160573572964}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:29:37,105 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 131.19160573572964} | RES: True
+2026-05-20 16:29:37,105 [INFO] <hosting:bot:ret:2> [SKIP_SPAM_PUBLIC_MESSAGE] type=TEXT duplicate=True
+2026-05-20 16:29:37,123 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:37,147 [INFO] <hosting:bot:ret:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:39,674 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:39,736 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2588.12, 'success': True, 'prompt_chars': 11396, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1403}
+2026-05-20 16:29:39,736 [INFO] 🧠 <hosting:bot:ret:3> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 0.000194, 'quantity': 560000.0}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000177, 'quantity': 7.5501625592436055}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'CIVILBANK and NEURALINK are OVERVALUED! Selling now before the crash!', 'payload': {}}}]}
+2026-05-20 16:29:39,859 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 0.000194, 'quantity': 560000.0} | RES: True
+2026-05-20 16:29:39,976 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000177, 'quantity': 7.5501625592436055} | RES: True
+2026-05-20 16:29:39,987 [INFO] <hosting:bot:ret:3> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'CIVILBANK and NEURALINK are OVERVALUED! Selling now before the crash!', 'payload': {}} | RES: True
+2026-05-20 16:29:41,008 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:41,030 [INFO] <hosting:bot:ret:4> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:42,475 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:43,450 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2418.51, 'success': True, 'prompt_chars': 10384, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1203}
+2026-05-20 16:29:43,450 [INFO] 🧠 <hosting:bot:ret:4> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 199.2037904377113}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178. Get yours now!', 'payload': {}}}]}
+2026-05-20 16:29:43,548 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 199.2037904377113} | RES: True
+2026-05-20 16:29:43,561 [INFO] <hosting:bot:ret:4> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178. Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:29:43,580 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:43,605 [INFO] <hosting:bot:ret:5> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:44,999 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:45,647 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2041.03, 'success': True, 'prompt_chars': 10421, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1183}
+2026-05-20 16:29:45,647 [INFO] 🧠 <hosting:bot:ret:5> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 20000.0}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178. Get yours now!', 'payload': {}}}]}
+2026-05-20 16:29:45,755 [INFO] <hosting:bot:ret:5> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 20000.0} | RES: True
+2026-05-20 16:29:45,766 [INFO] <hosting:bot:ret:5> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178. Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:29:46,792 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:46,819 [INFO] <hosting:bot:ret:6> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:47,573 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:49,360 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2540.78, 'success': True, 'prompt_chars': 11228, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1202}
+2026-05-20 16:29:49,360 [INFO] 🧠 <hosting:bot:ret:6> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 2.6e-05, 'quantity': 10003.604507006308}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling CIVILBANK at 0.000026! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:29:49,492 [INFO] <hosting:bot:ret:6> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 2.6e-05, 'quantity': 10003.604507006308} | RES: True
+2026-05-20 16:29:49,502 [INFO] <hosting:bot:ret:6> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling CIVILBANK at 0.000026! Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:29:49,522 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:49,548 [INFO] <hosting:bot:ret:7> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:50,290 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:52,958 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3409.37, 'success': True, 'prompt_chars': 10319, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1278}
+2026-05-20 16:29:52,958 [INFO] <hosting:bot:ret:7> [IDLE] No actions decided
+2026-05-20 16:29:53,028 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:54,058 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:54,085 [INFO] <hosting:bot:ret:8> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:55,332 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:57,323 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3237.55, 'success': False, 'prompt_chars': 10299, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:29:57,323 [INFO] <hosting:bot:ret:8> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:29:57,352 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:29:57,371 [INFO] <hosting:bot:ret:9> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:29:57,438 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:59,468 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2096.7, 'success': True, 'prompt_chars': 10931, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1194}
+2026-05-20 16:29:59,468 [INFO] 🧠 <hosting:bot:ret:9> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 1072557.8075039536}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178. Get yours now!', 'payload': {}}}]}
+2026-05-20 16:29:59,551 [INFO] <hosting:bot:ret:9> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 1072557.8075039536} | RES: True
+2026-05-20 16:29:59,611 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:29:59,636 [INFO] <hosting:bot:ret:9> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178. Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:30:00,661 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:00,680 [INFO] <hosting:bot:ret:10> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:01,973 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:04,037 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3355.73, 'success': True, 'prompt_chars': 11637, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1215}
+2026-05-20 16:30:04,037 [INFO] 🧠 <hosting:bot:ret:10> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 100054.49426666032}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178. Get yours now!', 'payload': {}}}]}
+2026-05-20 16:30:04,121 [INFO] <hosting:bot:ret:10> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 100054.49426666032} | RES: True
+2026-05-20 16:30:04,130 [INFO] <hosting:bot:ret:10> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000178. Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:30:04,148 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:04,169 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:04,420 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:06,518 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:07,418 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3248.54, 'success': False, 'prompt_chars': 10312, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:30:07,418 [INFO] <hosting:bot:inst:1> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:30:08,457 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:08,496 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:08,767 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:11,233 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:12,350 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3853.3, 'success': True, 'prompt_chars': 10916, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1931}
+2026-05-20 16:30:12,350 [INFO] 🧠 <hosting:bot:inst:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'sell', 'price': 0.000194, 'quantity': 2467676.3090045378}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'FOODMART', 'side': 'sell', 'price': 1.55e-05, 'quantity': 3044901.9516965183}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'sell', 'price': 9.9e-05, 'quantity': 3052096.202463626}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'sell', 'price': 0.000177, 'quantity': 1505333.041305171}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'ORBIT_LOG', 'side': 'sell', 'price': 2.25e-05, 'quantity': 3050361.505550058}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling CIVILBANK, FOODMART, MARS_GEN, NEURALINK, and ORBIT_LOG! Get yours now!', 'payload': {}}}]}
+2026-05-20 16:30:12,351 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'sell', 'price': 0.000194, 'quantity': 2467676.3090045378} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:30:12,351 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'FOODMART', 'side': 'sell', 'price': 1.55e-05, 'quantity': 3044901.9516965183} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:30:12,351 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'sell', 'price': 9.9e-05, 'quantity': 3052096.202463626} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:30:12,351 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'sell', 'price': 0.000177, 'quantity': 1505333.041305171} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:30:12,351 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'ORBIT_LOG', 'side': 'sell', 'price': 2.25e-05, 'quantity': 3050361.505550058} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:30:12,369 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:12,399 [INFO] <hosting:bot:inst:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:13,579 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:15,432 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3033.17, 'success': True, 'prompt_chars': 10337, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1252}
+2026-05-20 16:30:15,432 [INFO] 🧠 <hosting:bot:inst:3> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 2.6e-05, 'quantity': 14825.948861070425}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling CIVILBANK at 0.000026! Get yours now!', 'payload': {}, 'anonymous': False, 'alias': None}}]}
+2026-05-20 16:30:15,559 [INFO] <hosting:bot:inst:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 2.6e-05, 'quantity': 14825.948861070425} | RES: True
+2026-05-20 16:30:15,571 [INFO] <hosting:bot:inst:3> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling CIVILBANK at 0.000026! Get yours now!', 'payload': {}, 'anonymous': False, 'alias': None} | RES: True
+2026-05-20 16:30:15,675 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:16,606 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:16,625 [INFO] <hosting:bot:ret:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:17,778 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:19,857 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3232.49, 'success': False, 'prompt_chars': 10428, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:30:19,857 [INFO] <hosting:bot:ret:1> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:30:19,879 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:19,902 [INFO] <hosting:bot:ret:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:20,238 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:22,196 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2293.3, 'success': True, 'prompt_chars': 10419, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1225}
+2026-05-20 16:30:22,196 [INFO] 🧠 <hosting:bot:ret:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 135.24358101010858}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Dump NEURALINK while you can! Get out before it crashes!', 'payload': {}}}]}
+2026-05-20 16:30:22,281 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000178, 'quantity': 135.24358101010858} | RES: True
+2026-05-20 16:30:22,291 [INFO] <hosting:bot:ret:2> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Dump NEURALINK while you can! Get out before it crashes!', 'payload': {}} | RES: True
+2026-05-20 16:30:22,570 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:23,335 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:23,357 [INFO] <hosting:bot:ret:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:24,987 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:26,809 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3451.71, 'success': True, 'prompt_chars': 11405, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1425}
+2026-05-20 16:30:26,809 [INFO] 🧠 <hosting:bot:ret:3> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000171, 'quantity': 7.5501625592436055}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 0.000188, 'quantity': 560000.0}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': "I'm selling NEURALINK at 0.000171 and CIVILBANK at 0.000188. Get them while they're cheap!", 'payload': {}}}]}
+2026-05-20 16:30:26,909 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000171, 'quantity': 7.5501625592436055} | RES: True
+2026-05-20 16:30:27,019 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 0.000188, 'quantity': 560000.0} | RES: True
+2026-05-20 16:30:27,030 [INFO] <hosting:bot:ret:3> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': "I'm selling NEURALINK at 0.000171 and CIVILBANK at 0.000188. Get them while they're cheap!", 'payload': {}} | RES: True
+2026-05-20 16:30:27,048 [INFO] <hosting:bot:ret:4> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:27,067 [INFO] <hosting:bot:ret:4> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:27,461 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:29,210 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2141.75, 'success': True, 'prompt_chars': 11170, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1193}
+2026-05-20 16:30:29,210 [INFO] 🧠 <hosting:bot:ret:4> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000173, 'quantity': 199.2037904377113}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000173. Get yours now!', 'payload': {}}}]}
+2026-05-20 16:30:29,431 [INFO] <hosting:bot:ret:4> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000173, 'quantity': 199.2037904377113} | RES: True
+2026-05-20 16:30:29,443 [INFO] <hosting:bot:ret:4> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000173. Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:30:29,762 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:30,462 [INFO] <hosting:bot:ret:5> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:30,481 [INFO] <hosting:bot:ret:5> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:31,960 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:32,602 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2120.69, 'success': True, 'prompt_chars': 11111, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1202}
+2026-05-20 16:30:32,603 [INFO] 🧠 <hosting:bot:ret:5> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000173, 'quantity': 20000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000173. Get yours now!', 'payload': {}}}]}
+2026-05-20 16:30:32,691 [INFO] <hosting:bot:ret:5> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000173, 'quantity': 20000} | RES: True
+2026-05-20 16:30:32,701 [INFO] <hosting:bot:ret:5> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000173. Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:30:32,720 [INFO] <hosting:bot:ret:6> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:32,743 [INFO] <hosting:bot:ret:6> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:34,432 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:35,857 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3114.14, 'success': True, 'prompt_chars': 11494, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1228}
+2026-05-20 16:30:35,857 [INFO] 🧠 <hosting:bot:ret:6> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000173, 'quantity': 0.06625897489004628}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000173. Get yours now!', 'payload': {}}}]}
+2026-05-20 16:30:35,954 [INFO] <hosting:bot:ret:6> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000173, 'quantity': 0.06625897489004628} | RES: True
+2026-05-20 16:30:35,973 [INFO] <hosting:bot:ret:6> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000173. Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:30:36,884 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:37,003 [INFO] <hosting:bot:ret:7> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:37,029 [INFO] <hosting:bot:ret:7> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:39,303 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:41,049 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 4019.67, 'success': True, 'prompt_chars': 10251, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1275}
+2026-05-20 16:30:41,049 [INFO] <hosting:bot:ret:7> [IDLE] No actions decided
+2026-05-20 16:30:41,084 [INFO] <hosting:bot:ret:8> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:41,104 [INFO] <hosting:bot:ret:8> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:41,653 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:44,007 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:44,321 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3215.62, 'success': False, 'prompt_chars': 10276, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:30:44,321 [INFO] <hosting:bot:ret:8> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:30:45,324 [INFO] <hosting:bot:ret:9> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:45,348 [INFO] <hosting:bot:ret:9> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:46,141 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:48,516 [INFO] <mm:1> [MM_ADJUST] Health: 60.39% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:48,855 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3505.84, 'success': True, 'prompt_chars': 11130, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1215}
+2026-05-20 16:30:48,855 [INFO] 🧠 <hosting:bot:ret:9> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000179, 'quantity': 1072557.8075039536}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000179. Get yours now!', 'payload': {}}}]}
+2026-05-20 16:30:48,940 [INFO] <hosting:bot:ret:9> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000179, 'quantity': 1072557.8075039536} | RES: True
+2026-05-20 16:30:48,996 [INFO] <hosting:bot:ret:9> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Selling NEURALINK at 0.000179. Get yours now!', 'payload': {}} | RES: True
+2026-05-20 16:30:49,014 [INFO] <hosting:bot:ret:10> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:49,038 [INFO] <hosting:bot:ret:10> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:51,251 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:52,286 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3246.28, 'success': False, 'prompt_chars': 11118, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:30:52,286 [INFO] <hosting:bot:ret:10> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:30:53,316 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:53,340 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:53,882 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:55,175 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 1833.79, 'success': True, 'prompt_chars': 10280, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1035}
+2026-05-20 16:30:55,175 [INFO] 🧠 <hosting:bot:inst:1> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000173, 'quantity': 323159.84589362564}}]}
+2026-05-20 16:30:55,477 [INFO] <hosting:bot:inst:1> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000173, 'quantity': 323159.84589362564} | RES: True
+2026-05-20 16:30:55,497 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:55,527 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:30:57,312 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:30:58,393 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 2865.2, 'success': True, 'prompt_chars': 10846, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1648}
+2026-05-20 16:30:58,393 [INFO] 🧠 <hosting:bot:inst:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 2.4e-05, 'quantity': 10000000.0}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'FOODMART', 'side': 'BUY', 'price': 1.4e-05, 'quantity': 10000000.0}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 9.5e-05, 'quantity': 10000000.0}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 0.000171, 'quantity': 5000000.0}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'ORBIT_LOG', 'side': 'BUY', 'price': 2.1e-05, 'quantity': 10000000.0}}]}
+2026-05-20 16:30:58,507 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'BUY', 'price': 2.4e-05, 'quantity': 10000000.0} | RES: True
+2026-05-20 16:30:58,610 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'FOODMART', 'side': 'BUY', 'price': 1.4e-05, 'quantity': 10000000.0} | RES: True
+2026-05-20 16:30:58,726 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'BUY', 'price': 9.5e-05, 'quantity': 10000000.0} | RES: True
+2026-05-20 16:30:58,831 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'BUY', 'price': 0.000171, 'quantity': 5000000.0} | RES: False | CTX: {'error': 'insufficient position for seller'}
+2026-05-20 16:30:58,942 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'ORBIT_LOG', 'side': 'BUY', 'price': 2.1e-05, 'quantity': 10000000.0} | RES: True
+2026-05-20 16:30:59,945 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:30:59,969 [INFO] <hosting:bot:inst:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:31:00,246 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:31:01,772 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 1802.32, 'success': True, 'prompt_chars': 11526, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1033}
+2026-05-20 16:31:01,773 [INFO] 🧠 <hosting:bot:inst:3> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 0.00019, 'quantity': 574597.2812192265}}]}
+2026-05-20 16:31:01,884 [INFO] <hosting:bot:inst:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'SELL', 'price': 0.00019, 'quantity': 574597.2812192265} | RES: True
+2026-05-20 16:31:01,893 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:31:01,920 [INFO] <hosting:bot:ret:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:31:02,816 [INFO] <mm:1> [MM_ADJUST] Health: 59.47% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:31:05,653 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:31:08,366 [INFO] <mm:1> [MM_ADJUST] Health: 59.46% | Stress: 0.41 | Spread×9.1 | Qty×0.59 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:31:11,181 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 9260.79, 'success': True, 'prompt_chars': 10382, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1425}
+2026-05-20 16:31:11,181 [INFO] <hosting:bot:ret:1> [IDLE] No actions decided
+2026-05-20 16:31:11,314 [INFO] <mm:1> [MM_ADJUST] Health: 60.40% | Stress: 0.40 | Spread×8.9 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:31:19,220 [INFO] <mm:1> [MM_REGEN] Daily regen applied. Cash +2,500,000, Health before: 59.46%
+2026-05-20 16:31:19,251 [INFO] <hosting:bot:inst:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:31:19,294 [INFO] <hosting:bot:inst:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:31:19,294 [INFO] <hosting:bot:inst:1> [SKIP_LLM_COOLDOWN] cooldown=45s
+2026-05-20 16:31:19,387 [INFO] <hosting:bot:inst:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:31:19,414 [INFO] <hosting:bot:inst:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:31:21,879 [INFO] <mm:1> [MM_ADJUST] Health: 61.13% | Stress: 0.39 | Spread×8.8 | Qty×0.61 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:31:22,895 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3480.55, 'success': True, 'prompt_chars': 10931, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1670}
+2026-05-20 16:31:22,895 [INFO] 🧠 <hosting:bot:inst:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'buy', 'price': 2.4e-05, 'quantity': 10000000.0}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'FOODMART', 'side': 'buy', 'price': 1.4e-05, 'quantity': 10000000.0}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'MARS_GEN', 'side': 'buy', 'price': 9.4e-05, 'quantity': 10000000.0}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'buy', 'price': 0.000171, 'quantity': 5000000.0}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'ORBIT_LOG', 'side': 'buy', 'price': 2.1e-05, 'quantity': 10000000.0}}]}
+2026-05-20 16:31:22,896 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'buy', 'price': 2.4e-05, 'quantity': 10000000.0} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:31:22,896 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'FOODMART', 'side': 'buy', 'price': 1.4e-05, 'quantity': 10000000.0} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:31:22,896 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'MARS_GEN', 'side': 'buy', 'price': 9.4e-05, 'quantity': 10000000.0} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:31:22,896 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'buy', 'price': 0.000171, 'quantity': 5000000.0} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:31:22,896 [INFO] <hosting:bot:inst:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'ORBIT_LOG', 'side': 'buy', 'price': 2.1e-05, 'quantity': 10000000.0} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:31:23,926 [INFO] <hosting:bot:inst:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:31:23,946 [INFO] <hosting:bot:inst:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:31:24,599 [INFO] <mm:1> [MM_ADJUST] Health: 59.97% | Stress: 0.40 | Spread×9.0 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:31:27,154 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3207.4, 'success': False, 'prompt_chars': 10321, 'max_tokens': 800, 'provider': 'openrouter', 'error': '<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>'}
+2026-05-20 16:31:27,154 [INFO] <hosting:bot:inst:3> [LLM_PARSE_ERROR] <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)>
+2026-05-20 16:31:27,302 [INFO] <mm:1> [MM_ADJUST] Health: 61.14% | Stress: 0.39 | Spread×8.8 | Qty×0.61 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:31:27,338 [INFO] <hosting:bot:ret:1> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:31:27,374 [INFO] <hosting:bot:ret:1> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:31:27,374 [INFO] <hosting:bot:ret:1> [SKIP_LLM_COOLDOWN] cooldown=45s
+2026-05-20 16:31:28,390 [INFO] <hosting:bot:ret:2> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:31:28,429 [INFO] <hosting:bot:ret:2> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:31:30,099 [INFO] <mm:1> [MM_ADJUST] Health: 59.97% | Stress: 0.40 | Spread×9.0 | Qty×0.60 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:31:32,704 [INFO] <mm:1> [MM_ADJUST] Health: 61.14% | Stress: 0.39 | Spread×8.8 | Qty×0.61 | News Chains: 1 | Panic: 0.20
+2026-05-20 16:31:37,653 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 9222.85, 'success': True, 'prompt_chars': 11124, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1197}
+2026-05-20 16:31:37,653 [INFO] 🧠 <hosting:bot:ret:2> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000173, 'quantity': 147}}]}
+2026-05-20 16:31:37,753 [INFO] <hosting:bot:ret:2> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'SELL', 'price': 0.000173, 'quantity': 147} | RES: True
+2026-05-20 16:31:37,770 [INFO] <hosting:bot:ret:3> [TICK_ENTRY] LLM_READY: True
+2026-05-20 16:31:37,794 [INFO] <hosting:bot:ret:3> [OBSERVATION] PubMsgs: 10, PrivMsgs: 0, Contracts: 0, News: 5
+2026-05-20 16:31:41,123 [INFO] [LLM_METRIC] {'task': 'hosting_agent', 'profile': 'standard', 'model': 'google/gemini-2.0-flash-001', 'duration_ms': 3328.71, 'success': True, 'prompt_chars': 12080, 'max_tokens': 800, 'provider': 'openrouter', 'response_chars': 1378}
+2026-05-20 16:31:41,123 [INFO] 🧠 <hosting:bot:ret:3> THINKING: OBS: 10 msgs, 5 news... -> DECISION: {'tool_calls': [{'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'CIVILBANK', 'side': 'buy', 'price': 2.4e-05, 'quantity': 500000}}, {'name': 'trading.submit_limit_order', 'arguments': {'symbol': 'NEURALINK', 'side': 'buy', 'price': 0.00017, 'quantity': 100000}}, {'name': 'chat.send_public_message', 'arguments': {'message_type': 'TEXT', 'content': 'Buying CIVILBANK at 0.000024 and NEURALINK at 0.00017. Cheap!', 'payload': {}}}]}
+2026-05-20 16:31:41,124 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'CIVILBANK', 'side': 'buy', 'price': 2.4e-05, 'quantity': 500000} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:31:41,124 [INFO] <hosting:bot:ret:3> [SKILL_EXE:trading.submit_limit_order] ARGS: {'symbol': 'NEURALINK', 'side': 'buy', 'price': 0.00017, 'quantity': 100000} | RES: False | CTX: {'error': 'side must be BUY or SELL'}
+2026-05-20 16:31:41,153 [INFO] <hosting:bot:ret:3> [SKILL_EXE:chat.send_public_message] ARGS: {'message_type': 'TEXT', 'content': 'Buying CIVILBANK at 0.000024 and NEURALINK at 0.00017. Cheap!', 'payload': {}} | RES: True

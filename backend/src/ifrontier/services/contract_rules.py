@@ -189,6 +189,15 @@ def _eval_value(v: Any) -> float:
             return float(resolve_var(str(v["var"])))
 
         op = v.get("op")
+        if op == "var":
+            args = v.get("args")
+            if isinstance(args, str):
+                return float(resolve_var(args))
+            if isinstance(args, list) and len(args) == 1 and isinstance(args[0], str):
+                return float(resolve_var(args[0]))
+            if isinstance(args, dict) and "var" in args:
+                return float(resolve_var(str(args["var"])))
+            raise ValueError("invalid value")
         if op in {"add", "sub", "mul", "div", "min", "max"}:
             args = v.get("args")
             if not isinstance(args, list) or not args:
