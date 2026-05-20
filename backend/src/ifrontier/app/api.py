@@ -2218,7 +2218,6 @@ async def wealth_public_get(user_id: str) -> WealthPublicResponse:
 
 @router.post("/contracts/create")
 async def contract_create(req: ContractCreateRequest) -> ContractCreateResponse:
-    assert_player_can_act(req.actor_id)
     try:
         party_ids = _normalize_contract_party_ids(req.parties)
         contract_id = _contract_service.create_contract(

@@ -37,6 +37,14 @@ class VictoryService:
         from ifrontier.services.market_maker import BASELINE_CAPITAL
         self.mm_baseline = BASELINE_CAPITAL
 
+    @staticmethod
+    def _normalize_status(value: str | None) -> PlayerStatus:
+        try:
+            raw = str(value or "").strip().upper()
+        except Exception:
+            raw = ""
+        return PlayerStatus(raw) if raw in PlayerStatus.__members__ else PlayerStatus.ACTIVE
+
     def compute_total_valuation(self, account_id: str) -> float:
         """计算玩家总财富（现金 + 持仓市值）。"""
         try:
@@ -58,7 +66,7 @@ class VictoryService:
         snap = get_snapshot(account_id)
 
         locked_statuses = {PlayerStatus.SPECTATOR, PlayerStatus.WINNER, PlayerStatus.RETIRED}
-        current_status = PlayerStatus(str(snap.status).upper()) if str(snap.status).upper() in PlayerStatus.__members__ else PlayerStatus.ACTIVE
+        current_status = self._normalize_status(getattr(snap, "status", None))
 
         new_status = current_status
         achievement = None
@@ -76,7 +84,7 @@ class VictoryService:
                 else:
                     new_status = PlayerStatus.BANKRUPT
                     message = "资产仍低于复活线。你继续处于观战模式。"
-            elif total < BANKRUPTCY_THRESHOLD:
+            elif total <= BANKRUPTCY_THRESHOLD:
                 new_status = PlayerStatus.BANKRUPT
                 message = "您的资金已跌破生存线。根据《市场避难所协议》，您已被剥夺操作权，转为观战模式。"
             else:
@@ -113,6 +121,9 @@ class VictoryService:
 
         conn = get_connection()
         with conn:
+            if total <= BANKRUPTCY_THRESHOLD and new_status == PlayerStatus.ACTIVE:
+                # 资产已跌破生存线时，不允许意外回写为 ACTIVE。
+                new_status = PlayerStatus.BANKRUPT
             conn.execute(
                 "UPDATE accounts SET total_valuation = ?, status = ? WHERE account_id = ?",
                 (total, new_status.value, account_id),

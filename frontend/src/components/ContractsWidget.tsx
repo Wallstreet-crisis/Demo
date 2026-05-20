@@ -28,6 +28,25 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actorId = playerId ? `user:${playerId}` : ''
 
+  const resetDraftEditorState = useCallback(() => {
+    setDraft(null)
+    setIsEditingDraft(false)
+    setEditedDraftJson('')
+    setAiEditInstruction('')
+    setVersionHistory([])
+  }, [])
+
+  useEffect(() => {
+    // 离开合约面板后，清理上一次的草稿状态；重新打开时默认回到“新建草案”入口。
+    if (!isFocused) {
+      resetDraftEditorState()
+      setShowMentionList(false)
+      setMentionType(null)
+      setMentionQuery('')
+      setMentionIndex(0)
+    }
+  }, [isFocused, resetDraftEditorState])
+
   const fetchMentionsData = useCallback(async () => {
     if (!actorId) return
     try {
@@ -175,7 +194,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
 
   const handleDraft = async () => {
     if (!naturalLanguage.trim() || !actorId) return
-    setDraft(null)
+    resetDraftEditorState()
     setLoading(true)
     try {
       const res = await Api.contractAgentDraft({
@@ -275,9 +294,8 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
         // ignore
       }
 
-      setDraft(null)
+      resetDraftEditorState()
       setNaturalLanguage('')
-      setIsEditingDraft(false)
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : (e instanceof Error ? e.message : String(e))
       notify('error', msg)
@@ -298,7 +316,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
             onMouseDown={e => e.stopPropagation()}
             style={{
             position: 'absolute',
-            top: '100%',
+            bottom: '100%',
             left: 0,
             right: 0,
             background: 'rgba(10, 15, 25, 0.98)',
@@ -307,7 +325,7 @@ export default function ContractsWidget({ isFocused }: { isFocused?: boolean }) 
             zIndex: 2000,
             maxHeight: '150px',
             overflowY: 'auto',
-            marginTop: '6px',
+            marginBottom: '6px',
             borderRadius: '4px',
             backdropFilter: 'blur(8px)'
           }} className="custom-scrollbar">

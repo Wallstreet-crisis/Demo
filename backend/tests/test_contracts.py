@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
+import pytest
 from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +26,13 @@ def _reset_sqlite() -> None:
         conn.execute("DELETE FROM positions")
         conn.execute("DELETE FROM accounts")
         conn.execute("DELETE FROM orders")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_contract_tests() -> None:
+    _reset_sqlite()
+    yield
+    _reset_sqlite()
 
 
 def test_contract_create_sign_activate_flow() -> None:
@@ -137,16 +145,20 @@ def test_contract_scheduled_rule_execution_blocks_manual_trigger_but_allows_syst
     assert resp.status_code == 200
     contract_id = resp.json()["contract_id"]
 
-    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
-    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
-    client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    resp = client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
+    assert resp.status_code == 200, resp.text
+    resp = client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
+    assert resp.status_code == 200, resp.text
+    resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    assert resp.status_code == 200, resp.text
+    assert client.get(f"/contracts/{contract_id}").json()["status"] == "ACTIVE"
 
     resp = client.post(f"/contracts/{contract_id}/run_rules", json={"actor_id": "user:alice"})
     assert resp.status_code == 400
 
     resp = client.post(f"/contracts/{contract_id}/run_rules", json={"actor_id": "system:tick"})
     assert resp.status_code == 200
-    assert get_snapshot("user:alice").cash == 90.0
+    assert get_snapshot("user:alice").cash == 140.0
     assert get_snapshot("user:bob").cash == 10.0
 
 
@@ -207,7 +219,9 @@ def test_contract_proposal_suspend_requires_all_parties_approval() -> None:
 
     client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
     client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
-    client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    assert resp.status_code == 200, resp.text
+    assert client.get(f"/contracts/{contract_id}").json()["status"] == "ACTIVE"
 
     # create suspend proposal
     resp = client.post(
@@ -313,7 +327,9 @@ def test_contract_settle_transfers_assets_between_accounts() -> None:
 
     client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
     client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
-    client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    assert resp.status_code == 200, resp.text
+    assert client.get(f"/contracts/{contract_id}").json()["status"] == "ACTIVE"
 
     resp = client.post(f"/contracts/{contract_id}/settle", json={"actor_id": "user:alice"})
     assert resp.status_code == 200
@@ -360,7 +376,9 @@ def test_contract_settle_fails_and_rolls_back_on_insufficient_assets() -> None:
 
     client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
     client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
-    client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    assert resp.status_code == 200, resp.text
+    assert client.get(f"/contracts/{contract_id}").json()["status"] == "ACTIVE"
 
     before_alice = get_snapshot("user:alice")
     before_bob = get_snapshot("user:bob")
@@ -375,11 +393,116 @@ def test_contract_settle_fails_and_rolls_back_on_insufficient_assets() -> None:
     assert after_bob.cash == 50.0
 
 
+def test_contract_settle_refreshes_player_status_immediately() -> None:
+    _reset_sqlite()
+
+    create_account("user:chen", owner_type="user", initial_cash=3000.0)
+    create_account("user:loong", owner_type="user", initial_cash=3000.0)
+
+    resp = client.post(
+        "/contracts/create",
+        json={
+            "actor_id": "user:chen",
+            "kind": "EXCHANGE",
+            "title": "bankrupt-after-settle",
+            "terms": {
+                "transfers": [
+                    {
+                        "from": "user:chen",
+                        "to": "user:loong",
+                        "asset_type": "CASH",
+                        "symbol": "CASH",
+                        "quantity": 3000.0,
+                    }
+                ]
+            },
+            "parties": ["user:chen", "user:loong"],
+            "required_signers": ["user:chen", "user:loong"],
+        },
+    )
+    assert resp.status_code == 200
+    contract_id = resp.json()["contract_id"]
+
+    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:chen"})
+    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:loong"})
+    resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:chen"})
+    assert resp.status_code == 200, resp.text
+    assert client.get(f"/contracts/{contract_id}").json()["status"] == "ACTIVE"
+
+    resp = client.post(f"/contracts/{contract_id}/settle", json={"actor_id": "user:chen"})
+    assert resp.status_code == 200
+
+    chen = get_snapshot("user:chen")
+    loong = get_snapshot("user:loong")
+
+    assert chen.cash == 0.0
+    assert chen.status == "BANKRUPT"
+    assert loong.cash == 6000.0
+
+
+def test_contract_run_rules_refreshes_player_status_immediately() -> None:
+    _reset_sqlite()
+
+    create_account("user:chen", owner_type="user", initial_cash=3000.0)
+    create_account("user:loong", owner_type="user", initial_cash=3000.0)
+
+    resp = client.post(
+        "/contracts/create",
+        json={
+            "actor_id": "user:chen",
+            "kind": "RULES",
+            "title": "bankrupt-after-rule",
+            "terms": {
+                "rules": [
+                    {
+                        "rule_id": "r1",
+                        "schedule": {"type": "once"},
+                        "condition": True,
+                        "actions": {
+                            "transfers": [
+                                {
+                                    "from": "user:chen",
+                                    "to": "user:loong",
+                                    "asset_type": "CASH",
+                                    "symbol": "CASH",
+                                    "quantity": 3000.0,
+                                }
+                            ]
+                        },
+                    }
+                ]
+            },
+            "parties": ["user:chen", "user:loong"],
+            "required_signers": ["user:chen", "user:loong"],
+        },
+    )
+    assert resp.status_code == 200
+    contract_id = resp.json()["contract_id"]
+
+    resp = client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:chen"})
+    assert resp.status_code == 200, resp.text
+    resp = client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:loong"})
+    assert resp.status_code == 200, resp.text
+    resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:chen"})
+    assert resp.status_code == 200, resp.text
+    assert client.get(f"/contracts/{contract_id}").json()["status"] == "ACTIVE"
+
+    resp = client.post(f"/contracts/{contract_id}/run_rules", json={"actor_id": "user:chen"})
+    assert resp.status_code == 200, resp.text
+
+    chen = get_snapshot("user:chen")
+    loong = get_snapshot("user:loong")
+
+    assert chen.cash == 0.0
+    assert chen.status == "BANKRUPT"
+    assert loong.cash == 6000.0
+
+
 def test_contract_run_rules_once_executes_transfers_and_does_not_repeat() -> None:
     _reset_sqlite()
 
-    create_account("user:alice", owner_type="user", initial_cash=200.0)
-    create_account("user:bob", owner_type="user", initial_cash=0.0)
+    create_account("user:alice", owner_type="user", initial_cash=3000.0)
+    create_account("user:bob", owner_type="user", initial_cash=3000.0)
 
     resp = client.post(
         "/contracts/create",
@@ -420,25 +543,27 @@ def test_contract_run_rules_once_executes_transfers_and_does_not_repeat() -> Non
 
     client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
     client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
-    client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    assert resp.status_code == 200, resp.text
+    assert client.get(f"/contracts/{contract_id}").json()["status"] == "ACTIVE"
 
     resp = client.post(f"/contracts/{contract_id}/run_rules", json={"actor_id": "user:alice"})
-    assert resp.status_code == 200
-    assert get_snapshot("user:alice").cash == 150.0
-    assert get_snapshot("user:bob").cash == 50.0
+    assert resp.status_code == 200, resp.text
+    assert get_snapshot("user:alice").cash == 2950.0
+    assert get_snapshot("user:bob").cash == 3050.0
 
     # run again: once schedule should block, no further changes
     resp = client.post(f"/contracts/{contract_id}/run_rules", json={"actor_id": "user:alice"})
-    assert resp.status_code == 200
-    assert get_snapshot("user:alice").cash == 150.0
-    assert get_snapshot("user:bob").cash == 50.0
+    assert resp.status_code == 200, resp.text
+    assert get_snapshot("user:alice").cash == 2950.0
+    assert get_snapshot("user:bob").cash == 3050.0
 
 
 def test_contract_run_rules_condition_false_does_not_execute() -> None:
     _reset_sqlite()
 
-    create_account("user:alice", owner_type="user", initial_cash=10.0)
-    create_account("user:bob", owner_type="user", initial_cash=0.0)
+    create_account("user:alice", owner_type="user", initial_cash=3000.0)
+    create_account("user:bob", owner_type="user", initial_cash=3000.0)
 
     resp = client.post(
         "/contracts/create",
@@ -454,7 +579,7 @@ def test_contract_run_rules_condition_false_does_not_execute() -> None:
                         "condition": {
                             "op": ">=",
                             "left": {"var": "cash:user:alice"},
-                            "right": 100.0,
+                            "right": 5000.0,
                         },
                         "actions": {
                             "transfers": [
@@ -477,15 +602,19 @@ def test_contract_run_rules_condition_false_does_not_execute() -> None:
     assert resp.status_code == 200
     contract_id = resp.json()["contract_id"]
 
-    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
-    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
-    client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    resp = client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
+    assert resp.status_code == 200, resp.text
+    resp = client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
+    assert resp.status_code == 200, resp.text
+    resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
+    assert resp.status_code == 200, resp.text
+    assert client.get(f"/contracts/{contract_id}").json()["status"] == "ACTIVE"
 
     before_alice = get_snapshot("user:alice")
     before_bob = get_snapshot("user:bob")
 
     resp = client.post(f"/contracts/{contract_id}/run_rules", json={"actor_id": "user:alice"})
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
 
     after_alice = get_snapshot("user:alice")
     after_bob = get_snapshot("user:bob")

@@ -38,7 +38,12 @@ from ifrontier.infra.sqlite.contracts import (
 )
 from ifrontier.infra.sqlite.event_store import SqliteEventStore
 from ifrontier.infra.sqlite.ledger import ContractTransfer, apply_contract_transfers, get_snapshot
+from ifrontier.core.logger import get_logger
+from ifrontier.services.victory import VictoryService
 from ifrontier.services.contract_rules import eval_condition, parse_transfers, should_run
+
+
+_log = get_logger(__name__)
 
 
 class ContractService:
@@ -47,9 +52,39 @@ class ContractService:
     _TRIGGER_ACTIONS = ("activate", "settle", "run_rules")
     _SYSTEM_ACTORS = {"system", "system:tick"}
 
+    def __init__(self, event_store: SqliteEventStore) -> None:
+        self._event_store = event_store
+        self._victory_service = VictoryService()
+
+    def _get_victory_service(self) -> VictoryService:
+        victory_service = getattr(self, "_victory_service", None)
+        if victory_service is None:
+            victory_service = VictoryService()
+            self._victory_service = victory_service
+        return victory_service
+
     @staticmethod
     def _normalize_account_id(value: str) -> str:
         return str(value or "").strip().lower()
+
+    def _refresh_settlement_for_accounts(self, account_ids: List[str]) -> None:
+        """合同资产变动后，立即刷新相关账户的状态与总估值。
+
+        这里不主动广播事件，避免资产高频波动导致消息风暴；广播仍由
+        VictoryScheduler 在检测到状态变化时统一处理。
+        """
+        seen = set()
+        for acc_id in account_ids:
+            nid = self._normalize_account_id(acc_id)
+            if not nid or nid in seen:
+                continue
+            seen.add(nid)
+            try:
+                self._get_victory_service().update_player_settlement(nid)
+            except Exception as exc:
+                # 合同已成功落账，不因单个结算刷新失败阻断主流程；
+                # 但必须记录下来，避免状态刷新问题被静默吞掉而难以排查。
+                _log.exception("Failed to refresh settlement for account %s after contract mutation: %s", nid, exc)
 
     @classmethod
     def _default_trigger_policy(cls, *, kind: str, has_rules: bool) -> Dict[str, Dict[str, str]]:
@@ -701,6 +736,12 @@ class ContractService:
         if scaled:
             apply_contract_transfers(transfers=scaled, event_id=settlement_event_id)
 
+        affected_accounts = [actor_id]
+        for t in scaled:
+            affected_accounts.append(t.from_account_id)
+            affected_accounts.append(t.to_account_id)
+        self._refresh_settlement_for_accounts(affected_accounts)
+
         new_status = ContractStatus.SETTLED.value if fill_ratio >= 1.0 - 1e-9 else ContractStatus.DEFAULTED.value
         sqlite_update_contract_status(contract_id, new_status)
 
@@ -843,6 +884,12 @@ class ContractService:
             settlement_event_id = str(uuid4())
             if scaled:
                 apply_contract_transfers(transfers=scaled, event_id=settlement_event_id)
+
+            affected_accounts = [actor_id]
+            for t in scaled:
+                affected_accounts.append(t.from_account_id)
+                affected_accounts.append(t.to_account_id)
+            self._refresh_settlement_for_accounts(affected_accounts)
 
             if fill_ratio < 1.0 - 1e-9:
                 defaulted = True
