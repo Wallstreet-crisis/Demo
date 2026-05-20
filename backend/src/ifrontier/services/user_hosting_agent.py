@@ -365,7 +365,17 @@ class UserHostingAgent:
                         except Exception:
                             last_ts = None
 
-                    if last_hash and last_hash == content_hash:
+                    if last_hash and last_hash == content_hash and last_ts is not None:
+                        if (now_ts - last_ts) < float(cooldown_seconds):
+                            results.append({"ok": True, "skipped": True, "reason": "duplicate_public_message"})
+                            log_ai_action(
+                                agent_id=f"hosting:{self.user_id}",
+                                action_type="SKIP_SPAM_PUBLIC_MESSAGE",
+                                detail=f"type={msg_type} duplicate=True cooldown={cooldown_seconds}",
+                            )
+                            continue
+
+                    if last_hash and last_hash == content_hash and last_ts is None:
                         results.append({"ok": True, "skipped": True, "reason": "duplicate_public_message"})
                         log_ai_action(
                             agent_id=f"hosting:{self.user_id}",

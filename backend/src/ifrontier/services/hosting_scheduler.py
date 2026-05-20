@@ -62,10 +62,10 @@ class HostingScheduler:
             except asyncio.TimeoutError:
                 pass
 
-    async def tick_once(self) -> None:
+    async def tick_once(self, *, bypass_human_gate: bool = False) -> None:
         humans = int(await self._get_channel_size(self._channel_for_online_stats))
 
-        if humans <= 0:
+        if humans <= 0 and not bypass_human_gate:
             return
         
         # 允许一定比例或固定数量的 AI 始终在线，不受人类数量干扰（除非人类真的非常多）

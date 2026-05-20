@@ -25,6 +25,13 @@ class RoomEngine:
         self.market_maker_scheduler: Optional[MarketMakerScheduler] = None
         self.hosting_scheduler: Optional[HostingScheduler] = None
         self.victory_scheduler: Optional[VictoryScheduler] = None
+        
+        # 房间级服务实例
+        self.news_service: Optional[Any] = None
+        self.news_tick_engine: Optional[Any] = None
+        self.commonbot_emergency_runner: Optional[Any] = None
+        self.chat_service: Optional[Any] = None
+        self.contract_service: Optional[Any] = None
 
     def _make_broadcaster(self):
         room_id_captured = self.room_id
@@ -72,18 +79,42 @@ class RoomEngine:
             game_settings.setdefault("game_started_at", room_meta.game_started_at or room_meta.created_at)
 
         from ifrontier.app.api import (
-            _contract_service,
-            _news_service,
-            _news_tick_engine,
-            _commonbot_emergency_runner,
+            _make_broadcaster_for_events,
         )
+        from ifrontier.infra.sqlite.event_store import SqliteEventStore
+        from ifrontier.services.news import NewsService
+        from ifrontier.services.news_tick import NewsTickEngine
+        from ifrontier.services.commonbot_emergency import CommonBotEmergencyRunner
+        from ifrontier.services.chat import ChatService
+        from ifrontier.services.contracts import ContractService
+        from ifrontier.services.market_analytics import get_market_trends
 
         # 延迟导入 make_user_facade，避免循环依赖
         import ifrontier.app.api as api_module
         make_user_facade = api_module.make_user_facade
 
+        # 为每个房间创建独立的事件存储和服务实例，确保房间隔离
+        room_event_store = SqliteEventStore()
+        room_contract_service = ContractService(room_event_store)
+        room_news_service = NewsService(room_event_store)
+        room_chat_service = ChatService(event_store=room_event_store)
+        room_news_tick_engine = NewsTickEngine(room_event_store, room_news_service, broadcaster=broadcaster)
+        room_commonbot_emergency_runner = CommonBotEmergencyRunner(
+            news=room_news_service,
+            event_store=room_event_store,
+            market_data_provider=lambda symbols: get_market_trends(symbols=symbols),
+            broadcaster=broadcaster,
+        )
+        
+        # 保存房间级服务实例，供 API 层访问
+        self.contract_service = room_contract_service
+        self.news_service = room_news_service
+        self.chat_service = room_chat_service
+        self.news_tick_engine = room_news_tick_engine
+        self.commonbot_emergency_runner = room_commonbot_emergency_runner
+
         self.contract_scheduler = ContractRuleScheduler(
-            contract_service=_contract_service,
+            contract_service=room_contract_service,
             tick_interval_seconds=1.0,
             batch_size=50,
             max_concurrency=5,
@@ -92,7 +123,7 @@ class RoomEngine:
         )
 
         self.news_scheduler = NewsTickScheduler(
-            tick_engine=_news_tick_engine,
+            tick_engine=room_news_tick_engine,
             tick_interval_seconds=1.0,
             batch_size=50,
             broadcaster=broadcaster,
@@ -101,7 +132,7 @@ class RoomEngine:
         )
 
         self.market_session_scheduler = MarketSessionScheduler(
-            runner=_commonbot_emergency_runner,
+            runner=room_commonbot_emergency_runner,
             tick_interval_seconds=1.0,
             broadcaster=broadcaster,
             channel_for_online_stats="presence",
@@ -130,7 +161,7 @@ class RoomEngine:
             broadcaster=broadcaster,
             get_channel_size=get_size,
             room_settings=game_settings,
-            news_service=_news_service,
+            news_service=room_news_service,
         )
 
         token = room_id_var.set(self.room_id)
@@ -199,5 +230,9 @@ class RoomManager:
 
     def active_room_count(self) -> int:
         return len(self._rooms)
+    
+    def get_room_engine(self, room_id: str) -> Optional[RoomEngine]:
+        """获取指定房间的引擎实例"""
+        return self._rooms.get(room_id)
 
 room_manager = RoomManager()

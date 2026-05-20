@@ -106,6 +106,56 @@ def _news_debug_enabled() -> bool:
     """检查是否开启新闻调试。"""
     return str(os.getenv("IF_NEWS_DEBUG") or "0").strip().lower() in {"1", "true", "yes"}
 
+def _get_room_news_service():
+    """获取当前房间的 NewsService 实例。"""
+    from ifrontier.infra.sqlite.db import room_id_var
+    room_id = room_id_var.get()
+    engine = room_manager.get_room_engine(room_id)
+    if engine and engine.news_service:
+        return engine.news_service
+    # 回退到全局实例（兼容性）
+    return _news_service
+
+def _get_room_news_tick_engine():
+    """获取当前房间的 NewsTickEngine 实例。"""
+    from ifrontier.infra.sqlite.db import room_id_var
+    room_id = room_id_var.get()
+    engine = room_manager.get_room_engine(room_id)
+    if engine and engine.news_tick_engine:
+        return engine.news_tick_engine
+    # 回退到全局实例（兼容性）
+    return _news_tick_engine
+
+def _get_room_commonbot_emergency_runner():
+    """获取当前房间的 CommonBotEmergencyRunner 实例。"""
+    from ifrontier.infra.sqlite.db import room_id_var
+    room_id = room_id_var.get()
+    engine = room_manager.get_room_engine(room_id)
+    if engine and engine.commonbot_emergency_runner:
+        return engine.commonbot_emergency_runner
+    # 回退到全局实例（兼容性）
+    return _commonbot_emergency_runner
+
+def _get_room_chat_service():
+    """获取当前房间的 ChatService 实例。"""
+    from ifrontier.infra.sqlite.db import room_id_var
+    room_id = room_id_var.get()
+    engine = room_manager.get_room_engine(room_id)
+    if engine and engine.chat_service:
+        return engine.chat_service
+    # 回退到全局实例（兼容性）
+    return _chat_service
+
+def _get_room_contract_service():
+    """获取当前房间的 ContractService 实例。"""
+    from ifrontier.infra.sqlite.db import room_id_var
+    room_id = room_id_var.get()
+    engine = room_manager.get_room_engine(room_id)
+    if engine and engine.contract_service:
+        return engine.contract_service
+    # 回退到全局实例（兼容性）
+    return _contract_service
+
 # ==========================================
 # 房间管理 (Rooms API)
 # ==========================================
@@ -634,7 +684,7 @@ async def news_store_catalog(user_id: str, force_refresh: bool = False) -> NewsS
 
     # 2. 生成个性化货架
     # shelf_data: {"items": [(bp, price), ...], "expires_at": str}
-    shelf_result = _news_service.generate_market_shelf(
+    shelf_result = _get_room_news_service().generate_market_shelf(
         player_id=user_id,
         player_net_worth=player_net_worth,
         shelf_size=8,
@@ -673,11 +723,11 @@ async def news_store_catalog(user_id: str, force_refresh: bool = False) -> NewsS
                 assigned_symbol = str(sec_symbols[0])
 
         preview_symbols = [assigned_symbol] if assigned_symbol else []
-        presets_texts = _news_service.get_preset_templates(kind=kind, symbols=preview_symbols)
+        presets_texts = _get_room_news_service().get_preset_templates(kind=kind, symbols=preview_symbols)
         preview = (
             random.choice(presets_texts)
             if presets_texts
-            else _news_service.get_preset_template(kind=kind, symbols=preview_symbols)
+            else _get_room_news_service().get_preset_template(kind=kind, symbols=preview_symbols)
         )
         
         out.append(
@@ -720,7 +770,7 @@ class NewsInboxResponse(BaseModel):
 
 @router.get("/news/inbox/{player_id}")
 async def news_inbox(player_id: str, limit: int = 50) -> NewsInboxResponse:
-    items = _news_service.list_inbox(player_id=player_id, limit=limit)
+    items = _get_room_news_service().list_inbox(player_id=player_id, limit=limit)
     return NewsInboxResponse(items=[NewsInboxResponseItem(**it) for it in items])
 
 class NewsFeedItem(BaseModel):
@@ -975,7 +1025,7 @@ async def hosting_debug_tick_once() -> HostingDebugTickResponse:
             broadcaster=_make_broadcaster_for_events(),
             make_facade=make_user_facade,
         )
-    await sched.tick_once()
+    await sched.tick_once(bypass_human_gate=True)
     return HostingDebugTickResponse(ok=True)
 
 def _make_broadcaster_for_events():
@@ -2011,7 +2061,7 @@ class ChatIntroFeeQuoteResponse(BaseModel):
 @router.post("/chat/intro-fee/quote")
 async def chat_intro_fee_quote(req: ChatIntroFeeQuoteRequest) -> ChatIntroFeeQuoteResponse:
     try:
-        event_json = _chat_service.set_intro_fee_quote(
+        event_json = _get_room_chat_service().set_intro_fee_quote(
             rich_user_id=req.rich_user_id,
             fee_cash=req.fee_cash,
             actor_id=req.actor_id,
@@ -2038,7 +2088,7 @@ class ChatOpenPmResponse(BaseModel):
 @router.post("/chat/pm/open")
 async def chat_open_pm(req: ChatOpenPmRequest) -> ChatOpenPmResponse:
     try:
-        result, events = _chat_service.open_pm(requester_id=req.requester_id, target_id=req.target_id)
+        result, events = _get_room_chat_service().open_pm(requester_id=req.requester_id, target_id=req.target_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -2070,7 +2120,7 @@ class ChatSendMessageResponse(BaseModel):
 @router.post("/chat/public/send")
 async def chat_public_send(req: ChatSendMessageRequest) -> ChatSendMessageResponse:
     try:
-        event_json = _chat_service.send_public_message(
+        event_json = _get_room_chat_service().send_public_message(
             sender_id=req.sender_id,
             message_type=req.message_type,
             content=req.content,
@@ -2093,7 +2143,7 @@ class ChatSendPmMessageRequest(ChatSendMessageRequest):
 @router.post("/chat/pm/send")
 async def chat_pm_send(req: ChatSendPmMessageRequest) -> ChatSendMessageResponse:
     try:
-        event_json = _chat_service.send_pm_message(
+        event_json = _get_room_chat_service().send_pm_message(
             thread_id=req.thread_id,
             sender_id=req.sender_id,
             message_type=req.message_type,
@@ -2127,7 +2177,7 @@ class ChatListMessagesResponse(BaseModel):
 
 @router.get("/chat/public/messages")
 async def chat_public_messages(limit: int = 50, before: str | None = None) -> ChatListMessagesResponse:
-    items = _chat_service.list_public_messages(limit=limit, before=before)
+    items = _get_room_chat_service().list_public_messages(limit=limit, before=before)
     out: list[ChatMessageResponse] = []
     for m in items:
         anon = bool((m.payload or {}).get("anonymous"))
@@ -2149,7 +2199,7 @@ async def chat_public_messages(limit: int = 50, before: str | None = None) -> Ch
 
 @router.get("/chat/pm/{thread_id}/messages")
 async def chat_pm_messages(thread_id: str, limit: int = 50, before: str | None = None) -> ChatListMessagesResponse:
-    items = _chat_service.list_pm_messages(thread_id=thread_id, limit=limit, before=before)
+    items = _get_room_chat_service().list_pm_messages(thread_id=thread_id, limit=limit, before=before)
     out: list[ChatMessageResponse] = []
     for m in items:
         anon = bool((m.payload or {}).get("anonymous"))
@@ -2184,7 +2234,7 @@ class ChatListThreadsResponse(BaseModel):
 
 @router.get("/chat/threads/{user_id}")
 async def chat_list_threads(user_id: str, limit: int = 200) -> ChatListThreadsResponse:
-    items = _chat_service.list_threads(user_id=user_id, limit=limit)
+    items = _get_room_chat_service().list_threads(user_id=user_id, limit=limit)
     return ChatListThreadsResponse(items=[ChatThreadResponse(**t.__dict__) for t in items])
 
 
@@ -2196,7 +2246,7 @@ class WealthPublicRefreshResponse(BaseModel):
 
 @router.post("/wealth/public/refresh")
 async def wealth_public_refresh() -> WealthPublicRefreshResponse:
-    public_count, event_json = _chat_service.refresh_public_wealth_top10()
+    public_count, event_json = _get_room_chat_service().refresh_public_wealth_top10()
     await hub.broadcast_many(["events", str(event_json.event_type)], event_json.model_dump())
     return WealthPublicRefreshResponse(
         public_count=int(public_count),
@@ -2212,7 +2262,7 @@ class WealthPublicResponse(BaseModel):
 
 @router.get("/wealth/public/{user_id}")
 async def wealth_public_get(user_id: str) -> WealthPublicResponse:
-    v = _chat_service.get_public_total_value(user_id=user_id)
+    v = _get_room_chat_service().get_public_total_value(user_id=user_id)
     return WealthPublicResponse(user_id=user_id, public_total_value=v)
 
 
@@ -2220,7 +2270,7 @@ async def wealth_public_get(user_id: str) -> WealthPublicResponse:
 async def contract_create(req: ContractCreateRequest) -> ContractCreateResponse:
     try:
         party_ids = _normalize_contract_party_ids(req.parties)
-        contract_id = _contract_service.create_contract(
+        contract_id = _get_room_contract_service().create_contract(
             kind=req.kind,
             title=req.title,
             terms=req.terms,
@@ -2263,7 +2313,7 @@ async def list_players(limit: int = 100) -> PlayerListResponse:
     except Exception:
         # 兜底：尝试从新闻用户表中取（可能为空）
         try:
-            users_from_news = _news_service.list_users(limit=int(limit))
+            users_from_news = _get_room_news_service().list_users(limit=int(limit))
             # 返回 raw user_id（可能是 user:xxx），这里做一次归一化
             norm = [u[len("user:") :] if str(u).startswith("user:") else str(u) for u in users_from_news]
             return PlayerListResponse(items=norm)
@@ -2420,7 +2470,7 @@ async def contract_batch_create(req: ContractBatchCreateRequest) -> ContractBatc
             }
             for c in req.contracts
         ]
-        ids = _contract_service.create_contracts_batch(
+        ids = _get_room_contract_service().create_contracts_batch(
             actor_id=req.actor_id,
             contracts=contract_dicts,
         )
@@ -2496,7 +2546,7 @@ class ContractJoinRequest(BaseModel):
 @router.post("/contracts/{contract_id}/join")
 async def contract_join(contract_id: str, req: ContractJoinRequest) -> None:
     try:
-        _contract_service.join_contract(contract_id=contract_id, joiner=req.joiner)
+        _get_room_contract_service().join_contract(contract_id=contract_id, joiner=req.joiner)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -2513,7 +2563,7 @@ class ContractSignResponse(BaseModel):
 async def contract_sign(contract_id: str, req: ContractSignRequest) -> ContractSignResponse:
     assert_player_can_act(req.signer)
     try:
-        status = _contract_service.sign_contract(contract_id=contract_id, signer=str(req.signer).strip().lower())
+        status = _get_room_contract_service().sign_contract(contract_id=contract_id, signer=str(req.signer).strip().lower())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return ContractSignResponse(status=status.value)
@@ -2526,7 +2576,7 @@ class ContractActivateRequest(BaseModel):
 @router.post("/contracts/{contract_id}/activate")
 async def contract_activate(contract_id: str, req: ContractActivateRequest) -> None:
     try:
-        _contract_service.activate_contract(contract_id=contract_id, actor_id=req.actor_id)
+        _get_room_contract_service().activate_contract(contract_id=contract_id, actor_id=req.actor_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -2546,7 +2596,7 @@ async def contract_proposal_create(
     contract_id: str, req: ContractProposalCreateRequest
 ) -> ContractProposalCreateResponse:
     try:
-        proposal_id = _contract_service.create_proposal(
+        proposal_id = _get_room_contract_service().create_proposal(
             contract_id=contract_id,
             proposal_type=req.proposal_type,
             proposer=req.proposer,
@@ -2573,7 +2623,7 @@ async def contract_proposal_approve(
     contract_id: str, proposal_id: str, req: ContractProposalApproveRequest
 ) -> ContractProposalApproveResponse:
     try:
-        result = _contract_service.approve_proposal(
+        result = _get_room_contract_service().approve_proposal(
             contract_id=contract_id,
             proposal_id=proposal_id,
             approver=req.approver,
@@ -2595,7 +2645,7 @@ class ContractSettleRequest(BaseModel):
 @router.post("/contracts/{contract_id}/settle")
 async def contract_settle(contract_id: str, req: ContractSettleRequest) -> None:
     try:
-        _contract_service.settle_contract(contract_id=contract_id, actor_id=req.actor_id)
+        _get_room_contract_service().settle_contract(contract_id=contract_id, actor_id=req.actor_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -2607,7 +2657,7 @@ class ContractRunRulesRequest(BaseModel):
 @router.post("/contracts/{contract_id}/run_rules")
 async def contract_run_rules(contract_id: str, req: ContractRunRulesRequest) -> None:
     try:
-        _contract_service.run_rules(contract_id=contract_id, actor_id=req.actor_id)
+        _get_room_contract_service().run_rules(contract_id=contract_id, actor_id=req.actor_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -2620,7 +2670,7 @@ class SocialFollowRequest(BaseModel):
 @router.post("/social/follow")
 async def social_follow(req: SocialFollowRequest) -> None:
     try:
-        _news_service.follow(follower_id=req.follower_id, followee_id=req.followee_id)
+        _get_room_news_service().follow(follower_id=req.follower_id, followee_id=req.followee_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -2658,7 +2708,7 @@ async def news_create_card(req: NewsCreateCardRequest) -> NewsCreateCardResponse
         raise HTTPException(status_code=403, detail="direct news card creation is GM-only")
 
     try:
-        card_id, event_json = _news_service.create_card(
+        card_id, event_json = _get_room_news_service().create_card(
             kind=req.kind,
             image_anchor_id=req.image_anchor_id,
             image_uri=req.image_uri,
@@ -2699,7 +2749,7 @@ class NewsEmitVariantResponse(BaseModel):
 @router.post("/news/variants/emit")
 async def news_emit_variant(req: NewsEmitVariantRequest) -> NewsEmitVariantResponse:
     try:
-        variant_id, event_json = _news_service.emit_variant(
+        variant_id, event_json = _get_room_news_service().emit_variant(
             card_id=req.card_id,
             author_id=req.author_id,
             text=req.text,
@@ -2753,7 +2803,7 @@ async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVarian
             raise HTTPException(status_code=400, detail=str(exc))
 
     try:
-        new_variant_id, event_json = _news_service.mutate_variant(
+        new_variant_id, event_json = _get_room_news_service().mutate_variant(
             parent_variant_id=req.parent_variant_id,
             editor_id=req.editor_id,
             new_text=req.new_text,
@@ -2828,7 +2878,7 @@ async def news_propagate_quote(req: NewsPropagateQuoteRequest) -> NewsPropagateQ
     if budget <= 0:
         raise HTTPException(status_code=400, detail="spend_cash must be > 0")
 
-    ctx = _news_service.get_variant_context(variant_id=req.variant_id) or {}
+    ctx = _get_room_news_service().get_variant_context(variant_id=req.variant_id) or {}
     depth = int(ctx.get("mutation_depth") or 0)
 
     base_unit = float(os.getenv("IF_NEWS_PROPAGATE_CASH_PER_DELIVERY") or "500.0")
@@ -2865,7 +2915,7 @@ async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
 
     # 若提供 spend_cash，则按 mutation_depth 提高单次投递成本，并用预算限制可投递人数。
     if req.spend_cash is not None:
-        ctx = _news_service.get_variant_context(variant_id=req.variant_id) or {}
+        ctx = _get_room_news_service().get_variant_context(variant_id=req.variant_id) or {}
         depth = int(ctx.get("mutation_depth") or 0)
 
         base_unit = float(os.getenv("IF_NEWS_PROPAGATE_CASH_PER_DELIVERY") or "500.0")
@@ -2895,7 +2945,7 @@ async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
         recipients = []
 
     if req.spend_cash is not None and len(recipients) < limit:
-        users = _news_service.list_users(limit=5000)
+        users = _get_room_news_service().list_users(limit=5000)
         seen = set(recipients)
         candidates = [u for u in users if u not in seen and str(u) != str(req.from_actor_id)]
         random.shuffle(candidates)
@@ -2916,7 +2966,7 @@ async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
     delivery_reason = "PAID_PROMOTION" if req.spend_cash is not None else "SOCIAL_PROPAGATION"
     for to_player_id in recipients:
         try:
-            _delivery_id, ev = _news_service.deliver_variant(
+            _delivery_id, ev = _get_room_news_service().deliver_variant(
                 variant_id=req.variant_id,
                 to_player_id=to_player_id,
                 from_actor_id=req.from_actor_id,
@@ -2938,7 +2988,7 @@ async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
 @router.post("/news/broadcast")
 async def news_broadcast(req: NewsBroadcastRequest) -> NewsBroadcastResponse:
     try:
-        delivered, ev = _news_service.broadcast_variant(
+        delivered, ev = _get_room_news_service().broadcast_variant(
             variant_id=req.variant_id,
             channel=req.channel,
             visibility_level=req.visibility_level,
@@ -3106,7 +3156,7 @@ async def news_tick(req: NewsTickRequest) -> NewsTickResponse:
 @router.post("/news/ownership/grant")
 async def news_ownership_grant(req: NewsOwnershipGrantRequest) -> NewsOwnershipEventResponse:
     try:
-        event_json = _news_service.grant_ownership(
+        event_json = _get_room_news_service().grant_ownership(
             card_id=req.card_id,
             to_user_id=req.to_user_id,
             granter_id=req.granter_id,
@@ -3122,7 +3172,7 @@ async def news_ownership_grant(req: NewsOwnershipGrantRequest) -> NewsOwnershipE
 @router.post("/news/ownership/transfer")
 async def news_ownership_transfer(req: NewsOwnershipTransferRequest) -> NewsOwnershipEventResponse:
     try:
-        event_json = _news_service.transfer_ownership(
+        event_json = _get_room_news_service().transfer_ownership(
             card_id=req.card_id,
             from_user_id=req.from_user_id,
             to_user_id=req.to_user_id,
@@ -3138,7 +3188,7 @@ async def news_ownership_transfer(req: NewsOwnershipTransferRequest) -> NewsOwne
 
 @router.get("/news/ownership/{user_id}")
 async def news_ownership_list(user_id: str, limit: int = 200) -> NewsOwnedCardsResponse:
-    cards = _news_service.list_owned_cards(user_id=user_id, limit=limit)
+    cards = _get_room_news_service().list_owned_cards(user_id=user_id, limit=limit)
     return NewsOwnedCardsResponse(cards=cards)
 
 
@@ -3242,7 +3292,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
         major_card_id = str(result["major_card_id"])
         # 璐拱鑰呰幏寰椾富浜嬩欢鍗℃墍鏈夋潈
         try:
-            _news_service.grant_ownership(
+            _get_room_news_service().grant_ownership(
                 card_id=major_card_id,
                 to_user_id=req.buyer_user_id,
                 granter_id="system",
@@ -3263,7 +3313,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     symbols = req_symbols
     initial_text = req.initial_text
 
-    card_id, card_event = _news_service.create_card(
+    card_id, card_event = _get_room_news_service().create_card(
         kind=req.kind,
         image_anchor_id=req.image_anchor_id,
         image_uri=req.image_uri,
@@ -3275,7 +3325,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     )
     await hub.broadcast_many(["events", str(EventType.NEWS_CARD_CREATED)], card_event.model_dump())
 
-    variant_id, variant_event = _news_service.emit_variant(
+    variant_id, variant_event = _get_room_news_service().emit_variant(
         card_id=card_id,
         author_id=req.buyer_user_id,
         text=initial_text,
@@ -3287,7 +3337,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     await hub.broadcast_many(["events", str(EventType.NEWS_VARIANT_EMITTED)], variant_event.model_dump())
 
     try:
-        ownership_event = _news_service.grant_ownership(
+        ownership_event = _get_room_news_service().grant_ownership(
             card_id=card_id,
             to_user_id=req.buyer_user_id,
             granter_id="system",
@@ -3298,7 +3348,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
         pass
 
     try:
-        _delivery_id, delivered_event = _news_service.deliver_variant(
+        _delivery_id, delivered_event = _get_room_news_service().deliver_variant(
             variant_id=variant_id,
             to_player_id=req.buyer_user_id,
             from_actor_id="system",

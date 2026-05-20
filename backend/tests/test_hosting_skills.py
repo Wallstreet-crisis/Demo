@@ -25,6 +25,7 @@ def _reset_hosting_tables() -> None:
     with conn:
         conn.execute("DELETE FROM user_hosting_state")
         conn.execute("DELETE FROM user_hosting_context")
+        conn.execute("DELETE FROM chat_messages")
 
 
 def test_hosting_agent_skills_calls_are_executed(monkeypatch) -> None:
@@ -164,3 +165,66 @@ def test_hosting_agent_respects_max_tools_per_tick(monkeypatch) -> None:
 
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("IF_HOSTING_MAX_SKILLS_PER_TICK", raising=False)
+
+
+def test_hosting_agent_blocks_duplicate_public_message_across_ticks(monkeypatch) -> None:
+    _reset_hosting_tables()
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test")
+    monkeypatch.setenv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+    monkeypatch.setenv("IF_HOSTING_PUBLIC_MSG_COOLDOWN_SECONDS", "3600")
+
+    tool_calls = {
+        "tool_calls": [
+            {
+                "name": "chat.send_public_message",
+                "arguments": {"message_type": "TEXT", "content": "repeat-me", "payload": {}},
+            }
+        ]
+    }
+
+    resp_obj = {
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(tool_calls, ensure_ascii=False),
+                }
+            }
+        ]
+    }
+
+    class _FakeResp:
+        def __init__(self, s: str):
+            self._s = s
+
+        def read(self):
+            return self._s.encode("utf-8")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def _fake_urlopen(req, timeout=20):
+        return _FakeResp(json.dumps(resp_obj, ensure_ascii=False))
+
+    monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+
+    user_id = f"user:host:{uuid4()}"
+    en = client.post(f"/hosting/{user_id}/enable")
+    assert en.status_code == 200
+
+    resp1 = client.post("/hosting/debug/tick_once")
+    assert resp1.status_code == 200
+    resp2 = client.post("/hosting/debug/tick_once")
+    assert resp2.status_code == 200
+
+    msgs = client.get("/chat/public/messages", params={"limit": 10})
+    assert msgs.status_code == 200
+    items = msgs.json()["items"]
+    repeat_count = sum(1 for m in items if m["content"] == "repeat-me")
+    assert repeat_count == 1
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("IF_HOSTING_PUBLIC_MSG_COOLDOWN_SECONDS", raising=False)

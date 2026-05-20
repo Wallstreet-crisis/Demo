@@ -27,6 +27,7 @@ class VictoryScheduler:
         self._task: Optional[asyncio.Task[None]] = None
         self._victory_service = VictoryService()
         self._news_service = news_service
+        self._victory_announced = False
         
         # 默认设置，房间级配置会在这里覆盖，避免影响全局默认值
         self.settings = {
@@ -80,12 +81,14 @@ class VictoryScheduler:
                 
                 # 2. 全局胜利条件检测
                 result = await asyncio.to_thread(self._victory_service.check_global_victory, self.settings)
-                if result and self._broadcaster:
+                if result and not self._victory_announced:
+                    self._victory_announced = True
                     _log.info(f"Global Victory Reached: {result}")
-                    await self._broadcaster({
-                        "event_type": "game.victory",
-                        **result
-                    })
+                    if self._broadcaster:
+                        await self._broadcaster({
+                            "event_type": "game.victory",
+                            **result
+                        })
                     await self._publish_victory_news(result)
                     # 这里可以选择停止游戏，但目前先只广播
 
@@ -128,7 +131,7 @@ class VictoryScheduler:
         if not self._news_service:
             return
         try:
-            delivered, ev = self._news_service.broadcast_system_news(
+            self._news_service.broadcast_system_news(
                 kind="MAJOR_EVENT",
                 actor_id="system",
                 channel="game",
@@ -144,8 +147,6 @@ class VictoryScheduler:
                 },
                 symbols=[player_id],
             )
-            if self._broadcaster:
-                await self._broadcaster(ev.model_dump())
         except Exception as exc:
             _log.exception(f"Failed to publish status news for {player_id}: {exc}")
 
@@ -153,7 +154,7 @@ class VictoryScheduler:
         if not self._news_service:
             return
         try:
-            delivered, ev = self._news_service.broadcast_system_news(
+            self._news_service.broadcast_system_news(
                 kind="WORLD_EVENT",
                 actor_id="system",
                 channel="game",
@@ -161,8 +162,6 @@ class VictoryScheduler:
                 truth_payload=result,
                 symbols=[str(result.get("winner") or "NONE")],
             )
-            if self._broadcaster:
-                await self._broadcaster(ev.model_dump())
         except Exception as exc:
             _log.exception(f"Failed to publish victory news: {exc}")
 

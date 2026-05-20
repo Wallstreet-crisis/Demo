@@ -75,8 +75,8 @@ def test_contract_create_sign_activate_flow() -> None:
 def test_contract_creator_only_trigger_policy_blocks_non_creator_activation() -> None:
     _reset_sqlite()
 
-    create_account("user:alice", owner_type="user", initial_cash=100.0)
-    create_account("user:bob", owner_type="user", initial_cash=100.0)
+    create_account("user:alice", owner_type="user", initial_cash=3000.0)
+    create_account("user:bob", owner_type="user", initial_cash=3000.0)
 
     resp = client.post(
         "/contracts/create",
@@ -97,21 +97,23 @@ def test_contract_creator_only_trigger_policy_blocks_non_creator_activation() ->
     assert resp.status_code == 200
     contract_id = resp.json()["contract_id"]
 
-    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
-    client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
+    resp1 = client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:alice"})
+    assert resp1.status_code == 200, f"Sign alice failed: {resp1.text}"
+    resp2 = client.post(f"/contracts/{contract_id}/sign", json={"signer": "user:bob"})
+    assert resp2.status_code == 200, f"Sign bob failed: {resp2.text}"
 
     resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:bob"})
     assert resp.status_code == 400
 
     resp = client.post(f"/contracts/{contract_id}/activate", json={"actor_id": "user:alice"})
-    assert resp.status_code == 200
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
 
 def test_contract_scheduled_rule_execution_blocks_manual_trigger_but_allows_system_tick() -> None:
     _reset_sqlite()
 
-    create_account("user:alice", owner_type="user", initial_cash=100.0)
-    create_account("user:bob", owner_type="user", initial_cash=100.0)
+    create_account("user:alice", owner_type="user", initial_cash=3000.0)
+    create_account("user:bob", owner_type="user", initial_cash=3000.0)
 
     resp = client.post(
         "/contracts/create",
@@ -158,8 +160,8 @@ def test_contract_scheduled_rule_execution_blocks_manual_trigger_but_allows_syst
 
     resp = client.post(f"/contracts/{contract_id}/run_rules", json={"actor_id": "system:tick"})
     assert resp.status_code == 200
-    assert get_snapshot("user:alice").cash == 140.0
-    assert get_snapshot("user:bob").cash == 10.0
+    assert get_snapshot("user:alice").cash == 2990.0
+    assert get_snapshot("user:bob").cash == 3010.0
 
 
 def test_contract_sign_nonexistent_returns_400() -> None:
@@ -285,8 +287,8 @@ def test_contract_batch_create_returns_multiple_ids() -> None:
 def test_contract_settle_transfers_assets_between_accounts() -> None:
     _reset_sqlite()
 
-    create_account("user:alice", owner_type="user", initial_cash=1000.0)
-    create_account("user:bob", owner_type="user", initial_cash=0.0)
+    create_account("user:alice", owner_type="user", initial_cash=3000.0)
+    create_account("user:bob", owner_type="user", initial_cash=3000.0)
 
     conn = get_connection()
     with conn:
@@ -339,8 +341,8 @@ def test_contract_settle_transfers_assets_between_accounts() -> None:
     alice = get_snapshot("user:alice")
     bob = get_snapshot("user:bob")
 
-    assert alice.cash == 900.0
-    assert bob.cash == 100.0
+    assert alice.cash == 2900.0
+    assert bob.cash == 3100.0
     assert alice.positions.get("BLUEGOLD", 0.0) == 10.0
     assert bob.positions.get("BLUEGOLD", 0.0) == 40.0
 
@@ -348,8 +350,8 @@ def test_contract_settle_transfers_assets_between_accounts() -> None:
 def test_contract_settle_fails_and_rolls_back_on_insufficient_assets() -> None:
     _reset_sqlite()
 
-    create_account("user:alice", owner_type="user", initial_cash=50.0)
-    create_account("user:bob", owner_type="user", initial_cash=100.0)
+    create_account("user:alice", owner_type="user", initial_cash=3000.0)
+    create_account("user:bob", owner_type="user", initial_cash=3000.0)
 
     # create contract that would require alice to pay 100 cash (insufficient)
     resp = client.post(
@@ -391,8 +393,8 @@ def test_contract_settle_fails_and_rolls_back_on_insufficient_assets() -> None:
     after_alice = get_snapshot("user:alice")
     after_bob = get_snapshot("user:bob")
 
-    assert after_alice.cash == 0.0
-    assert after_bob.cash == 50.0
+    assert after_alice.cash == 2900.0
+    assert after_bob.cash == 3100.0
 
 
 def test_contract_settle_refreshes_player_status_immediately() -> None:
