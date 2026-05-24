@@ -15,6 +15,7 @@ import NotFoundPage from './pages/NotFoundPage'
 import OnboardingPage from './pages/OnboardingPage'
 import TradePage from './pages/TradePage'
 import MainMenuPage from './pages/MainMenuPage'
+import NewsStudioPage from './pages/NewsStudioPage'
 
 import { useAppSession } from './app/context'
 
@@ -29,6 +30,7 @@ function App() {
       <Route path="/" element={<Navigate to="/menu" replace />} />
       <Route path="/menu" element={<MainMenuPage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
+      <Route path="/studio/news" element={<NewsStudioPage />} />
 
       <Route element={playerIdOk ? <Layout /> : <Navigate to="/menu" replace />}>
         <Route path="/dashboard" element={<DashboardPage />} />

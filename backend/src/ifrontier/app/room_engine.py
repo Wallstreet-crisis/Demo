@@ -65,9 +65,54 @@ class RoomEngine:
             bots = default_bot_profiles()
             bot_ids = [b.account_id for b in bots] + ["system"]
             _news_service.ensure_bot_users(bot_ids)
-            _news_service.init_news_seed_data()
+            
+            # 3. Import scenario if specified
+            room_meta = load_room_meta(self.room_id)
+            scenario_id = room_meta.game_settings.scenario_id if room_meta else None
+            if scenario_id:
+                _log.info("Importing scenario '%s' into room '%s'", scenario_id, self.room_id)
+                self._import_scenario_from_global_db(scenario_id)
+            else:
+                _news_service.init_news_seed_data()
         finally:
             room_id_var.reset(token)
+
+    def _import_scenario_from_global_db(self, scenario_id: str):
+        """将剧本从全局库拷贝到当前房间库"""
+        from ifrontier.app.api import _get_global_news_db_conn
+        from ifrontier.infra.sqlite.db import get_connection
+        
+        global_conn = _get_global_news_db_conn()
+        room_conn = get_connection()
+        
+        rows = global_conn.execute("SELECT * FROM news WHERE scenario_id = ?", (scenario_id,)).fetchall()
+        if not rows:
+            return
+            
+        import json
+        with room_conn:
+            for r in rows:
+                room_conn.execute(
+                    """
+                    INSERT OR REPLACE INTO news (
+                        card_id, variant_id, kind, text, symbols_json, tags_json, 
+                        publisher_id, published_at, is_suppressed, suppression_reason,
+                        truth_payload_json, image_uri, image_anchor_id, preset_id, rarity, faction, created_at,
+                        author_id, parent_variant_id, mutation_depth, influence_cost, risk_roll_json,
+                        parent_card_id, activation_prob, scheduled_at, success_criteria_json, failure_outcome_json,
+                        scenario_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        r["card_id"], r["variant_id"], r["kind"], r["text"], r["symbols_json"], r["tags_json"],
+                        r["publisher_id"], r["published_at"], r["is_suppressed"], r["suppression_reason"],
+                        r["truth_payload_json"], r["image_uri"], r["image_anchor_id"], r["preset_id"], r["rarity"], r["faction"], r["created_at"],
+                        r["author_id"], r["parent_variant_id"], r["mutation_depth"], r["influence_cost"], r["risk_roll_json"],
+                        r["parent_card_id"], r["activation_prob"], r["scheduled_at"],
+                        r["success_criteria_json"], r["failure_outcome_json"],
+                        r["scenario_id"]
+                    )
+                )
 
     def start_schedulers(self):
         broadcaster = self._make_broadcaster()

@@ -260,6 +260,11 @@ class NewsService:
         actor_id: str,
         rarity: str | None = None,
         correlation_id: UUID | None = None,
+        parent_card_id: str | None = None,
+        activation_prob: float = 1.0,
+        scheduled_at: str | None = None,
+        success_criteria: Dict[str, Any] | None = None,
+        failure_outcome: Dict[str, Any] | None = None,
     ) -> tuple[str, EventEnvelopeJson]:
         now = datetime.now(timezone.utc)
         card_id = str(uuid4())
@@ -291,6 +296,11 @@ class NewsService:
             tags=tags or [],
             rarity=rarity,
             faction=faction,
+            parent_card_id=parent_card_id,
+            activation_prob=activation_prob,
+            scheduled_at=scheduled_at,
+            success_criteria=success_criteria,
+            failure_outcome=failure_outcome,
         )
 
         payload = NewsCardCreatedPayload(
@@ -647,6 +657,15 @@ class NewsService:
     def list_owned_cards(self, *, user_id: str, limit: int = 200) -> List[str]:
         rows = news_db.list_owned_cards(user_id=user_id, limit=int(limit))
         return [str(r.get("card_id")) for r in rows if r.get("card_id")]
+
+    def list_cards(self, limit: int = 100) -> List[Dict[str, Any]]:
+        return news_db.list_all_cards(limit=limit)
+
+    def list_variants(self, card_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        return news_db.list_variants_by_card(card_id=card_id, limit=limit)
+
+    def get_all_presets(self) -> Dict[str, List[str]]:
+        return self._preset_templates()
 
     def ensure_bot_users(self, bot_ids: List[str]) -> None:
         """确保内置机器人在新闻用户表中存在"""

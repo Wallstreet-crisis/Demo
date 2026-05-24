@@ -29,12 +29,20 @@ class NewsRecord:
     parent_variant_id: Optional[str] = None
     rarity: str = "COMMON"
     faction: Optional[str] = None
+    parent_card_id: Optional[str] = None
+    activation_prob: float = 1.0
+    scheduled_at: Optional[str] = None
+    success_criteria: Dict[str, Any] = None
+    failure_outcome: Dict[str, Any] = None
+    scenario_id: Optional[str] = None
 
     @staticmethod
     def from_row(row: Any) -> NewsRecord:
         symbols = []
         tags = []
         truth_payload = {}
+        success_criteria = {}
+        failure_outcome = {}
         
         is_dict = isinstance(row, dict)
         def get_v(key: str, default: Any = None):
@@ -57,6 +65,16 @@ class NewsRecord:
             try: truth_payload = json.loads(truth_payload_json)
             except: pass
 
+        sc_json = get_v("success_criteria_json")
+        if sc_json:
+            try: success_criteria = json.loads(sc_json)
+            except: pass
+
+        fo_json = get_v("failure_outcome_json")
+        if fo_json:
+            try: failure_outcome = json.loads(fo_json)
+            except: pass
+
         return NewsRecord(
             card_id=get_v("card_id"),
             variant_id=get_v("variant_id"),
@@ -76,6 +94,12 @@ class NewsRecord:
             parent_variant_id=get_v("parent_variant_id"),
             rarity=get_v("rarity") or "COMMON",
             faction=get_v("faction"),
+            parent_card_id=get_v("parent_card_id"),
+            activation_prob=float(get_v("activation_prob", 1.0)),
+            scheduled_at=get_v("scheduled_at"),
+            success_criteria=success_criteria,
+            failure_outcome=failure_outcome,
+            scenario_id=get_v("scenario_id"),
         )
 
 
@@ -125,12 +149,19 @@ def init_news_schema() -> None:
         """
     )
 
-    # 动态迁移补充缺失列
-    _add_column_if_not_exists(cur, "news", "created_at", "TEXT")
+    _add_column_if_not_exists(cur, "news", "image_anchor_id", "TEXT")
     _add_column_if_not_exists(cur, "news", "author_id", "TEXT")
     _add_column_if_not_exists(cur, "news", "parent_variant_id", "TEXT")
-    _add_column_if_not_exists(cur, "news", "rarity", "TEXT DEFAULT 'COMMON'")
+    _add_column_if_not_exists(cur, "news", "mutation_depth", "INTEGER DEFAULT 0")
+    _add_column_if_not_exists(cur, "news", "influence_cost", "REAL DEFAULT 0.0")
+    _add_column_if_not_exists(cur, "news", "rarity", "TEXT")
     _add_column_if_not_exists(cur, "news", "faction", "TEXT")
+    _add_column_if_not_exists(cur, "news", "parent_card_id", "TEXT")
+    _add_column_if_not_exists(cur, "news", "activation_prob", "REAL DEFAULT 1.0")
+    _add_column_if_not_exists(cur, "news", "scheduled_at", "TEXT")
+    _add_column_if_not_exists(cur, "news", "success_criteria_json", "TEXT")
+    _add_column_if_not_exists(cur, "news", "failure_outcome_json", "TEXT")
+    _add_column_if_not_exists(cur, "news", "scenario_id", "TEXT")
 
     conn.commit()
 
@@ -174,6 +205,12 @@ def save_news(
     influence_cost: float = 0.0,
     risk_roll: Optional[Dict[str, Any]] = None,
     faction: Optional[str] = None,
+    parent_card_id: Optional[str] = None,
+    activation_prob: float = 1.0,
+    scheduled_at: Optional[str] = None,
+    success_criteria: Optional[Dict[str, Any]] = None,
+    failure_outcome: Optional[Dict[str, Any]] = None,
+    scenario_id: Optional[str] = None,
 ) -> None:
     conn = get_connection()
     now = datetime.now(timezone.utc).isoformat()
@@ -189,8 +226,10 @@ def save_news(
                 card_id, variant_id, kind, text, symbols_json, tags_json, 
                 publisher_id, published_at, is_suppressed, suppression_reason,
                 truth_payload_json, image_uri, image_anchor_id, preset_id, rarity, faction, created_at,
-                author_id, parent_variant_id, mutation_depth, influence_cost, risk_roll_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                author_id, parent_variant_id, mutation_depth, influence_cost, risk_roll_json,
+                parent_card_id, activation_prob, scheduled_at, success_criteria_json, failure_outcome_json,
+                scenario_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 card_id,
@@ -215,6 +254,12 @@ def save_news(
                 mutation_depth,
                 influence_cost,
                 json.dumps(risk_roll or {}, ensure_ascii=False),
+                parent_card_id,
+                activation_prob,
+                scheduled_at,
+                json.dumps(success_criteria or {}, ensure_ascii=False),
+                json.dumps(failure_outcome or {}, ensure_ascii=False),
+                scenario_id,
             ),
         )
 

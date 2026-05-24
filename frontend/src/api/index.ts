@@ -280,6 +280,18 @@ export const Api = {
     api.get<NewsStoreCatalogResponse>('/news/store/catalog', { user_id, force_refresh }, roomRequest),
   newsStorePurchase: (req: NewsStorePurchaseRequest) => api.post<NewsStorePurchaseResponse>('/news/store/purchase', req, roomRequest),
 
+  studioNewsCards: (actor_id: string, limit = 100) => api.get<any[]>('/studio/news/cards', { actor_id, limit }, roomRequest),
+  studioNewsVariants: (cardId: string, actor_id: string, limit = 100) => api.get<any[]>(`/studio/news/cards/${encodeURIComponent(cardId)}/variants`, { actor_id, limit }, roomRequest),
+  studioNewsPresets: (actor_id: string) => api.get<Record<string, string[]>>('/studio/news/presets', { actor_id }, roomRequest),
+  studioNewsScenarios: (actor_id: string) => api.get<any[]>('/studio/news/scenarios', { actor_id }, roomRequest),
+  studioNewsScenarioCards: (scenarioId: string, actor_id: string) => api.get<any[]>(`/studio/news/scenarios/${encodeURIComponent(scenarioId)}/cards`, { actor_id }, roomRequest),
+
+  globalStudioNewsScenarios: () => api.get<any[]>('/global/studio/news/scenarios'),
+  globalStudioNewsScenarioCards: (scenarioId: string) => api.get<any[]>(`/global/studio/news/scenarios/${encodeURIComponent(scenarioId)}/cards`),
+  globalStudioNewsCreateCard: (req: any) => api.post<any>('/global/studio/news/cards', req),
+  globalStudioNewsVariants: (cardId: string) => api.get<any[]>(`/global/studio/news/cards/${encodeURIComponent(cardId)}/variants`),
+  globalStudioNewsEmitVariant: (req: any) => api.post<any>('/global/studio/news/variants/emit', req),
+
   hostingEnable: (user_id: string) => api.post<HostingEnableResponse>(`/hosting/${encodeURIComponent(user_id)}/enable`, undefined, roomRequest),
   hostingDisable: (user_id: string) => api.post<HostingDisableResponse>(`/hosting/${encodeURIComponent(user_id)}/disable`, undefined, roomRequest),
   hostingStatus: (user_id: string) => getWithBootstrapCache<HostingStatusResponse>(`hostingStatus:${String(user_id).toLowerCase()}`, 5000, () => api.get<HostingStatusResponse>(`/hosting/${encodeURIComponent(user_id)}/status`, undefined, roomRequest)),

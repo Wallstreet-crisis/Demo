@@ -1712,6 +1712,20 @@ async def _warm_player_bootstrap_data(*, player_id: str, account_id: str, prefer
 
 @router.post("/players/bootstrap")
 async def players_bootstrap(req: PlayerBootstrapRequest) -> PlayerAccountResponse:
+    # 隔离 author 账号，不允许其作为玩家参与对局逻辑
+    if str(req.player_id).lower() == "author":
+        # 如果是作者，直接返回一个模拟的“管理账户”，不进行数据库持久化
+        return PlayerAccountResponse(
+            player_id="author",
+            account_id="system:author",
+            cash=0.0,
+            positions={},
+            caste_id="ADMIN",
+            equity=0.0,
+            total_assets=0.0,
+            free_margin=0.0,
+        )
+
     # 幂等：如果已存在则返回现有数据，不报错也不重复发放初始资产（除非阶级缺失）
     account_id = f"user:{str(req.player_id).lower()}"
     
@@ -2675,6 +2689,174 @@ async def social_follow(req: SocialFollowRequest) -> None:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+# 全局编剧数据库（用于存放剧本模板）
+def _get_global_news_db_conn():
+    import sqlite3
+    import os
+    db_path = os.getenv("IF_GLOBAL_STUDIO_DB", "global_studio.db")
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    # 初始化表结构（如果不存在）
+    from ifrontier.infra.sqlite.news import init_news_schema
+    init_news_schema(conn)
+    return conn
+
+
+@router.get("/global/studio/news/scenarios")
+async def global_studio_news_scenarios() -> List[Dict[str, Any]]:
+    # 彻底开放，不再校验身份
+    conn = _get_global_news_db_conn()
+    rows = conn.execute("SELECT DISTINCT scenario_id FROM news WHERE scenario_id IS NOT NULL").fetchall()
+    return [{"id": r["scenario_id"], "name": r["scenario_id"]} for r in rows]
+
+
+@router.get("/global/studio/news/scenarios/{scenario_id}/cards")
+async def global_studio_news_scenario_cards(scenario_id: str) -> List[Dict[str, Any]]:
+    # 彻底开放，不再校验身份
+    conn = _get_global_news_db_conn()
+    rows = conn.execute("SELECT * FROM news WHERE scenario_id = ? AND variant_id IS NULL", (scenario_id,)).fetchall()
+    from ifrontier.infra.sqlite.news import NewsRecord
+    return [NewsRecord.from_row(r).__dict__ for r in rows]
+
+
+@router.post("/global/studio/news/cards")
+async def global_studio_news_create_card(req: NewsCreateCardRequest) -> NewsCreateCardResponse:
+    # 彻底开放，不再校验身份
+    from uuid import uuid4
+    from datetime import datetime, timezone
+    from ifrontier.infra.sqlite.news import save_news
+    
+    card_id = str(uuid4())
+    conn = _get_global_news_db_conn()
+    
+    # 使用一个简化的逻辑直接存入全局库，不经过 NewsService 触发事件（因为此时没有房间环境）
+    with conn:
+        # 重用 save_news 的 SQL 逻辑，但由于 save_news 内部调用了 get_connection()，
+        # 我们需要临时替换掉全局连接或直接写 SQL。
+        # 这里为了保持代码复用，手动实现简单的插入：
+        import json
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO news (
+                card_id, variant_id, kind, text, symbols_json, tags_json, 
+                publisher_id, published_at, is_suppressed, suppression_reason,
+                truth_payload_json, image_uri, image_anchor_id, preset_id, rarity, faction, created_at,
+                author_id, parent_variant_id, mutation_depth, influence_cost, risk_roll_json,
+                parent_card_id, activation_prob, scheduled_at, success_criteria_json, failure_outcome_json,
+                scenario_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                card_id, None, req.kind, None, json.dumps(req.symbols), json.dumps([]),
+                req.actor_id, None, 0, None, json.dumps(req.truth_payload or {}),
+                req.image_uri, req.image_anchor_id, None, "COMMON", None, now,
+                req.actor_id, None, 0, 0.0, json.dumps({}),
+                req.parent_card_id, req.activation_prob, req.scheduled_at,
+                json.dumps(req.success_criteria or {}), json.dumps(req.failure_outcome or {}),
+                req.scenario_id
+            )
+        )
+    
+    return NewsCreateCardResponse(
+        card_id=card_id,
+        event_id=uuid4(), # 占位，局外设计不产生真实事件
+        correlation_id=req.correlation_id or uuid4(),
+    )
+
+
+@router.get("/global/studio/news/cards/{card_id}/variants")
+async def global_studio_news_variants(card_id: str) -> List[Dict[str, Any]]:
+    conn = _get_global_news_db_conn()
+    rows = conn.execute("SELECT * FROM news WHERE card_id = ? AND variant_id IS NOT NULL ORDER BY created_at ASC", (card_id,)).fetchall()
+    from ifrontier.infra.sqlite.news import NewsRecord
+    return [NewsRecord.from_row(r).__dict__ for r in rows]
+
+
+class GlobalNewsEmitVariantRequest(BaseModel):
+    card_id: str
+    author_id: str
+    text: str
+    parent_variant_id: str | None = None
+
+@router.post("/global/studio/news/variants/emit")
+async def global_studio_news_emit_variant(req: GlobalNewsEmitVariantRequest):
+    from uuid import uuid4
+    from datetime import datetime, timezone
+    import json
+    
+    conn = _get_global_news_db_conn()
+    variant_id = str(uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    
+    with conn:
+        card = conn.execute("SELECT * FROM news WHERE card_id = ? AND variant_id IS NULL", (req.card_id,)).fetchone()
+        if not card:
+            raise HTTPException(status_code=404, detail="card not found in global db")
+            
+        conn.execute(
+            """
+            INSERT INTO news (
+                card_id, variant_id, kind, text, symbols_json, tags_json, 
+                published_at, is_suppressed, truth_payload_json, created_at,
+                author_id, parent_variant_id, mutation_depth, influence_cost, risk_roll_json,
+                scenario_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                req.card_id, variant_id, card["kind"], req.text, card["symbols_json"], card["tags_json"],
+                now, 0, card["truth_payload_json"], now,
+                req.author_id, req.parent_variant_id, 0, 0.0, json.dumps({}),
+                card["scenario_id"]
+            )
+        )
+    return {"variant_id": variant_id}
+
+
+def _assert_studio_authorized(actor_id: str):
+    is_privileged = actor_id == "author" or actor_id == "system" or str(actor_id).startswith("gm:")
+    if not is_privileged:
+        raise HTTPException(status_code=403, detail="studio access restricted")
+
+
+@router.get("/studio/news/cards")
+async def studio_news_cards(actor_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+    _assert_studio_authorized(actor_id)
+    return _get_room_news_service().list_cards(limit=limit)
+
+
+@router.get("/studio/news/cards/{card_id}/variants")
+async def studio_news_variants(card_id: str, actor_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+    _assert_studio_authorized(actor_id)
+    return _get_room_news_service().list_variants(card_id=card_id, limit=limit)
+
+
+@router.get("/studio/news/presets")
+async def studio_news_presets(actor_id: str) -> Dict[str, List[str]]:
+    _assert_studio_authorized(actor_id)
+    return _get_room_news_service().get_all_presets()
+
+
+@router.get("/studio/news/scenarios")
+async def studio_news_scenarios(actor_id: str) -> List[Dict[str, Any]]:
+    _assert_studio_authorized(actor_id)
+    # 简单实现：从 news 表中聚合唯一的 scenario_id
+    from ifrontier.infra.sqlite.db import get_connection
+    conn = get_connection()
+    rows = conn.execute("SELECT DISTINCT scenario_id FROM news WHERE scenario_id IS NOT NULL").fetchall()
+    return [{"id": r["scenario_id"], "name": r["scenario_id"]} for r in rows]
+
+
+@router.get("/studio/news/scenarios/{scenario_id}/cards")
+async def studio_news_scenario_cards(scenario_id: str, actor_id: str) -> List[Dict[str, Any]]:
+    _assert_studio_authorized(actor_id)
+    from ifrontier.infra.sqlite.db import get_connection
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM news WHERE scenario_id = ? AND variant_id IS NULL", (scenario_id,)).fetchall()
+    from ifrontier.infra.sqlite.news import NewsRecord
+    return [NewsRecord.from_row(r).__dict__ for r in rows]
+
+
 class NewsCreateCardRequest(BaseModel):
     actor_id: str
     kind: str
@@ -2684,6 +2866,13 @@ class NewsCreateCardRequest(BaseModel):
     symbols: list[str] = []
     tags: list[str] = []
     correlation_id: UUID | None = None
+    # 新增扩展字段
+    parent_card_id: str | None = None
+    activation_prob: float = 1.0
+    scheduled_at: str | None = None
+    success_criteria: Dict[str, Any] | None = None
+    failure_outcome: Dict[str, Any] | None = None
+    scenario_id: str | None = None
 
 
 class NewsCreateCardResponse(BaseModel):
@@ -2705,7 +2894,9 @@ async def news_create_card(req: NewsCreateCardRequest) -> NewsCreateCardResponse
     }
     is_privileged_actor = req.actor_id == "system" or str(req.actor_id).startswith("gm:")
     if not allow_direct_create and not is_privileged_actor:
-        raise HTTPException(status_code=403, detail="direct news card creation is GM-only")
+        # 特别允许 author 身份，即使开关关闭
+        if req.actor_id != "author":
+            raise HTTPException(status_code=403, detail="direct news card creation restricted")
 
     try:
         card_id, event_json = _get_room_news_service().create_card(
@@ -2717,6 +2908,12 @@ async def news_create_card(req: NewsCreateCardRequest) -> NewsCreateCardResponse
             tags=req.tags,
             actor_id=req.actor_id,
             correlation_id=req.correlation_id,
+            parent_card_id=req.parent_card_id,
+            activation_prob=req.activation_prob,
+            scheduled_at=req.scheduled_at,
+            success_criteria=req.success_criteria,
+            failure_outcome=req.failure_outcome,
+            scenario_id=req.scenario_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -10,6 +10,7 @@ class RoomGameSettings(BaseModel):
     ultimate_owner_threshold: Optional[float] = None
     mass_bankruptcy_mode: Optional[bool] = None
     min_active_players: Optional[int] = None
+    scenario_id: Optional[str] = None
 
 
 class RoomMeta(BaseModel):

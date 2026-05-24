@@ -88,27 +88,39 @@ export default function MainMenuPage() {
     }
   }
 
-  const handleNewSimulation = async () => {
-    if (!isInputValid) return
+  const [activeLocalView, setActiveLocalView] = useState<'LOAD' | 'CREATE'>('LOAD')
+  const [networkConnected, setNetworkConnected] = useState(false)
+  const [targetRoomId, setTargetRoomId] = useState<string | null>(null) // 用于暂存要进入的房间
+
+  const handleCreateNewSimulation = async () => {
     setIsTransitioning(true)
-    
-    // UI 淡出动画通常需要 800ms
-    // 我们并发启动建房请求和倒计时，等两者都完成了再跳转
     const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
-    localStorage.removeItem('if_network_target') // Reset network target to default
+    if (activeView === 'LOCAL') {
+      localStorage.removeItem('if_network_target')
+    }
     const minutes = Number(roomTimeLimitMinutes)
-    const game_settings = roomTimeLimitEnabled && Number.isFinite(minutes) && minutes > 0
-      ? { time_limit_seconds: Math.round(minutes * 60) }
-      : undefined
-    const createRoomPromise = Api.createRoom({ player_id: inputPlayerId, game_settings })
+    const game_settings: any = {
+      scenario_id: selectedScenario || undefined
+    }
+    if (roomTimeLimitEnabled && Number.isFinite(minutes) && minutes > 0) {
+      game_settings.time_limit_seconds = Math.round(minutes * 60)
+    }
+    
+    // 我们暂时使用 HOST 作为创建者标识
+    const createRoomPromise = Api.createRoom({ player_id: 'HOST', game_settings })
 
     try {
       const [, res] = await Promise.all([animationPromise, createRoomPromise])
       if (res.ok && res.room_id) {
-        setRoomId(res.room_id)
-        setGlobalPlayerId(inputPlayerId)
-        setCasteId('' as any)
-        nav('/onboarding')
+        setIsTransitioning(false)
+        if (activeView === 'LOCAL') {
+          fetchLocalRooms()
+          setActiveLocalView('LOAD')
+          setSelectedRoomId(res.room_id)
+        } else {
+          // Network link
+          handleJoinNetwork()
+        }
       }
     } catch (e) {
       console.error('Failed to create new room:', e)
@@ -117,10 +129,15 @@ export default function MainMenuPage() {
     }
   }
 
-  const handleResumeSimulation = async () => {
+  const handleJoinSelectedSimulation = async () => {
     if (!selectedRoomId || !isInputValid) return
     setIsTransitioning(true)
-    localStorage.removeItem('if_network_target') // Reset network target to default
+    if (activeView === 'LOCAL') {
+      localStorage.removeItem('if_network_target')
+    } else {
+      localStorage.setItem('if_network_target', networkIp)
+    }
+    
     setRoomId(selectedRoomId)
     
     try {
@@ -128,9 +145,7 @@ export default function MainMenuPage() {
       const activatePromise = Api.activateRoom(selectedRoomId)
       
       const [, activateRes] = await Promise.all([animationPromise, activatePromise])
-      if (!activateRes.ok) {
-        throw new Error('Room activation failed')
-      }
+      if (!activateRes.ok) throw new Error('Room activation failed')
       
       setGlobalPlayerId(inputPlayerId)
       setCasteId('' as any)
@@ -139,36 +154,113 @@ export default function MainMenuPage() {
       console.error('Failed to resume simulation:', e)
       setRoomId('default')
       setIsTransitioning(false)
-      
-      // 提供更详细的错误信息
       const detail = e?.body?.detail || e?.message || 'Unknown error'
       alert(`Failed to load simulation: ${detail}`)
     }
   }
 
   const handleJoinNetwork = async () => {
-    if (!isInputValid || !networkIp) return
+    if (!networkIp) return
     setNetworkScanning(true)
-    
-    // Save target before making request so ApiClient uses it
     localStorage.setItem('if_network_target', networkIp)
 
     try {
       const res = await Api.networkJoinCheck() as any
-      if (res.ok && res.rooms && res.rooms.length > 0) {
-        setRemoteRooms(res.rooms)
+      if (res.ok) {
+        setRemoteRooms(res.rooms || [])
+        setNetworkConnected(true)
+        fetchGlobalScenarios()
       } else {
-        throw new Error('No active sessions found on target server.')
+        throw new Error('Connection rejected by remote host.')
       }
     } catch (e) {
       console.error('Failed to connect to network target:', e)
       localStorage.removeItem('if_network_target')
       setRemoteRooms([])
-      alert('Connection failed or no sessions found on remote host.')
+      setNetworkConnected(false)
+      alert('Connection failed or rejected by remote host.')
     } finally {
       setNetworkScanning(false)
     }
   }
+
+  const renderRoomSettings = () => (
+    <div style={{ marginBottom: '18px', padding: '12px', border: '1px solid rgba(148,163,184,0.18)', background: 'rgba(15, 23, 42, 0.45)' }}>
+      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>ROOM GAME SETTINGS</div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1', marginBottom: '8px' }}>
+        <input
+          type="checkbox"
+          checked={roomTimeLimitEnabled}
+          onChange={(e) => setRoomTimeLimitEnabled(e.target.checked)}
+        />
+        ENABLE TIME SETTLEMENT
+      </label>
+      <div style={{ opacity: roomTimeLimitEnabled ? 1 : 0.45, transition: 'opacity 0.2s ease', marginBottom: '16px' }}>
+        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>TIME LIMIT (MINUTES)</div>
+        <input
+          type="number"
+          min="1"
+          step="1"
+          disabled={!roomTimeLimitEnabled}
+          value={roomTimeLimitMinutes}
+          onChange={(e) => setRoomTimeLimitMinutes(e.target.value)}
+          className="cyber-input"
+          style={{
+            width: '100%',
+            height: '44px',
+            background: 'var(--panel-bg)',
+            border: '1px solid var(--terminal-border)',
+            color: 'var(--terminal-text)',
+            padding: '0 16px',
+            fontFamily: 'monospace',
+            fontSize: '16px',
+            boxSizing: 'border-box'
+          }}
+        />
+      </div>
+
+      <div style={{ marginBottom: '8px' }}>
+        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>ACTIVE SCENARIO (BLUEPRINT)</span>
+          <button 
+            onClick={() => nav('/studio/news')}
+            className="cyber-button"
+            style={{ 
+              fontSize: '9px', 
+              padding: '2px 8px', 
+              height: 'auto',
+              background: 'rgba(59, 130, 246, 0.1)',
+              borderColor: 'rgba(59, 130, 246, 0.3)',
+              color: 'var(--terminal-info)'
+            }}
+          >
+            OPEN_DESIGNER
+          </button>
+        </div>
+        <select 
+          className="cyber-input"
+          value={selectedScenario}
+          onChange={(e) => setSelectedScenario(e.target.value)}
+          style={{
+            width: '100%',
+            height: '44px',
+            background: 'var(--panel-bg)',
+            border: '1px solid var(--terminal-border)',
+            color: 'var(--terminal-text)',
+            padding: '0 12px',
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            boxSizing: 'border-box'
+          }}
+        >
+          <option value="">DEFAULT_SIMULATION (SEED DATA)</option>
+          {availableScenarios.map(s => (
+            <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
 
   const handleResumeNetworkSimulation = async () => {
     if (!selectedRoomId || !networkIp.trim() || !isInputValid) return

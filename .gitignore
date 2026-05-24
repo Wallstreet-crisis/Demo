@@ -10,3 +10,4 @@ deploy/.env.*
 logs/ai_behavior.log
 backend/src/logs/ai_behavior.log
 backend/src/logs/ai_behavior.log
+backend/src/global_studio.db
