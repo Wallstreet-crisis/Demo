@@ -21,8 +21,19 @@ export default function MainMenuPage() {
   const [networkScanning, setNetworkScanning] = useState(false)
   const [roomTimeLimitEnabled, setRoomTimeLimitEnabled] = useState(false)
   const [roomTimeLimitMinutes, setRoomTimeLimitMinutes] = useState('30')
+  const [availableScenarios, setAvailableScenarios] = useState<any[]>([])
+  const [selectedScenario, setSelectedScenario] = useState<string>('')
 
   const isInputValid = inputPlayerId.length >= 3 && inputPlayerId.length <= 20
+
+  const fetchGlobalScenarios = async () => {
+    try {
+      const data = await Api.globalStudioNewsScenarios()
+      setAvailableScenarios(data)
+    } catch (e) {
+      console.error('Failed to load global scenarios:', e)
+    }
+  }
 
   const fetchLocalRooms = async () => {
     try {
@@ -39,14 +50,17 @@ export default function MainMenuPage() {
   }
 
   useEffect(() => {
+    setActiveLocalView('IDLE')
     if (activeView === 'LOCAL') {
       localStorage.removeItem('if_network_target')
       fetchLocalRooms()
+      fetchGlobalScenarios()
       setSelectedRoomId(null)
       setEditingRoomId(null)
     } else if (activeView === 'NETWORK') {
       setRemoteRooms([])
       setSelectedRoomId(null)
+      setNetworkConnected(false)
     }
   }, [activeView])
 
@@ -88,10 +102,9 @@ export default function MainMenuPage() {
     }
   }
 
-  const [activeLocalView, setActiveLocalView] = useState<'LOAD' | 'CREATE'>('LOAD')
+  const [activeLocalView, setActiveLocalView] = useState<'IDLE' | 'LOAD' | 'CREATE' | 'EDIT' | 'JOIN'>('IDLE')
   const [networkConnected, setNetworkConnected] = useState(false)
-  const [targetRoomId, setTargetRoomId] = useState<string | null>(null) // 用于暂存要进入的房间
-
+  
   const handleCreateNewSimulation = async () => {
     setIsTransitioning(true)
     const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
@@ -115,17 +128,46 @@ export default function MainMenuPage() {
         setIsTransitioning(false)
         if (activeView === 'LOCAL') {
           fetchLocalRooms()
-          setActiveLocalView('LOAD')
           setSelectedRoomId(res.room_id)
+          setActiveLocalView('JOIN') // 直接进入加入界面
         } else {
           // Network link
           handleJoinNetwork()
+          setActiveLocalView('LOAD')
         }
       }
     } catch (e) {
       console.error('Failed to create new room:', e)
       setIsTransitioning(false)
       alert('Failed to initialize new simulation instance.')
+    }
+  }
+
+  const handleUpdateRoomSettings = async () => {
+    if (!selectedRoomId) return
+    const room = (activeView === 'LOCAL' ? localRooms : remoteRooms).find(r => r.room_id === selectedRoomId)
+    if (!room) return
+
+    const minutes = Number(roomTimeLimitMinutes)
+    const game_settings: any = {
+      scenario_id: selectedScenario || undefined
+    }
+    if (roomTimeLimitEnabled && Number.isFinite(minutes) && minutes > 0) {
+      game_settings.time_limit_seconds = Math.round(minutes * 60)
+    } else {
+      game_settings.time_limit_seconds = null
+    }
+
+    try {
+      const res = await Api.updateRoomMeta(selectedRoomId, room.name, game_settings)
+      if (res.ok) {
+        setActiveLocalView('LOAD')
+        if (activeView === 'LOCAL') fetchLocalRooms()
+        else handleJoinNetwork()
+      }
+    } catch (e) {
+      console.error('Failed to update room settings:', e)
+      alert('Failed to save room settings updates.')
     }
   }
 
@@ -184,111 +226,152 @@ export default function MainMenuPage() {
     }
   }
 
-  const renderRoomSettings = () => (
-    <div style={{ marginBottom: '18px', padding: '12px', border: '1px solid rgba(148,163,184,0.18)', background: 'rgba(15, 23, 42, 0.45)' }}>
-      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>ROOM GAME SETTINGS</div>
-      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1', marginBottom: '8px' }}>
-        <input
-          type="checkbox"
-          checked={roomTimeLimitEnabled}
-          onChange={(e) => setRoomTimeLimitEnabled(e.target.checked)}
-        />
-        ENABLE TIME SETTLEMENT
-      </label>
-      <div style={{ opacity: roomTimeLimitEnabled ? 1 : 0.45, transition: 'opacity 0.2s ease', marginBottom: '16px' }}>
-        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>TIME LIMIT (MINUTES)</div>
-        <input
-          type="number"
-          min="1"
-          step="1"
-          disabled={!roomTimeLimitEnabled}
-          value={roomTimeLimitMinutes}
-          onChange={(e) => setRoomTimeLimitMinutes(e.target.value)}
-          className="cyber-input"
-          style={{
-            width: '100%',
-            height: '44px',
-            background: 'var(--panel-bg)',
-            border: '1px solid var(--terminal-border)',
-            color: 'var(--terminal-text)',
-            padding: '0 16px',
-            fontFamily: 'monospace',
-            fontSize: '16px',
-            boxSizing: 'border-box'
-          }}
-        />
+  const renderRoomSettings = (isEdit = false) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '24px' }}>
+      {/* 模块1: 基础环境配置 */}
+      <div style={{ 
+        padding: '16px', 
+        border: '1px solid var(--terminal-border)', 
+        background: 'rgba(15, 23, 42, 0.4)',
+        position: 'relative'
+      }}>
+        <div style={{ 
+          position: 'absolute', 
+          top: '-8px', 
+          left: '12px', 
+          background: 'var(--terminal-bg)', 
+          padding: '0 8px', 
+          fontSize: '10px', 
+          color: '#64748b',
+          fontFamily: 'monospace' 
+        }}>
+          01_ENVIRONMENT_STABILITY
+        </div>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#fff', marginBottom: '16px', cursor: 'pointer' }}>
+          <div style={{ 
+            width: '18px', 
+            height: '18px', 
+            border: '1px solid var(--terminal-info)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            background: roomTimeLimitEnabled ? 'var(--terminal-info)' : 'transparent',
+            transition: 'all 0.2s'
+          }}>
+            <input
+              type="checkbox"
+              style={{ display: 'none' }}
+              checked={roomTimeLimitEnabled}
+              onChange={(e) => setRoomTimeLimitEnabled(e.target.checked)}
+            />
+            {roomTimeLimitEnabled && <div style={{ width: '8px', height: '8px', background: '#000' }} />}
+          </div>
+          <span style={{ letterSpacing: '1px', fontWeight: 600 }}>AUTO-SETTLEMENT PROTOCOL</span>
+        </label>
+
+        <div style={{ 
+          opacity: roomTimeLimitEnabled ? 1 : 0.3, 
+          pointerEvents: roomTimeLimitEnabled ? 'auto' : 'none',
+          transition: 'all 0.3s ease' 
+        }}>
+          <div style={{ fontSize: '11px', color: 'var(--terminal-info)', marginBottom: '8px', fontFamily: 'monospace' }}>{'>'} DURATION_MINUTES</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <input
+              type="range"
+              min="5"
+              max="180"
+              step="5"
+              value={roomTimeLimitMinutes}
+              onChange={(e) => setRoomTimeLimitMinutes(e.target.value)}
+              style={{ flex: 1, accentColor: 'var(--terminal-info)' }}
+            />
+            <div style={{ 
+              width: '60px', 
+              textAlign: 'right', 
+              fontFamily: 'monospace', 
+              fontSize: '18px', 
+              color: 'var(--terminal-info)',
+              textShadow: '0 0 10px rgba(59, 130, 246, 0.5)'
+            }}>
+              {roomTimeLimitMinutes}m
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div style={{ marginBottom: '8px' }}>
-        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>ACTIVE SCENARIO (BLUEPRINT)</span>
-          <button 
-            onClick={() => nav('/studio/news')}
-            className="cyber-button"
-            style={{ 
-              fontSize: '9px', 
-              padding: '2px 8px', 
-              height: 'auto',
-              background: 'rgba(59, 130, 246, 0.1)',
-              borderColor: 'rgba(59, 130, 246, 0.3)',
-              color: 'var(--terminal-info)'
+      {/* 模块2: 剧本选择与设计 */}
+      <div style={{ 
+        padding: '16px', 
+        border: '1px solid var(--terminal-border)', 
+        background: 'rgba(15, 23, 42, 0.4)',
+        position: 'relative'
+      }}>
+        <div style={{ 
+          position: 'absolute', 
+          top: '-8px', 
+          left: '12px', 
+          background: 'var(--terminal-bg)', 
+          padding: '0 8px', 
+          fontSize: '10px', 
+          color: '#64748b',
+          fontFamily: 'monospace' 
+        }}>
+          02_SIMULATION_BLUEPRINT
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--terminal-info)', marginBottom: '8px', fontFamily: 'monospace' }}>{'>'} SELECT_ACTIVE_SCENARIO</div>
+          <select 
+            className="cyber-input"
+            value={selectedScenario}
+            onChange={(e) => setSelectedScenario(e.target.value)}
+            style={{
+              width: '100%',
+              height: '40px',
+              background: 'rgba(0,0,0,0.3)',
+              border: '1px solid var(--terminal-border)',
+              color: '#fff',
+              padding: '0 12px',
+              fontFamily: 'monospace',
+              fontSize: '13px'
             }}
           >
-            OPEN_DESIGNER
-          </button>
+            <option value="">DEFAULT_SIMULATION (SEED DATA)</option>
+            {availableScenarios.map(s => (
+              <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>
+            ))}
+          </select>
         </div>
-        <select 
-          className="cyber-input"
-          value={selectedScenario}
-          onChange={(e) => setSelectedScenario(e.target.value)}
+
+        <div 
+          onClick={() => nav('/studio/news')}
           style={{
-            width: '100%',
-            height: '44px',
-            background: 'var(--panel-bg)',
-            border: '1px solid var(--terminal-border)',
-            color: 'var(--terminal-text)',
-            padding: '0 12px',
-            fontFamily: 'monospace',
-            fontSize: '14px',
-            boxSizing: 'border-box'
+            padding: '12px',
+            border: '1px dashed rgba(59, 130, 246, 0.4)',
+            background: 'rgba(59, 130, 246, 0.05)',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            color: 'var(--terminal-info)'
           }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.05)'}
         >
-          <option value="">DEFAULT_SIMULATION (SEED DATA)</option>
-          {availableScenarios.map(s => (
-            <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>
-          ))}
-        </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ fontSize: '20px' }}>⚒</div>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px' }}>SCENARIO DESIGNER</div>
+              <div style={{ fontSize: '10px', color: '#64748b' }}>Create or modify simulation cards</div>
+            </div>
+          </div>
+          <div style={{ fontSize: '12px' }}>LAUNCH_STUDIO_EXE →</div>
+        </div>
       </div>
     </div>
   )
-
-  const handleResumeNetworkSimulation = async () => {
-    if (!selectedRoomId || !networkIp.trim() || !isInputValid) return
-    setIsTransitioning(true)
-    localStorage.setItem('if_network_target', networkIp)
-    setRoomId(selectedRoomId)
-    
-    try {
-      // 先尝试激活远程房间（依赖后端 middleware 自动激活）
-      const activatePromise = Api.activateRoom(selectedRoomId)
-      const animationPromise = new Promise(resolve => setTimeout(resolve, 800))
-      
-      const [, activateRes] = await Promise.all([animationPromise, activatePromise])
-      if (!activateRes.ok) {
-        throw new Error('Remote room activation failed')
-      }
-      
-      setGlobalPlayerId(inputPlayerId)
-      setCasteId('' as any)
-      nav('/onboarding')
-    } catch (e) {
-      console.error('Failed to join remote simulation:', e)
-      localStorage.removeItem('if_network_target')
-      setRoomId('default')
-      setIsTransitioning(false)
-      alert('Failed to join remote simulation. The room may not exist or is not activated on the remote server.')
-    }
-  }
 
   return (
     <div style={{
@@ -387,77 +470,25 @@ export default function MainMenuPage() {
 
           {activeView === 'LOCAL' && (
             <>
-              <div style={{ color: 'var(--terminal-info)', marginBottom: '16px', fontSize: '12px', fontFamily: 'monospace' }}>{'>'} SELECT STARTUP SEQUENCE</div>
-              
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>PLAYER_ID</div>
-                <input 
-                  type="text"
-                  value={inputPlayerId}
-                  onChange={(e) => setInputPlayerId(e.target.value.toUpperCase())}
-                  placeholder="3-20 ALPHANUMERIC"
-                  className="cyber-input"
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    background: 'var(--panel-bg)',
-                    border: `1px solid ${isInputValid ? 'var(--terminal-border)' : 'var(--terminal-error)'}`,
-                    color: 'var(--terminal-text)',
-                    padding: '0 16px',
-                    fontFamily: 'monospace',
-                    fontSize: '16px',
-                    boxSizing: 'border-box',
-                    letterSpacing: '2px'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '18px', padding: '12px', border: '1px solid rgba(148,163,184,0.18)', background: 'rgba(15, 23, 42, 0.45)' }}>
-                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>ROOM GAME SETTINGS</div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1', marginBottom: '8px' }}>
-                  <input
-                    type="checkbox"
-                    checked={roomTimeLimitEnabled}
-                    onChange={(e) => setRoomTimeLimitEnabled(e.target.checked)}
-                  />
-                  ENABLE TIME SETTLEMENT
-                </label>
-                <div style={{ opacity: roomTimeLimitEnabled ? 1 : 0.45, transition: 'opacity 0.2s ease' }}>
-                  <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>TIME LIMIT (MINUTES)</div>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    disabled={!roomTimeLimitEnabled}
-                    value={roomTimeLimitMinutes}
-                    onChange={(e) => setRoomTimeLimitMinutes(e.target.value)}
-                    className="cyber-input"
-                    style={{
-                      width: '100%',
-                      height: '44px',
-                      background: 'var(--panel-bg)',
-                      border: '1px solid var(--terminal-border)',
-                      color: 'var(--terminal-text)',
-                      padding: '0 16px',
-                      fontFamily: 'monospace',
-                      fontSize: '16px',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-              </div>
-
+              <div style={{ color: 'var(--terminal-info)', marginBottom: '16px', fontSize: '12px', fontFamily: 'monospace' }}>{'>'} LOCAL_NODE_CONTROLLER</div>
               <MenuButton 
-                onClick={handleResumeSimulation} 
-                label="RESUME SIMULATION" 
-                sub={selectedRoomId ? `Join selected node` : 'No active save found'} 
-                disabled={!selectedRoomId || !isInputValid}
+                onClick={() => {
+                  setActiveLocalView('CREATE')
+                  setSelectedRoomId(null)
+                }} 
+                label="INITIALIZE NEW" 
+                sub="Spin up fresh simulation" 
+                active={activeLocalView === 'CREATE'}
               />
               <MenuButton 
-                onClick={handleNewSimulation} 
-                label="NEW SIMULATION" 
-                sub="Initialize fresh instance" 
-                disabled={!isInputValid}
+                onClick={() => {
+                  setActiveLocalView('LOAD')
+                  setSelectedRoomId(null)
+                  fetchLocalRooms()
+                }} 
+                label="BROWSE SAVES" 
+                sub="Access stored node archives" 
+                active={activeLocalView === 'LOAD' || activeLocalView === 'JOIN' || activeLocalView === 'EDIT'}
               />
               <MenuButton onClick={() => setActiveView('MAIN')} label="RETURN" sub="Back to root" secondary />
             </>
@@ -465,47 +496,40 @@ export default function MainMenuPage() {
 
           {activeView === 'NETWORK' && (
             <>
-              <div style={{ color: 'var(--terminal-info)', marginBottom: '16px', fontSize: '12px', fontFamily: 'monospace' }}>{'>'} UPLINK CONFIGURATION</div>
-              
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>PLAYER_ID</div>
-                <input 
-                  type="text"
-                  value={inputPlayerId}
-                  onChange={(e) => setInputPlayerId(e.target.value.toUpperCase())}
-                  placeholder="3-20 ALPHANUMERIC"
-                  className="cyber-input"
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    background: 'var(--panel-bg)',
-                    border: `1px solid ${isInputValid ? 'var(--terminal-border)' : 'var(--terminal-error)'}`,
-                    color: 'var(--terminal-text)',
-                    padding: '0 16px',
-                    fontFamily: 'monospace',
-                    fontSize: '16px',
-                    boxSizing: 'border-box',
-                    letterSpacing: '2px'
-                  }}
-                />
-              </div>
+              <div style={{ color: 'var(--terminal-info)', marginBottom: '16px', fontSize: '12px', fontFamily: 'monospace' }}>{'>'} UPLINK_CONTROLLER</div>
 
-              {remoteRooms.length > 0 ? (
+              {networkConnected ? (
                 <>
-                  <div style={{ color: 'var(--terminal-info)', marginBottom: '16px', fontSize: '12px', fontFamily: 'monospace' }}>{'>'} REMOTE NODES FOUND</div>
+                  <div style={{ color: '#22c55e', marginBottom: '16px', fontSize: '12px', fontFamily: 'monospace' }}>{'>'} LINK_ESTABLISHED: {networkIp}</div>
                   <MenuButton 
-                    onClick={handleResumeNetworkSimulation} 
-                    label="JOIN SIMULATION" 
-                    sub={selectedRoomId ? `Connect to node ${selectedRoomId}` : 'Select a node from list'} 
-                    disabled={!selectedRoomId || !isInputValid}
+                    onClick={() => {
+                      setActiveLocalView('CREATE')
+                      setSelectedRoomId(null)
+                    }} 
+                    label="CREATE REMOTE" 
+                    sub="Spin up node on host" 
+                    active={activeLocalView === 'CREATE'}
+                  />
+                  <MenuButton 
+                    onClick={() => {
+                      setActiveLocalView('LOAD')
+                      setSelectedRoomId(null)
+                    }} 
+                    label="REMOTE NODES" 
+                    sub="Browse active simulation nodes" 
+                    active={activeLocalView === 'LOAD' || activeLocalView === 'JOIN' || activeLocalView === 'EDIT'}
                   />
                   <MenuButton 
                     onClick={() => {
                       setRemoteRooms([])
                       setSelectedRoomId(null)
+                      setNetworkConnected(false)
+                      setActiveLocalView('IDLE')
+                      localStorage.removeItem('if_network_target')
                     }} 
-                    label="RESCAN" 
-                    sub="Scan for different IP" 
+                    label="DISCONNECT" 
+                    sub="Sever uplink and return" 
+                    secondary
                   />
                 </>
               ) : (
@@ -535,7 +559,7 @@ export default function MainMenuPage() {
                     onClick={handleJoinNetwork} 
                     label={networkScanning ? "SCANNING..." : "INITIATE UPLINK"} 
                     sub="Connect to remote host" 
-                    disabled={!isInputValid || networkScanning}
+                    disabled={networkScanning || !networkIp}
                   />
                   <MenuButton onClick={() => setActiveView('MAIN')} label="RETURN" sub="Back to root" secondary />
                 </>
@@ -545,250 +569,247 @@ export default function MainMenuPage() {
         </div>
       </div>
 
-      {/* Right Reserved Area for Animation / Panels */}
+      {/* Right Workspace Area */}
       <div style={{
         flex: 1,
         position: 'relative',
         zIndex: 5,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'flex-start',
-        paddingLeft: '40px'
+        justifyContent: 'center',
+        padding: '40px'
       }}>
-        {/* Local Saves List */}
-        {activeView === 'LOCAL' && localRooms.length > 0 && (
+        {activeLocalView !== 'IDLE' && (
           <div className="cyber-card" style={{ 
-            width: '400px', 
-            maxHeight: '60vh', 
-            background: 'rgba(15, 23, 42, 0.8)',
-            backdropFilter: 'blur(8px)',
+            width: '640px',
+            maxHeight: '85vh', 
+            background: 'rgba(15, 23, 42, 0.9)',
+            backdropFilter: 'blur(20px)',
             border: '1px solid var(--terminal-border)',
-            padding: '20px',
+            padding: '40px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px',
-            overflowY: 'auto'
+            position: 'relative',
+            boxShadow: '0 0 60px rgba(0,0,0,0.6)',
+            overflow: 'hidden'
           }}>
-            <div style={{ color: 'var(--terminal-info)', fontSize: '12px', fontFamily: 'monospace', marginBottom: '8px' }}>
-              {'>'} AVAILABLE LOCAL NODES
-            </div>
-            {localRooms.map(room => (
-              <div 
-                key={room.room_id}
+            {/* 窗口头部装饰 */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '32px',
+              paddingBottom: '16px',
+              borderBottom: '2px solid rgba(59, 130, 246, 0.2)'
+            }}>
+              <div style={{ color: 'var(--terminal-info)', fontSize: '14px', fontFamily: 'monospace', fontWeight: 'bold', letterSpacing: '4px' }}>
+                {activeLocalView === 'LOAD' && !selectedRoomId && '>> ARCHIVE_BROWSER'}
+                {activeLocalView === 'CREATE' && '>> NODE_INITIALIZER'}
+                {activeLocalView === 'EDIT' && '>> PROTOCOL_CONFIGURATOR'}
+                {activeLocalView === 'JOIN' && '>> AUTHENTICATION_TERMINAL'}
+                {activeLocalView === 'LOAD' && selectedRoomId && '>> AUTHENTICATION_TERMINAL'}
+              </div>
+              <button 
                 onClick={() => {
-                  if (editingRoomId !== room.room_id) {
-                    setSelectedRoomId(room.room_id)
-                  }
-                }}
-                onDoubleClick={() => {
-                  if (editingRoomId !== room.room_id && selectedRoomId === room.room_id && isInputValid) {
-                    handleResumeSimulation()
-                  }
+                  setActiveLocalView('IDLE')
+                  setSelectedRoomId(null)
                 }}
                 style={{
-                  padding: '16px',
-                  background: selectedRoomId === room.room_id ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0,0,0,0.3)',
-                  border: `1px solid ${selectedRoomId === room.room_id ? 'var(--terminal-info)' : 'var(--terminal-border)'}`,
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  position: 'relative'
+                  fontSize: '18px',
+                  fontFamily: 'monospace',
+                  transition: 'color 0.2s'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--terminal-error)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = '#64748b'}
               >
-                {editingRoomId === room.room_id ? (
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                    <input
-                      autoFocus
-                      type="text"
-                      value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleRenameSave(room.room_id, editingName)
-                        if (e.key === 'Escape') setEditingRoomId(null)
-                      }}
-                      className="cyber-input"
-                      style={{
-                        flex: 1,
-                        height: '28px',
-                        background: 'var(--panel-bg)',
-                        border: '1px solid var(--terminal-info)',
-                        color: 'var(--terminal-text)',
-                        padding: '0 8px',
-                        fontFamily: 'Inter, sans-serif',
-                        fontSize: '14px',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleRenameSave(room.room_id, editingName)
-                      }}
-                      style={{
-                        background: 'var(--terminal-info)',
-                        color: '#000',
-                        border: 'none',
-                        padding: '0 12px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        fontSize: '12px'
-                      }}
-                    >
-                      SAVE
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setEditingRoomId(null)
-                      }}
-                      style={{
-                        background: 'transparent',
-                        color: 'var(--terminal-text)',
-                        border: '1px solid var(--terminal-border)',
-                        padding: '0 12px',
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                      }}
-                    >
-                      X
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: selectedRoomId === room.room_id ? '#fff' : '#e2e8f0' }}>
-                      {room.name}
+                [X]
+              </button>
+            </div>
+
+            {/* 窗口主体内容 */}
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', scrollbarWidth: 'thin' }}>
+              {/* 1. 列表模式 */}
+              {activeLocalView === 'LOAD' && !selectedRoomId && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {(activeView === 'LOCAL' ? localRooms : remoteRooms).length === 0 ? (
+                    <div style={{ padding: '60px 0', textAlign: 'center', color: '#64748b', fontStyle: 'italic', fontFamily: 'monospace' }}>
+                      {'>'} NO_ACTIVE_NODES_DETECTED
                     </div>
-                    {selectedRoomId === room.room_id && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setEditingRoomId(room.room_id)
-                            setEditingName(room.name)
-                          }}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#94a3b8',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            textDecoration: 'underline'
-                          }}
-                        >
-                          RENAME
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteSave(room.room_id)
-                          }}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--terminal-error)',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            textDecoration: 'underline'
-                          }}
-                        >
-                          DELETE
-                        </button>
+                  ) : (activeView === 'LOCAL' ? localRooms : remoteRooms).map(room => (
+                    <div 
+                      key={room.room_id}
+                      onClick={() => setSelectedRoomId(room.room_id)}
+                      onDoubleClick={() => {
+                        setSelectedRoomId(room.room_id)
+                        setActiveLocalView('JOIN')
+                      }}
+                      style={{
+                        padding: '20px',
+                        background: selectedRoomId === room.room_id ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0,0,0,0.3)',
+                        border: `1px solid ${selectedRoomId === room.room_id ? 'var(--terminal-info)' : 'var(--terminal-border)'}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        position: 'relative'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: selectedRoomId === room.room_id ? '#fff' : '#e2e8f0', fontFamily: 'monospace' }}>
+                          {room.name}
+                        </div>
+                        <div style={{ display: 'flex', gap: '16px' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedRoomId(room.room_id)
+                              setRoomTimeLimitEnabled(!!room.game_settings?.time_limit_seconds)
+                              setRoomTimeLimitMinutes(String(Math.round((room.game_settings?.time_limit_seconds || 1800) / 60)))
+                              setSelectedScenario(room.game_settings?.scenario_id || '')
+                              setActiveLocalView('EDIT')
+                            }}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--terminal-info)', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline', fontFamily: 'monospace' }}
+                          >
+                            CONFIG
+                          </button>
+                          {activeView === 'LOCAL' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteSave(room.room_id)
+                              }}
+                              style={{ background: 'transparent', border: 'none', color: 'var(--terminal-error)', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline', fontFamily: 'monospace' }}
+                            >
+                              PURGE
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                )}
-                <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>CREATOR:</span>
-                    <span style={{ color: '#94a3b8' }}>{room.player_id}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>TIME LIMIT:</span>
-                    <span style={{ color: '#94a3b8' }}>
-                      {room.game_settings?.time_limit_seconds ? `${Math.round(room.game_settings.time_limit_seconds / 60)} MIN` : 'OFF'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>LAST SYNC:</span>
-                    <span style={{ color: '#94a3b8' }}>{room.updated_at ? new Date(room.updated_at).toLocaleString() : '--'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>NODE ID:</span>
-                    <span style={{ color: '#94a3b8' }}>{room.room_id.split('_')[1] || room.room_id}</span>
+                      <div style={{ fontSize: '11px', color: '#64748b', display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '8px', fontFamily: 'monospace' }}>
+                        <div>CREATOR: <span style={{ color: '#94a3b8' }}>{room.player_id}</span></div>
+                        <div>TIME_LIMIT: <span style={{ color: '#94a3b8' }}>{room.game_settings?.time_limit_seconds ? `${Math.round(room.game_settings.time_limit_seconds / 60)} MIN` : 'UNLIMITED'}</span></div>
+                        <div>LAST_SYNC: <span style={{ color: '#94a3b8' }}>{room.updated_at ? new Date(room.updated_at).toLocaleString() : '--'}</span></div>
+                        <div>NODE_ID: <span style={{ color: '#94a3b8' }}>{room.room_id.split('_')[1] || room.room_id}</span></div>
+                      </div>
+                      {selectedRoomId === room.room_id && (
+                        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: 'var(--terminal-info)', boxShadow: '0 0 10px var(--terminal-info)' }} />
+                      )}
+                    </div>
+                  ))}
+                  
+                  {selectedRoomId && (
+                    <div style={{ marginTop: '30px' }}>
+                      <MenuButton 
+                        onClick={() => setActiveLocalView('JOIN')} 
+                        label="ESTABLISH UPLINK" 
+                        sub="Begin synchronization sequence" 
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 2. 创建/编辑模式 */}
+              {(activeLocalView === 'CREATE' || activeLocalView === 'EDIT') && (
+                <div style={{ padding: '4px' }}>
+                  {renderRoomSettings()}
+                  <div style={{ marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <MenuButton 
+                      onClick={activeLocalView === 'CREATE' ? handleCreateNewSimulation : handleUpdateRoomSettings} 
+                      label={activeLocalView === 'CREATE' ? "COMMENCE INITIALIZATION" : "APPLY_CONFIG_PATCH"} 
+                      sub={activeLocalView === 'CREATE' ? "Deploy new simulation environment" : "Update node protocol"} 
+                    />
+                    <MenuButton onClick={() => setActiveLocalView('LOAD')} label="ABORT_OPERATION" sub="Discard changes and return" secondary />
                   </div>
                 </div>
-                {selectedRoomId === room.room_id && (
-                  <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: 'var(--terminal-info)' }} />
-                )}
+              )}
+
+              {/* 3. 加入模式 */}
+              {(activeLocalView === 'JOIN' || (activeLocalView === 'LOAD' && selectedRoomId)) && activeLocalView !== 'EDIT' && (
+                <div style={{ maxWidth: '440px', margin: '40px auto' }}>
+                  <div style={{ marginBottom: '32px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--terminal-info)', marginBottom: '12px', fontFamily: 'monospace', textAlign: 'center', letterSpacing: '2px' }}>AUTHENTICATING PLAYER_ID</div>
+                    <input 
+                      autoFocus
+                      type="text"
+                      value={inputPlayerId}
+                      onChange={(e) => setInputPlayerId(e.target.value.toUpperCase())}
+                      placeholder="ENTER_ID"
+                      className="cyber-input"
+                      style={{
+                        width: '100%',
+                        height: '60px',
+                        background: 'rgba(0,0,0,0.5)',
+                        border: `2px solid ${isInputValid ? 'var(--terminal-info)' : 'var(--terminal-error)'}`,
+                        color: 'var(--terminal-text)',
+                        padding: '0 20px',
+                        fontFamily: 'monospace',
+                        fontSize: '28px',
+                        boxSizing: 'border-box',
+                        letterSpacing: '8px',
+                        textAlign: 'center',
+                        textShadow: isInputValid ? '0 0 10px rgba(59, 130, 246, 0.5)' : 'none'
+                      }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '12px' }}>
+                      {!isInputValid ? (
+                         <div style={{ fontSize: '10px', color: 'var(--terminal-error)', fontFamily: 'monospace' }}>
+                           !! ERROR: ID_LENGTH_VIOLATION [3-20] !!
+                         </div>
+                      ) : (
+                         <div style={{ fontSize: '10px', color: '#22c55e', fontFamily: 'monospace' }}>
+                           READY_FOR_SYNCHRONIZATION
+                         </div>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <MenuButton 
+                      onClick={handleJoinSelectedSimulation} 
+                      label="ESTABLISH_LINK" 
+                      sub="Authorize and connect" 
+                      disabled={!isInputValid}
+                    />
+                    <MenuButton onClick={() => { setActiveLocalView('LOAD'); setSelectedRoomId(null); }} label="BROWSER_BACK" sub="Return to archive list" secondary />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 窗口底部装饰 */}
+            <div style={{ 
+              marginTop: '32px', 
+              fontSize: '10px', 
+              color: 'rgba(148,163,184,0.3)', 
+              fontFamily: 'monospace',
+              display: 'flex',
+              justifyContent: 'space-between',
+              borderTop: '1px solid rgba(148,163,184,0.1)',
+              paddingTop: '16px'
+            }}>
+              <div style={{ display: 'flex', gap: '20px' }}>
+                <span>SYS_REF: {activeView}::{activeLocalView}</span>
+                <span>ENC: AES_256_GCM</span>
               </div>
-            ))}
+              <span>CONNECTION_STATUS: STABLE</span>
+            </div>
           </div>
         )}
 
-        {/* Remote Saves List */}
-        {activeView === 'NETWORK' && remoteRooms.length > 0 && (
-          <div className="cyber-card" style={{ 
-            width: '400px', 
-            maxHeight: '60vh', 
-            background: 'rgba(15, 23, 42, 0.8)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid var(--terminal-border)',
-            padding: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-            overflowY: 'auto'
+        {/* 装饰性背景，当没有窗口打开时显示 */}
+        {activeLocalView === 'IDLE' && (
+          <div style={{ 
+            textAlign: 'center', 
+            opacity: 0.15, 
+            pointerEvents: 'none',
+            userSelect: 'none'
           }}>
-            <div style={{ color: 'var(--terminal-info)', fontSize: '12px', fontFamily: 'monospace', marginBottom: '8px' }}>
-              {'>'} AVAILABLE REMOTE NODES
+            <div style={{ fontSize: '180px', color: 'var(--terminal-info)', textShadow: '0 0 30px rgba(59, 130, 246, 0.3)' }}>❂</div>
+            <div style={{ fontSize: '16px', fontFamily: 'monospace', marginTop: '30px', letterSpacing: '8px', color: 'var(--terminal-info)' }}>
+              AWAITING_COMMAND_INPUT
             </div>
-            {remoteRooms.map(room => (
-              <div 
-                key={room.room_id}
-                onClick={() => setSelectedRoomId(room.room_id)}
-                onDoubleClick={() => {
-                  if (selectedRoomId === room.room_id && isInputValid) {
-                    handleResumeNetworkSimulation()
-                  }
-                }}
-                style={{
-                  padding: '16px',
-                  background: selectedRoomId === room.room_id ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0,0,0,0.3)',
-                  border: `1px solid ${selectedRoomId === room.room_id ? 'var(--terminal-info)' : 'var(--terminal-border)'}`,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  position: 'relative'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: selectedRoomId === room.room_id ? '#fff' : '#e2e8f0' }}>
-                    {room.name}
-                  </div>
-                </div>
-                <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>CREATOR:</span>
-                    <span style={{ color: '#94a3b8' }}>{room.player_id}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>TIME LIMIT:</span>
-                    <span style={{ color: '#94a3b8' }}>
-                      {room.game_settings?.time_limit_seconds ? `${Math.round(room.game_settings.time_limit_seconds / 60)} MIN` : 'OFF'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>LAST SYNC:</span>
-                    <span style={{ color: '#94a3b8' }}>{room.updated_at ? new Date(room.updated_at).toLocaleString() : '--'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>NODE ID:</span>
-                    <span style={{ color: '#94a3b8' }}>{room.room_id.split('_')[1] || room.room_id}</span>
-                  </div>
-                </div>
-                {selectedRoomId === room.room_id && (
-                  <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: 'var(--terminal-info)' }} />
-                )}
-              </div>
-            ))}
           </div>
         )}
       </div>
@@ -816,13 +837,15 @@ function MenuButton({
   label, 
   sub, 
   disabled = false,
-  secondary = false
+  secondary = false,
+  active = false
 }: { 
   onClick: () => void, 
   label: string, 
   sub: string, 
   disabled?: boolean,
-  secondary?: boolean
+  secondary?: boolean,
+  active?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
 
@@ -835,20 +858,21 @@ function MenuButton({
       onMouseLeave={() => setHovered(false)}
       style={{
         padding: '16px 24px',
-        background: hovered ? 'var(--terminal-border)' : 'var(--panel-bg)',
-        borderLeft: `4px solid ${hovered ? baseColor : (disabled ? 'transparent' : 'var(--terminal-border)')}`,
+        background: active ? 'rgba(59, 130, 246, 0.1)' : (hovered ? 'var(--terminal-border)' : 'var(--panel-bg)'),
+        borderLeft: `4px solid ${active ? 'var(--terminal-info)' : (hovered ? baseColor : (disabled ? 'transparent' : 'var(--terminal-border)'))}`,
         cursor: disabled ? 'not-allowed' : 'pointer',
         transition: 'all 0.15s ease',
         opacity: disabled ? 0.4 : 1,
         position: 'relative',
         overflow: 'hidden',
-        borderRadius: '2px'
+        borderRadius: '2px',
+        marginBottom: '4px'
       }}
     >
       <div style={{ 
         fontSize: '16px', 
         fontWeight: 600, 
-        color: hovered ? '#fff' : (secondary ? '#cbd5e1' : 'var(--terminal-text)'),
+        color: active ? 'var(--terminal-info)' : (hovered ? '#fff' : (secondary ? '#cbd5e1' : 'var(--terminal-text)')),
         letterSpacing: '0.5px',
         marginBottom: '4px',
         fontFamily: 'Inter, sans-serif'
@@ -857,11 +881,23 @@ function MenuButton({
       </div>
       <div style={{ 
         fontSize: '12px', 
-        color: hovered ? '#94a3b8' : '#64748b',
+        color: active ? 'rgba(59, 130, 246, 0.7)' : (hovered ? '#94a3b8' : '#64748b'),
         fontFamily: 'Inter, sans-serif'
       }}>
         {sub}
       </div>
+      {active && (
+        <div style={{ 
+          position: 'absolute', 
+          right: '16px', 
+          top: '50%', 
+          transform: 'translateY(-50%)',
+          color: 'var(--terminal-info)',
+          fontSize: '12px'
+        }}>
+          ACTIVE_SESSION ►
+        </div>
+      )}
     </div>
   )
 }

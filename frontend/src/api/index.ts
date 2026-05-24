@@ -185,7 +185,7 @@ export const Api = {
   deleteRoom: (roomId: string) => api.delete<{ok: boolean}>(`/rooms/${encodeURIComponent(roomId)}`, roomRequest),
   listLocalRooms: () => api.get<LocalRoomsResponse>('/rooms/local', undefined, roomRequest),
   networkJoinCheck: () => api.get<LocalRoomsResponse>('/rooms/network_join'),
-  updateRoomMeta: (roomId: string, name: string) => api.post<{ok: boolean, meta: RoomMeta}>(`/rooms/${encodeURIComponent(roomId)}/meta`, { name }, roomRequest),
+  updateRoomMeta: (roomId: string, name: string, game_settings?: RoomGameSettings) => api.post<{ok: boolean, meta: RoomMeta}>(`/rooms/${encodeURIComponent(roomId)}/meta`, { name, game_settings }, roomRequest),
 
   marketSymbols: () => getWithBootstrapCache<string[]>('marketSymbols', 8000, () => api.get<string[]>('/market/symbols', undefined, roomRequest)),
 
