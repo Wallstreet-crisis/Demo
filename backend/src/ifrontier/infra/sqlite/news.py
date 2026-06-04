@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import json
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -110,8 +111,9 @@ def _add_column_if_not_exists(cur, table: str, column: str, type_def: str):
         pass
 
 
-def init_news_schema() -> None:
-    conn = get_connection()
+def init_news_schema(conn: Optional[sqlite3.Connection] = None) -> None:
+    if conn is None:
+        conn = get_connection()
     cur = conn.cursor()
 
     cur.executescript(
@@ -139,6 +141,11 @@ def init_news_schema() -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_news_card_id ON news(card_id);
         CREATE INDEX IF NOT EXISTS idx_news_variant_id ON news(variant_id);
+        
+        -- 增加唯一索引以支持 INSERT OR REPLACE 逻辑
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_news_unique_card_variant ON news(card_id, variant_id);
+        -- 针对主卡片（variant_id 为 NULL）增加部分唯一索引
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_news_main_card_unique ON news(card_id) WHERE variant_id IS NULL;
 
         CREATE TABLE IF NOT EXISTS news_market_shelves (
             player_id TEXT PRIMARY KEY,
@@ -343,8 +350,9 @@ def get_card_owner(card_id: str) -> Optional[str]:
     return row["user_id"] if row else None
 
 
-def init_news_relationships_schema() -> None:
-    conn = get_connection()
+def init_news_relationships_schema(conn: Optional[sqlite3.Connection] = None) -> None:
+    if conn is None:
+        conn = get_connection()
     cur = conn.cursor()
 
     cur.executescript(
@@ -477,6 +485,41 @@ def list_owned_cards(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
     ).fetchall()
     # Convert rows to dicts
     return [dict(r) for r in rows]
+
+
+def list_pending_scenario_cards(limit: int = 50) -> List[NewsRecord]:
+    conn = get_connection()
+    # Find cards that:
+    # 1. Have no variant (not yet emitted)
+    # 2. Are not suppressed
+    # 3. Have a scheduled_at time
+    # 4. DO NOT have any associated variants already emitted
+    rows = conn.execute(
+        """
+        SELECT n.* FROM news n
+        WHERE n.variant_id IS NULL 
+        AND n.is_suppressed = 0 
+        AND n.scheduled_at IS NOT NULL
+        AND NOT EXISTS (
+            SELECT 1 FROM news v 
+            WHERE v.card_id = n.card_id 
+            AND v.variant_id IS NOT NULL
+        )
+        ORDER BY n.scheduled_at ASC 
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [NewsRecord.from_row(r) for r in rows]
+
+
+def has_variant(card_id: str) -> bool:
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT 1 FROM news WHERE card_id = ? AND variant_id IS NOT NULL LIMIT 1",
+        (card_id,),
+    ).fetchone()
+    return row is not None
 
 
 def deliver_variant(

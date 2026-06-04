@@ -213,6 +213,10 @@ class NewsTickEngine:
         # 0) 定期生成新的系统新闻
         spawn_events = await self._periodic_spawn(now=now)
 
+        # 0.5) 处理剧情树节点 (Scenario Nodes)
+        scenario_events = await self._tick_scenario_cards(now=now, limit=limit)
+        spawn_events.extend(scenario_events)
+
         chains = await self._list_active_chains(now=now, limit=limit)
 
         results: List[Dict[str, Any]] = []
@@ -432,6 +436,83 @@ class NewsTickEngine:
                 spawned_events.append(res["chain_started_event"].model_dump(mode="json"))
 
         return spawned_events
+
+    async def _tick_scenario_cards(self, *, now: datetime, limit: int = 50) -> List[Dict[str, Any]]:
+        """处理基于剧情树（scenario）定义的定时、依赖、概率触发逻辑"""
+        from ifrontier.infra.sqlite.news import list_pending_scenario_cards, has_variant, suppress_news
+        
+        pending = await asyncio.to_thread(list_pending_scenario_cards, limit=limit)
+        events = []
+        
+        for card in pending:
+            # 1. 检查时间
+            if not card.scheduled_at:
+                continue
+            
+            try:
+                # 处理 ISO 字符串，兼容带或不带时区的情况
+                t_str = card.scheduled_at
+                if t_str.endswith('Z'):
+                    t_str = t_str[:-1] + '+00:00'
+                sched_at = datetime.fromisoformat(t_str)
+                if sched_at.tzinfo is None:
+                    sched_at = sched_at.replace(tzinfo=timezone.utc)
+            except Exception as e:
+                _log.warning("Invalid scheduled_at format for card %s: %s", card.card_id, card.scheduled_at)
+                continue
+                
+            if now < sched_at:
+                continue
+                
+            # 2. 检查依赖 (Parent-Child Dependency)
+            if card.parent_card_id:
+                parent_exists = await asyncio.to_thread(has_variant, card.parent_card_id)
+                if not parent_exists:
+                    # 父节点还没触发，跳过（等待父节点）
+                    continue
+            
+            # 3. 检查概率 (Activation Probability)
+            prob = card.activation_prob
+            if prob < 1.0:
+                if py_random.random() > prob:
+                    # 触发失败，标记为抑制（剧情树分支在此断开）
+                    await asyncio.to_thread(suppress_news, card.card_id, "PROBABILITY_FAILURE")
+                    _log.info("Scenario Card %s failed probability check (prob=%f)", card.card_id, prob)
+                    continue
+            
+            # 4. 执行发布 (Emission)
+            _log.info("Activating scenario card %s (kind=%s, scenario=%s)", card.card_id, card.kind, card.scenario_id)
+            
+            # 自动生成内容：如果文本为空，尝试从蓝图获取
+            text = card.text
+            if not text:
+                text = self._news.get_preset_template(kind=card.kind, symbols=card.symbols)
+            
+            # 发布变体
+            variant_id, var_ev = await asyncio.to_thread(
+                self._news.emit_variant,
+                card_id=card.card_id,
+                author_id=card.publisher_id or "system",
+                text=text
+            )
+            events.append(var_ev.model_dump(mode="json"))
+            
+            # 如果是重大新闻，自动广播给全体玩家
+            if card.kind in {"MAJOR_EVENT", "WORLD_EVENT", "EARNINGS"}:
+                # 检查 broadcast_variant 是否存在（在 NewsService 中）
+                if hasattr(self._news, 'broadcast_variant'):
+                    broadcasted, broadcast_ev = await asyncio.to_thread(
+                        self._news.broadcast_variant,
+                        variant_id=variant_id,
+                        channel="GLOBAL_MANDATORY",
+                        visibility_level="NORMAL",
+                        actor_id="system"
+                    )
+                    if broadcast_ev:
+                        events.append(broadcast_ev.model_dump(mode="json"))
+                    
+        return events
+
 
     async def _tick_one_chain(self, *, now: datetime, chain: Dict[str, Any]) -> Dict[str, Any]:
         chain_id = str(chain["chain_id"])

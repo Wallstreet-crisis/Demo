@@ -57,7 +57,7 @@ def create_app() -> FastAPI:
             return await call_next(request)
 
         room_id = request.headers.get("X-Room-Id", "default")
-        if not room_id.strip():
+        if not room_id.strip() or request.url.path.startswith("/api/global/") or request.url.path.startswith("/global/"):
             room_id = "default"
 
         # 确保 default 房间始终存活

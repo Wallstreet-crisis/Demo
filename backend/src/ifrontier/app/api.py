@@ -2689,6 +2689,9 @@ async def social_follow(req: SocialFollowRequest) -> None:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+# 全局编剧数据库初始化标志
+_global_news_db_initialized = False
+
 # 全局编剧数据库（用于存放剧本模板）
 def _get_global_news_db_conn():
     import sqlite3
@@ -2696,9 +2699,14 @@ def _get_global_news_db_conn():
     db_path = os.getenv("IF_GLOBAL_STUDIO_DB", "global_studio.db")
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    # 初始化表结构（如果不存在）
-    from ifrontier.infra.sqlite.news import init_news_schema
-    init_news_schema(conn)
+    
+    global _global_news_db_initialized
+    if not _global_news_db_initialized:
+        # 初始化表结构（如果不存在）
+        from ifrontier.infra.sqlite.news import init_news_schema
+        init_news_schema(conn)
+        _global_news_db_initialized = True
+        
     return conn
 
 
@@ -2719,50 +2727,75 @@ async def global_studio_news_scenario_cards(scenario_id: str) -> List[Dict[str, 
     return [NewsRecord.from_row(r).__dict__ for r in rows]
 
 
+
+
+class NewsCreateCardResponse(BaseModel):
+    card_id: str
+    event_id: UUID
+    correlation_id: UUID | None
+
+
+class NewsCreateCardRequest(BaseModel):
+    actor_id: str
+    kind: str
+    card_id: str | None = None
+    image_anchor_id: str | None = None
+    image_uri: str | None = None
+    truth_payload: Dict[str, Any] | None = None
+    symbols: list[str] = []
+    tags: list[str] = []
+    correlation_id: UUID | None = None
+    # 新增扩展字段
+    parent_card_id: str | None = None
+    activation_prob: float = 1.0
+    scheduled_at: str | None = None
+    success_criteria: Dict[str, Any] | None = None
+    failure_outcome: Dict[str, Any] | None = None
+    scenario_id: str | None = None
+
+
 @router.post("/global/studio/news/cards")
 async def global_studio_news_create_card(req: NewsCreateCardRequest) -> NewsCreateCardResponse:
     # 彻底开放，不再校验身份
-    from uuid import uuid4
-    from datetime import datetime, timezone
-    from ifrontier.infra.sqlite.news import save_news
-    
-    card_id = str(uuid4())
+    card_id = req.card_id or str(uuid4())
     conn = _get_global_news_db_conn()
     
-    # 使用一个简化的逻辑直接存入全局库，不经过 NewsService 触发事件（因为此时没有房间环境）
-    with conn:
-        # 重用 save_news 的 SQL 逻辑，但由于 save_news 内部调用了 get_connection()，
-        # 我们需要临时替换掉全局连接或直接写 SQL。
-        # 这里为了保持代码复用，手动实现简单的插入：
-        import json
-        now = datetime.now(timezone.utc).isoformat()
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO news (
-                card_id, variant_id, kind, text, symbols_json, tags_json, 
-                publisher_id, published_at, is_suppressed, suppression_reason,
-                truth_payload_json, image_uri, image_anchor_id, preset_id, rarity, faction, created_at,
-                author_id, parent_variant_id, mutation_depth, influence_cost, risk_roll_json,
-                parent_card_id, activation_prob, scheduled_at, success_criteria_json, failure_outcome_json,
-                scenario_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                card_id, None, req.kind, None, json.dumps(req.symbols), json.dumps([]),
-                req.actor_id, None, 0, None, json.dumps(req.truth_payload or {}),
-                req.image_uri, req.image_anchor_id, None, "COMMON", None, now,
-                req.actor_id, None, 0, 0.0, json.dumps({}),
-                req.parent_card_id, req.activation_prob, req.scheduled_at,
-                json.dumps(req.success_criteria or {}), json.dumps(req.failure_outcome or {}),
-                req.scenario_id
+    try:
+        # 使用一个简化的逻辑直接存入全局库，不经过 NewsService 触发事件（因为此时没有房间环境）
+        with conn:
+            now = datetime.now(timezone.utc).isoformat()
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO news (
+                    card_id, variant_id, kind, text, symbols_json, tags_json, 
+                    publisher_id, published_at, is_suppressed, suppression_reason,
+                    truth_payload_json, image_uri, image_anchor_id, preset_id, rarity, faction, created_at,
+                    author_id, parent_variant_id, mutation_depth, influence_cost, risk_roll_json,
+                    parent_card_id, activation_prob, scheduled_at, success_criteria_json, failure_outcome_json,
+                    scenario_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    card_id, None, req.kind, None, json.dumps(req.symbols), json.dumps([]),
+                    req.actor_id, None, 0, None, json.dumps(req.truth_payload or {}),
+                    req.image_uri, req.image_anchor_id, None, "COMMON", None, now,
+                    req.actor_id, None, 0, 0.0, json.dumps({}),
+                    req.parent_card_id, req.activation_prob, req.scheduled_at,
+                    json.dumps(req.success_criteria or {}), json.dumps(req.failure_outcome or {}),
+                    req.scenario_id
+                )
             )
+        
+        return NewsCreateCardResponse(
+            card_id=card_id,
+            event_id=uuid4(), # 占位，局外设计不产生真实事件
+            correlation_id=req.correlation_id or uuid4(),
         )
-    
-    return NewsCreateCardResponse(
-        card_id=card_id,
-        event_id=uuid4(), # 占位，局外设计不产生真实事件
-        correlation_id=req.correlation_id or uuid4(),
-    )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 
 
 @router.get("/global/studio/news/cards/{card_id}/variants")
@@ -2857,28 +2890,8 @@ async def studio_news_scenario_cards(scenario_id: str, actor_id: str) -> List[Di
     return [NewsRecord.from_row(r).__dict__ for r in rows]
 
 
-class NewsCreateCardRequest(BaseModel):
-    actor_id: str
-    kind: str
-    image_anchor_id: str | None = None
-    image_uri: str | None = None
-    truth_payload: Dict[str, Any] | None = None
-    symbols: list[str] = []
-    tags: list[str] = []
-    correlation_id: UUID | None = None
-    # 新增扩展字段
-    parent_card_id: str | None = None
-    activation_prob: float = 1.0
-    scheduled_at: str | None = None
-    success_criteria: Dict[str, Any] | None = None
-    failure_outcome: Dict[str, Any] | None = None
-    scenario_id: str | None = None
 
 
-class NewsCreateCardResponse(BaseModel):
-    card_id: str
-    event_id: UUID
-    correlation_id: UUID | None
 
 
 @router.post("/news/cards")

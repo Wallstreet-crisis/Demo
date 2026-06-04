@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   Image as ImageIcon, 
@@ -7,15 +8,23 @@ import {
   RefreshCw,
   Clock,
   Settings,
-  AlertTriangle,
   GitBranch,
   Book,
-  Download,
-  Trash2,
-  ChevronRight,
-  ChevronDown,
   ArrowRight
 } from 'lucide-react';
+import { 
+  ReactFlow, 
+  MiniMap, 
+  Controls, 
+  Background, 
+  MarkerType,
+  Handle,
+  Position,
+  useNodesState,
+  useEdgesState,
+} from '@xyflow/react';
+import type { Connection, Node, Edge } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { Api } from '../api';
 import { useAppSession } from '../app/context';
 
@@ -45,7 +54,79 @@ interface Scenario {
   name: string;
 }
 
+// 1. 自定义节点组件（符合游戏赛博/终端美术设计风格）
+const CyberNewsNode = ({ data, selected }: any) => {
+  const card = data.card;
+  const isSelected = selected;
+  
+  const kindColors: Record<string, string> = {
+    EARNINGS: '#4ade80',
+    MILITARY: '#f87171',
+    DEFAULT: '#60a5fa'
+  };
+  const color = kindColors[card.kind] || kindColors.DEFAULT;
+
+  return (
+    <div style={{
+      padding: '14px',
+      borderRadius: '8px',
+      background: isSelected ? 'rgba(34, 211, 238, 0.16)' : 'rgba(10, 15, 30, 0.85)',
+      border: `2px solid ${isSelected ? '#22d3ee' : 'rgba(59, 130, 246, 0.25)'}`,
+      boxShadow: isSelected ? '0 0 25px rgba(34, 211, 238, 0.4)' : '0 4px 12px rgba(0,0,0,0.5)',
+      color: '#fff',
+      width: '180px',
+      fontFamily: 'monospace',
+      backdropFilter: 'blur(8px)',
+      position: 'relative'
+    }}>
+      <Handle type="target" position={Position.Left} style={{ background: '#22d3ee', width: 8, height: 8 }} />
+      
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <span style={{
+          fontSize: '8px',
+          padding: '2px 6px',
+          borderRadius: '3px',
+          background: `${color}20`,
+          border: `1px solid ${color}50`,
+          color: color,
+          fontWeight: 'bold',
+          textTransform: 'uppercase'
+        }}>
+          {card.kind}
+        </span>
+        <span style={{ fontSize: '10px', color: '#475569' }}>
+          T+{data.offsetSeconds}s
+        </span>
+      </div>
+      
+      <div style={{ 
+        fontSize: '12px', 
+        fontWeight: '900', 
+        overflow: 'hidden', 
+        textOverflow: 'ellipsis', 
+        whiteSpace: 'nowrap', 
+        marginBottom: '4px',
+        color: '#fff',
+        letterSpacing: '0.5px'
+      }}>
+        {card.text || `BLOCK_${card.card_id.split('-')[0].toUpperCase()}`}
+      </div>
+      
+      <div style={{ fontSize: '10px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {card.symbols?.join(', ') || 'NO_SYMBOLS'}
+      </div>
+
+      <Handle type="source" position={Position.Right} style={{ background: '#22d3ee', width: 8, height: 8 }} />
+    </div>
+  );
+};
+
+const nodeTypes = {
+  cybernews: CyberNewsNode
+};
+
 const NewsStudioPage: React.FC = () => {
+  const nav = useNavigate();
   const { playerId } = useAppSession();
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
@@ -53,8 +134,13 @@ const NewsStudioPage: React.FC = () => {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [presets, setPresets] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
   const [scenarioFilter, setScenarioFilter] = useState('');
+  
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  
+  // 缩放滑块：控制 X 轴事件之间时间触发间隔的拉伸/压缩
+  const [timeScale, setTimeScale] = useState<number>(2.0); // 默认 1px = 0.5s，即 1s = 2px
 
   const [editCard, setEditCard] = useState<Partial<NewsCard>>({
     kind: 'EARNINGS',
@@ -68,6 +154,14 @@ const NewsStudioPage: React.FC = () => {
 
   const [variants, setVariants] = useState<any[]>([]);
 
+  // 局外持久化节点 Y 坐标，因为数据库没有提供 layout 的 Y 字段
+  const [nodePositions, setNodePositions] = useState<Record<string, { x: number; y: number }>>(() => {
+    try {
+      const saved = localStorage.getItem('studio_node_positions_v2');
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+
   useEffect(() => {
     loadScenarios();
     loadPresets();
@@ -79,6 +173,7 @@ const NewsStudioPage: React.FC = () => {
     } else {
       loadAllCards();
     }
+    setSelectedCardId(null);
   }, [selectedScenarioId]);
 
   useEffect(() => {
@@ -138,12 +233,12 @@ const NewsStudioPage: React.FC = () => {
 
   const loadPresets = async () => {
     try {
-      // 预设依然可以从房间获取，或者未来也移至全局
       const data = await Api.studioNewsPresets(playerId || 'author');
       setPresets(data);
     } catch (err) { console.error('Failed to load presets:', err); }
   };
 
+  // 保存（创建/修改）节点
   const handleSaveCard = async () => {
     try {
       setLoading(true);
@@ -153,7 +248,6 @@ const NewsStudioPage: React.FC = () => {
         scenario_id: selectedScenarioId || editCard.scenario_id
       };
       const resp = await Api.globalStudioNewsCreateCard(payload as any);
-      setIsCreating(false);
       setSelectedCardId(resp.card_id);
       if (selectedScenarioId) loadScenarioCards(selectedScenarioId);
       alert('保存成功');
@@ -161,121 +255,272 @@ const NewsStudioPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  // 树形结构辅助函数
-  const treeNodes = useMemo(() => {
-    const rootNodes = cards.filter(c => !c.parent_card_id || !cards.find(p => p.card_id === c.parent_card_id));
-    return rootNodes;
-  }, [cards]);
+  // 创建一个全新的根事件/独立事件
+  const handleCreateNewNode = async () => {
+    if (!selectedScenarioId) {
+      alert('请先选择一个剧本归档，或者创建一个新剧本归档');
+      return;
+    }
+    try {
+      setLoading(true);
+      const nowTime = new Date().toISOString();
+      const payload = {
+        kind: 'EARNINGS',
+        symbols: [],
+        tags: [],
+        truth_payload: { impact: 0.1, direction: 'UP', intensity: 0.5, ttl_seconds: 3600 },
+        activation_prob: 1.0,
+        actor_id: playerId || 'author',
+        scenario_id: selectedScenarioId,
+        scheduled_at: nowTime,
+        parent_card_id: null
+      };
+      const resp = await Api.globalStudioNewsCreateCard(payload as any);
+      setSelectedCardId(resp.card_id);
+      loadScenarioCards(selectedScenarioId);
+    } catch (err) {
+      alert('创建事件节点失败: ' + err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const getChildren = (parentId: string) => cards.filter(c => c.parent_card_id === parentId);
+  // 当节点被点击选中时
+  const onNodeClick = useCallback((_event: React.MouseEvent, node: any) => {
+    setSelectedCardId(node.id);
+  }, []);
 
-  // 递归渲染树节点
-  const TreeNode: React.FC<{ card: NewsCard; depth: number }> = ({ card, depth }) => {
-    const [expanded, setExpanded] = useState(true);
-    const children = getChildren(card.card_id);
-    const isSelected = selectedCardId === card.card_id;
+  useEffect(() => {
+    const referenceTime = cards.length > 0 
+      ? new Date(Math.min(...cards.map(c => c.scheduled_at ? new Date(c.scheduled_at).getTime() : Date.now())))
+      : new Date();
 
-    return (
-      <div className="ml-4 border-l border-slate-800 pl-4 mt-2">
-        <div 
-          onClick={() => setSelectedCardId(card.card_id)}
-          className={`group flex items-center gap-2 p-2 rounded-md cursor-pointer transition-all ${
-            isSelected ? 'bg-cyan-500/10 border border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.2)]' : 'hover:bg-slate-800 border border-transparent'
-          }`}
-        >
-          <div className="shrink-0 text-slate-500">
-            {children.length > 0 ? (
-              expanded ? <ChevronDown size={14} onClick={(e) => { e.stopPropagation(); setExpanded(false); }} /> : 
-                        <ChevronRight size={14} onClick={(e) => { e.stopPropagation(); setExpanded(true); }} />
-            ) : <ArrowRight size={14} className="opacity-30" />}
-          </div>
-          
-          <div className={`text-xs px-1.5 py-0.5 rounded border ${
-            card.kind === 'EARNINGS' ? 'border-green-500/30 text-green-400 bg-green-500/5' :
-            card.kind === 'MILITARY' ? 'border-red-500/30 text-red-400 bg-red-500/5' :
-            'border-blue-500/30 text-blue-400 bg-blue-500/5'
-          }`}>
-            {card.kind}
-          </div>
-          
-          <span className={`text-xs font-mono truncate max-w-[120px] ${isSelected ? 'text-cyan-400' : 'text-slate-300'}`}>
-            {card.card_id.split('-')[0]}
-          </span>
+    const newNodes = cards.map((card, index) => {
+      const offsetMs = card.scheduled_at ? new Date(card.scheduled_at).getTime() - referenceTime.getTime() : 0;
+      const offsetSeconds = Math.max(0, Math.floor(offsetMs / 1000));
+      
+      const savedPos = nodePositions[card.card_id];
+      const defaultX = offsetSeconds * timeScale + 50;
+      const defaultY = savedPos ? savedPos.y : (index % 5) * 130 + 80;
 
-          <div className="ml-auto flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-             <button 
-              title="添加后续事件"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsCreating(true);
-                setEditCard({
-                  ...editCard,
-                  card_id: undefined as any,
-                  parent_card_id: card.card_id,
-                  scenario_id: card.scenario_id
-                });
-                setSelectedCardId(null);
-              }}
-              className="p-1 hover:text-cyan-400"
-            >
-               <Plus size={14} />
-             </button>
-          </div>
-        </div>
-        
-        {expanded && children.length > 0 && (
-          <div className="mt-1">
-            {children.map(child => (
-              <TreeNode key={child.card_id} card={child} depth={depth + 1} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
+      return {
+        id: card.card_id,
+        type: 'cybernews',
+        position: { x: savedPos ? offsetSeconds * timeScale + 50 : defaultX, y: defaultY },
+        data: { 
+          card, 
+          offsetSeconds 
+        }
+      };
+    });
+    setNodes(newNodes as Node[]);
+
+    const newEdges = cards
+      .filter(c => c.parent_card_id && cards.some(p => p.card_id === c.parent_card_id))
+      .map(c => ({
+        id: `edge-${c.parent_card_id}-${c.card_id}`,
+        source: c.parent_card_id!,
+        target: c.card_id,
+        animated: true,
+        style: { stroke: '#22d3ee', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#22d3ee' }
+      }));
+    setEdges(newEdges as Edge[]);
+  }, [cards, timeScale, nodePositions, setNodes, setEdges]);
+
+  const onNodeDragStop = useCallback(async (_event: any, node: any) => {
+    const card = cards.find(c => c.card_id === node.id);
+    if (!card) return;
+
+    const referenceTime = cards.length > 0 
+      ? new Date(Math.min(...cards.map(c => c.scheduled_at ? new Date(c.scheduled_at).getTime() : Date.now())))
+      : new Date();
+
+    // 根据新的 X 计算时间差偏移
+    const currentOffsetSeconds = Math.max(0, Math.floor((node.position.x - 50) / timeScale));
+    const newScheduledTime = new Date(referenceTime.getTime() + currentOffsetSeconds * 1000).toISOString();
+
+    // 更新局外 Y 坐标
+    const updatedPos = {
+      ...nodePositions,
+      [node.id]: { x: node.position.x, y: node.position.y }
+    };
+    setNodePositions(updatedPos);
+    localStorage.setItem('studio_node_positions_v2', JSON.stringify(updatedPos));
+
+    try {
+      await Api.globalStudioNewsCreateCard({
+        ...card,
+        scheduled_at: newScheduledTime,
+        actor_id: playerId || 'author',
+      } as any);
+      if (selectedScenarioId) {
+        loadScenarioCards(selectedScenarioId);
+      }
+    } catch (err) {
+      console.error('Failed to update scheduled position:', err);
+    }
+  }, [cards, timeScale, nodePositions, selectedScenarioId, playerId]);
+
+  // 连线建立：A 连接 B，表示 B 依赖于 A （B.parent_card_id = A.card_id）
+  const onConnect = useCallback(async (params: Connection) => {
+    const sourceId = params.source;
+    const targetId = params.target;
+    if (!sourceId || !targetId) return;
+
+    const targetCard = cards.find(c => c.card_id === targetId);
+    if (targetCard) {
+      try {
+        await Api.globalStudioNewsCreateCard({
+          ...targetCard,
+          parent_card_id: sourceId,
+          actor_id: playerId || 'author'
+        } as any);
+        if (selectedScenarioId) {
+          loadScenarioCards(selectedScenarioId);
+        }
+      } catch (err) {
+        alert('连接依赖失败: ' + err);
+      }
+    }
+  }, [cards, selectedScenarioId, playerId]);
+
+  // 解除父依赖
+  const handleRemoveParent = async () => {
+    const card = cards.find(c => c.card_id === selectedCardId);
+    if (card) {
+      try {
+        await Api.globalStudioNewsCreateCard({
+          ...card,
+          parent_card_id: null,
+          actor_id: playerId || 'author'
+        } as any);
+        if (selectedScenarioId) {
+          loadScenarioCards(selectedScenarioId);
+        }
+      } catch (err) {
+        alert('解除依赖失败: ' + err);
+      }
+    }
   };
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-mono">
-      {/* 极窄侧边栏：剧本列表 */}
-      <div className="w-64 border-r border-slate-800 flex flex-col bg-slate-900/50">
-        <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80">
-          <h2 className="text-sm font-bold flex items-center gap-2 text-indigo-400 uppercase tracking-widest">
-            <Book size={16} /> 新闻剧本
-          </h2>
+    <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#020617', color: '#cbd5e1', overflow: 'hidden', fontFamily: 'Inter, sans-serif' }}>
+      
+      {/* 1. 剧本库 (Scenario Library) */}
+      <div style={{ width: '300px', borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', background: '#0a0f1e', flexShrink: 0 }}>
+        <div style={{ padding: '40px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <button 
-            onClick={() => {
-              const name = prompt('请输入新剧本名称:');
-              if (name) setSelectedScenarioId(name);
+            onClick={() => nav('/')}
+            style={{ 
+              width: '100%', 
+              padding: '14px', 
+              background: 'rgba(59, 130, 246, 0.06)', 
+              border: '1px solid rgba(59, 130, 246, 0.25)', 
+              borderRadius: '8px', 
+              color: '#60a5fa', 
+              fontSize: '12px', 
+              fontWeight: '900', 
+              letterSpacing: '3px',
+              cursor: 'pointer',
+              marginBottom: '40px',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              textTransform: 'uppercase'
             }}
-            className="p-1 hover:bg-slate-700 rounded text-indigo-400"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
+              e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.06)';
+              e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.25)';
+              e.currentTarget.style.color = '#60a5fa';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
           >
-            <Plus size={16} />
+            <ArrowRight size={16} style={{ transform: 'rotate(180deg)' }} /> EXIT_TO_SYSTEM
           </button>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '11px', color: '#818cf8', fontWeight: '900', letterSpacing: '3px', marginBottom: '6px', fontFamily: 'monospace' }}>DATA_ARCHIVE</div>
+              <h2 style={{ fontSize: '20px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '12px', color: '#fff', margin: 0, letterSpacing: '-0.5px' }}>
+                <Book size={24} style={{ color: '#818cf8' }} /> SCENARIOS
+              </h2>
+            </div>
+            <button 
+              onClick={() => {
+                const name = prompt('NEW SCENARIO IDENTIFIER:');
+                if (name) setSelectedScenarioId(name.toUpperCase());
+              }}
+              style={{ background: 'rgba(129, 140, 248, 0.15)', border: '1px solid rgba(129, 140, 248, 0.3)', borderRadius: '8px', padding: '10px', color: '#818cf8', cursor: 'pointer', transition: 'all 0.2s' }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(129, 140, 248, 0.25)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(129, 140, 248, 0.15)'}
+            >
+              <Plus size={20} />
+            </button>
+          </div>
         </div>
-        <div className="p-2">
-          <input 
-            type="text" placeholder="过滤剧本..." 
-            className="w-full bg-slate-800 border border-slate-700 rounded-md py-1.5 px-3 text-[10px] focus:outline-none focus:border-indigo-500"
-            value={scenarioFilter}
-            onChange={(e) => setScenarioFilter(e.target.value)}
-          />
+
+        <div style={{ padding: '24px' }}>
+          <div style={{ position: 'relative', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', right: '14px', top: '14px', color: '#334155' }}>
+              <RefreshCw size={14} />
+            </div>
+            <input 
+              type="text" placeholder="FILTER_DB_BLUEPRINTS..." 
+              style={{ width: '100%', background: 'rgba(0,0,0,0.5)', border: 'none', padding: '14px 18px', fontSize: '12px', outline: 'none', color: '#fff', fontFamily: 'monospace' }}
+              value={scenarioFilter}
+              onChange={(e) => setScenarioFilter(e.target.value)}
+            />
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 32px 24px', scrollbarWidth: 'none' }}>
           <div 
             onClick={() => setSelectedScenarioId(null)}
-            className={`p-2 rounded text-[10px] cursor-pointer border transition-colors ${
-              selectedScenarioId === null ? 'border-indigo-500 bg-indigo-500/10' : 'border-transparent hover:bg-slate-800'
-            }`}
+            style={{
+              padding: '16px 20px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '900',
+              marginBottom: '12px',
+              transition: 'all 0.2s',
+              background: selectedScenarioId === null ? 'rgba(129, 140, 248, 0.15)' : 'transparent',
+              border: `1px solid ${selectedScenarioId === null ? 'rgba(129, 140, 248, 0.5)' : 'transparent'}`,
+              color: selectedScenarioId === null ? '#fff' : '#475569',
+              letterSpacing: '1px'
+            }}
           >
-            ALL_RECORDS (所有孤立事件)
+            {'>'} UNLINKED_RECORDS
           </div>
+          
+          <div style={{ margin: '40px 0 20px 0', fontSize: '11px', color: '#1e293b', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '4px', paddingLeft: '10px', borderLeft: '2px solid #1e293b' }}>Archives</div>
+          
           {scenarios.filter(s => s.name.toLowerCase().includes(scenarioFilter.toLowerCase())).map(s => (
             <div 
               key={s.id}
               onClick={() => setSelectedScenarioId(s.id)}
-              className={`p-2 rounded text-[10px] cursor-pointer border transition-colors ${
-                selectedScenarioId === s.id ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400' : 'border-transparent hover:bg-slate-800'
-              }`}
+              style={{
+                padding: '16px 20px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                marginBottom: '8px',
+                transition: 'all 0.2s',
+                background: selectedScenarioId === s.id ? 'rgba(129, 140, 248, 0.15)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${selectedScenarioId === s.id ? 'rgba(129, 140, 248, 0.5)' : 'transparent'}`,
+                color: selectedScenarioId === s.id ? '#fff' : '#94a3b8',
+                letterSpacing: '0.5px'
+              }}
             >
               {s.name}
             </div>
@@ -283,282 +528,348 @@ const NewsStudioPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 中间栏：树状设计器 */}
-      <div className="w-80 border-r border-slate-800 flex flex-col bg-slate-900">
-        <div className="p-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
-          <h2 className="text-sm font-bold flex items-center gap-2 text-cyan-400 uppercase tracking-widest">
-            <GitBranch size={16} /> 节点树
-          </h2>
-          <div className="flex gap-2">
-            <button 
-              onClick={() => {
-                setIsCreating(true);
-                setSelectedCardId(null);
-                setEditCard({
-                  kind: 'EARNINGS',
-                  symbols: [],
-                  tags: [],
-                  truth_payload: { impact: 0.1, direction: 'UP', intensity: 0.5, ttl_seconds: 3600 },
-                  activation_prob: 1.0,
-                  scenario_id: selectedScenarioId
-                });
+      {/* 2. 蓝图逻辑树 (Node Blueprint Editor Workspace) */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#020617', position: 'relative' }}>
+        
+        {/* 工具栏：控制缩放拉伸，以及快速添加节点 */}
+        <div style={{ height: '70px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#070a13', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', zIndex: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <GitBranch size={20} style={{ color: '#22d3ee' }} />
+              <span style={{ fontSize: '14px', fontWeight: '900', color: '#fff', letterSpacing: '1px' }}>SCENARIO_BLUEPRINT</span>
+            </div>
+            
+            {/* 横轴时间缩放滑块 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.02)', padding: '6px 16px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>TIMELINE_ZOOM:</span>
+              <input 
+                type="range" min="0.5" max="8.0" step="0.1"
+                style={{ width: '120px', accentColor: '#22d3ee' }}
+                value={timeScale}
+                onChange={e => setTimeScale(parseFloat(e.target.value))}
+              />
+              <span style={{ fontSize: '10px', color: '#22d3ee', fontWeight: 'bold', width: '35px', fontFamily: 'monospace' }}>x{Number(timeScale || 0).toFixed(1)}</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <button
+              onClick={handleCreateNewNode}
+              style={{
+                background: 'rgba(34, 211, 238, 0.1)',
+                border: '1px solid rgba(34, 211, 238, 0.3)',
+                color: '#22d3ee',
+                padding: '10px 20px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '900',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s'
               }}
-              className="p-1 hover:bg-slate-700 rounded text-cyan-400"
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(34, 211, 238, 0.2)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(34, 211, 238, 0.1)'}
             >
-              <Plus size={18} />
+              <Plus size={16} /> + INITIALIZE_NEW_BLOCK
             </button>
-            <button className="p-1 hover:bg-slate-700 rounded text-slate-500"><Download size={18} /></button>
           </div>
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-          {loading ? (
-            <div className="flex justify-center p-8 text-slate-600 animate-spin"><RefreshCw /></div>
-          ) : treeNodes.length === 0 ? (
-            <div className="p-8 text-center text-slate-600 text-[10px]">
-              此剧本尚无事件，点击上方 + 创建根节点
+
+        {/* 蓝图可视画板 */}
+        <div style={{ flex: 1, position: 'relative' }}>
+          {cards.length === 0 ? (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+              <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,255,255,0.02)', border: '2px dashed rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }}>
+                <GitBranch size={40} style={{ color: '#1e293b' }} />
+              </div>
+              <p style={{ fontSize: '12px', color: '#475569', textTransform: 'uppercase', letterSpacing: '2px', textAlign: 'center', lineHeight: '2' }}>
+                {selectedScenarioId ? `Sequence [${selectedScenarioId}] is void.` : "Select or create a scenario archive."}
+                <br /><span style={{ color: '#22d3ee' }}>Click 'INITIALIZE_NEW_BLOCK' to deploy the root node.</span>
+              </p>
             </div>
           ) : (
-            treeNodes.map(node => (
-              <TreeNode key={node.card_id} card={node} depth={0} />
-            ))
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onNodeClick={onNodeClick}
+              onNodeDragStop={onNodeDragStop}
+              onConnect={onConnect}
+              nodeTypes={nodeTypes}
+              fitView
+              attributionPosition="bottom-left"
+            >
+              <Background color="#0f172a" gap={24} size={1} />
+              <Controls />
+              <MiniMap style={{ background: '#0a0f1e' }} nodeColor={() => '#1e293b'} />
+            </ReactFlow>
           )}
         </div>
       </div>
 
-      {/* 主界面：高级编辑器 */}
-      <div className="flex-1 flex flex-col bg-slate-950 overflow-hidden">
-        {!selectedCardId && !isCreating ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-4">
-            <div className="w-24 h-24 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800 animate-pulse">
-              <Zap size={48} className="text-slate-800 shadow-[0_0_20px_rgba(255,255,255,0.05)]" />
+      {/* 3. 核心节点参数编辑器 (Node Inspector Sidebar) */}
+      <div style={{ width: '420px', borderLeft: '1px solid rgba(255,255,255,0.05)', background: '#0a0f1e', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        {!selectedCardId ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '24px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }}>
+              <Zap size={32} style={{ color: '#1e293b' }} />
             </div>
-            <p className="text-sm tracking-widest opacity-50 uppercase">Select or create a news node</p>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', fontWeight: '900', letterSpacing: '4px', color: '#1e293b', textTransform: 'uppercase', marginBottom: '8px' }}>NO_NODE_SELECTED</div>
+              <div style={{ fontSize: '10px', color: '#334155', letterSpacing: '1px', textTransform: 'uppercase' }}>Select a blueprint node to access protected parameters</div>
+            </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col">
-            <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h1 className="text-2xl font-black text-white flex items-center gap-3">
-                    {isCreating ? 'NEW_NODE_CONSTRUCTION' : 'NODE_PARAMETER_TUNING'}
-                    {editCard.kind && (
-                      <span className="text-xs px-2 py-1 bg-cyan-900/30 text-cyan-400 border border-cyan-500/30 rounded">
-                        {editCard.kind}
-                      </span>
-                    )}
-                  </h1>
-                  <p className="text-slate-500 text-xs mt-2 uppercase tracking-tighter">
-                    {editCard.card_id || 'Generating unique cryptographic signature...'}
-                  </p>
-                </div>
-                <div className="flex gap-4">
-                  <button 
-                    onClick={handleSaveCard}
-                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all uppercase text-xs font-bold"
-                  >
-                    <Save size={18} /> Commit Changes
-                  </button>
-                  <button className="p-2.5 border border-slate-800 hover:border-red-500/50 hover:bg-red-500/10 text-slate-600 hover:text-red-400 rounded transition-all">
-                    <Trash2 size={18} />
-                  </button>
-                </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            
+            {/* Inspector Header */}
+            <div style={{ padding: '32px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(15, 23, 42, 0.4)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#22d3ee', boxShadow: '0 0 10px rgba(34, 211, 238, 0.6)', transform: 'rotate(45deg)' }} />
+                <span style={{ fontSize: '10px', color: 'rgba(34, 211, 238, 0.8)', fontWeight: '900', letterSpacing: '2px', fontFamily: 'monospace' }}>NODE_INSPECTOR</span>
               </div>
-
-              <div className="grid grid-cols-12 gap-8">
-                {/* 左列：基础 */}
-                <div className="col-span-7 space-y-6">
-                  <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-lg space-y-6">
-                    <h3 className="text-xs font-bold text-slate-400 border-b border-slate-800 pb-4 flex items-center gap-2">
-                      <Settings size={14} /> CORE_ATTRIBUTES
-                    </h3>
-                    
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-slate-500 uppercase">Event Kind</label>
-                        <select 
-                          className="w-full bg-slate-950 border border-slate-800 rounded py-2 px-3 text-sm focus:border-cyan-500 outline-none"
-                          value={editCard.kind}
-                          onChange={e => setEditCard({...editCard, kind: e.target.value})}
-                        >
-                          {Object.keys(presets).map(k => <option key={k} value={k}>{k}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-slate-500 uppercase">Target Symbols</label>
-                        <input 
-                          type="text" placeholder="BTC, ETH..."
-                          className="w-full bg-slate-950 border border-slate-800 rounded py-2 px-3 text-sm focus:border-cyan-500 outline-none placeholder:text-slate-800"
-                          value={editCard.symbols?.join(', ')}
-                          onChange={e => setEditCard({...editCard, symbols: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] text-slate-500 uppercase">Visual Identity (Image URI)</label>
-                      <div className="relative">
-                        <ImageIcon size={14} className="absolute left-3 top-3 text-slate-700" />
-                        <input 
-                          type="text" placeholder="https://cdn.os.ifrontier.ai/assets/..."
-                          className="w-full bg-slate-950 border border-slate-800 rounded py-2 pl-10 pr-3 text-sm focus:border-cyan-500 outline-none"
-                          value={editCard.image_uri || ''}
-                          onChange={e => setEditCard({...editCard, image_uri: e.target.value})}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-lg space-y-6">
-                    <h3 className="text-xs font-bold text-slate-400 border-b border-slate-800 pb-4 flex items-center gap-2">
-                      <Zap size={14} /> TRUTH_PAYLOAD (MARKET_IMPACT)
-                    </h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-slate-500 uppercase">Impact Factor</label>
-                        <input 
-                          type="number" step="0.01" min="-1" max="1"
-                          className="w-full bg-slate-950 border border-slate-800 rounded py-2 px-3 text-sm focus:border-cyan-500 outline-none"
-                          value={editCard.truth_payload?.impact || 0}
-                          onChange={e => setEditCard({...editCard, truth_payload: {...editCard.truth_payload, impact: parseFloat(e.target.value)}})}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-slate-500 uppercase">Intensity</label>
-                        <input 
-                          type="number" step="0.1" min="0" max="1"
-                          className="w-full bg-slate-950 border border-slate-800 rounded py-2 px-3 text-sm focus:border-cyan-500 outline-none"
-                          value={editCard.truth_payload?.intensity || 0.5}
-                          onChange={e => setEditCard({...editCard, truth_payload: {...editCard.truth_payload, intensity: parseFloat(e.target.value)}})}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-slate-500 uppercase">Bias Direction</label>
-                        <select 
-                          className="w-full bg-slate-950 border border-slate-800 rounded py-2 px-3 text-sm focus:border-cyan-500 outline-none"
-                          value={editCard.truth_payload?.direction || 'STABLE'}
-                          onChange={e => setEditCard({...editCard, truth_payload: {...editCard.truth_payload, direction: e.target.value}})}
-                        >
-                          <option value="UP">BULLISH (UP)</option>
-                          <option value="DOWN">BEARISH (DOWN)</option>
-                          <option value="STABLE">STABLE</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 右列：逻辑 */}
-                <div className="col-span-5 space-y-6">
-                   <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-lg space-y-6">
-                    <h3 className="text-xs font-bold text-slate-400 border-b border-slate-800 pb-4 flex items-center gap-2">
-                      <GitBranch size={14} /> SEQUENCING_LOGIC
-                    </h3>
-                    <div className="space-y-4">
-                       <div className="space-y-2">
-                        <label className="text-[10px] text-slate-500 uppercase">Success Probability (0.0 - 1.0)</label>
-                        <div className="flex items-center gap-4">
-                          <input 
-                            type="range" min="0" max="1" step="0.1"
-                            className="flex-1 accent-indigo-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
-                            value={editCard.activation_prob || 0}
-                            onChange={e => setEditCard({...editCard, activation_prob: parseFloat(e.target.value)})}
-                          />
-                          <span className="text-indigo-400 text-xs font-bold w-8">{Math.round((editCard.activation_prob || 0) * 100)}%</span>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-slate-500 uppercase">Scheduled Release (T+N)</label>
-                        <div className="relative">
-                          <Clock size={14} className="absolute left-3 top-3 text-slate-700" />
-                          <input 
-                            type="datetime-local"
-                            className="w-full bg-slate-950 border border-slate-800 rounded py-2 pl-10 pr-3 text-xs focus:border-indigo-500 outline-none"
-                            value={editCard.scheduled_at?.slice(0, 16) || ''}
-                            onChange={e => setEditCard({...editCard, scheduled_at: e.target.value})}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-slate-500 uppercase">Scenario Metadata</label>
-                        <div className="text-[10px] bg-slate-950 border border-slate-800 rounded p-2 text-slate-500 italic">
-                           Scenario ID: {editCard.scenario_id || 'STANDALONE_EVENT'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-lg space-y-4">
-                    <div className="flex gap-2 p-3 bg-amber-500/5 border border-amber-500/20 rounded-md">
-                       <AlertTriangle className="text-amber-500 shrink-0" size={16} />
-                       <div className="text-[10px] text-amber-500/70 leading-relaxed">
-                          DESIGNER_WARNING: Modifying logic nodes will affect all downstream triggers in this tree branch. Ensure consistency before committing.
-                       </div>
-                    </div>
-                  </div>
+              <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#fff', margin: 0, letterSpacing: '-0.5px' }}>
+                EDIT_PARAMETERS
+              </h1>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                <div style={{ padding: '4px 10px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '4px', fontSize: '10px', fontFamily: 'monospace', color: '#64748b' }}>
+                  UID: <span style={{ color: '#94a3b8' }}>{editCard.card_id?.split('-')[0].toUpperCase()}</span>
                 </div>
               </div>
             </div>
 
-            {/* 变体与新闻链部分 */}
-            {selectedCardId && !isCreating && (
-              <section className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xl font-bold text-cyan-400 flex items-center gap-2">
-                    <Book size={22} /> 信号内容与变体 (Signal Text Variants)
-                  </h3>
+            {/* Inspector Body (Scrollable) */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+              
+              {/* 1. Core Config */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '24px', borderRadius: '12px' }}>
+                <h3 style={{ fontSize: '10px', fontWeight: '900', color: '#475569', letterSpacing: '2px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <Settings size={14} /> 01_CORE_ATTRIBUTES
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>INTERNAL_BLOCK_LABEL</label>
+                    <input 
+                      type="text" placeholder="EX: MAJOR_BREAKTHROUGH"
+                      style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '10px', color: '#fff', fontSize: '13px', outline: 'none', fontFamily: 'monospace' }}
+                      value={editCard.text || ''}
+                      onChange={e => setEditCard({...editCard, text: e.target.value})}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>EVENT_CLASSIFICATION</label>
+                    <select 
+                      style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '10px', color: '#fff', fontSize: '13px', outline: 'none' }}
+                      value={editCard.kind}
+                      onChange={e => setEditCard({...editCard, kind: e.target.value})}
+                    >
+                      {Object.keys(presets).map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>TARGET_VECTORS (SYMBOLS)</label>
+                    <input 
+                      type="text" placeholder="EX: CIVILBANK, NEURALINK"
+                      style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '10px', color: '#fff', fontSize: '13px', outline: 'none', fontFamily: 'monospace' }}
+                      value={editCard.symbols?.join(', ')}
+                      onChange={e => setEditCard({...editCard, symbols: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>IMAGE_RESOURCE_URI</label>
+                    <div style={{ position: 'relative' }}>
+                      <ImageIcon size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: '#334155' }} />
+                      <input 
+                        type="text" placeholder="HTTPS://ASSETS.FRONTIER.AI/HASH_ID..."
+                        style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '10px 10px 10px 32px', color: '#fff', fontSize: '13px', outline: 'none', fontFamily: 'monospace' }}
+                        value={editCard.image_uri || ''}
+                        onChange={e => setEditCard({...editCard, image_uri: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Timing and Dependency */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '24px', borderRadius: '12px' }}>
+                <h3 style={{ fontSize: '10px', fontWeight: '900', color: '#475569', letterSpacing: '2px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <Clock size={14} /> 02_TIMING_AND_DEPENDENCY
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>SCHEDULED_PATCH_TIME</label>
+                    <input 
+                      type="datetime-local"
+                      style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '10px', color: '#fff', fontSize: '13px', outline: 'none', fontFamily: 'monospace' }}
+                      value={editCard.scheduled_at?.slice(0, 16) || ''}
+                      onChange={e => setEditCard({...editCard, scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : null})}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>ACTIVATION_PROBABILITY</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(0,0,0,0.4)', padding: '8px 12px', borderRadius: '6px' }}>
+                      <input 
+                        type="range" min="0" max="1" step="0.1"
+                        style={{ flex: 1, accentColor: '#818cf8' }}
+                        value={editCard.activation_prob || 0}
+                        onChange={e => setEditCard({...editCard, activation_prob: parseFloat(e.target.value)})}
+                      />
+                      <span style={{ fontSize: '14px', fontWeight: '900', color: '#818cf8', fontFamily: 'monospace' }}>{Math.round((editCard.activation_prob || 0) * 100)}%</span>
+                    </div>
+                  </div>
+
+                  {editCard.parent_card_id && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>DEPENDS_ON_PARENT_BLOCK</label>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(34, 211, 238, 0.05)', border: '1px solid rgba(34, 211, 238, 0.15)', padding: '10px', borderRadius: '6px' }}>
+                        <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#22d3ee' }}>
+                          BLOCK: {editCard.parent_card_id.split('-')[0].toUpperCase()}
+                        </span>
+                        <button 
+                          onClick={handleRemoveParent}
+                          style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '11px', cursor: 'pointer', fontFamily: 'monospace' }}
+                        >
+                          [UNLINK]
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. Market Payload */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '24px', borderRadius: '12px' }}>
+                <h3 style={{ fontSize: '10px', fontWeight: '900', color: '#475569', letterSpacing: '2px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <Zap size={14} /> 03_MARKET_IMPACT_PAYLOAD
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '10px', color: '#22d3ee', fontWeight: '900' }}>IMPACT_MAGNITUDE</label>
+                    <input 
+                      type="range" step="0.01" min="-1" max="1"
+                      style={{ width: '100%', accentColor: '#22d3ee' }}
+                      value={editCard.truth_payload?.impact || 0}
+                      onChange={e => setEditCard({...editCard, truth_payload: {...editCard.truth_payload, impact: parseFloat(e.target.value)}})}
+                    />
+                    <div style={{ fontSize: '14px', fontWeight: '900', color: '#fff', fontFamily: 'monospace', textAlign: 'center' }}>
+                      {Number(editCard.truth_payload?.impact || 0).toFixed(2)}
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '10px', color: '#22d3ee', fontWeight: '900' }}>SIGNAL_INTENSITY</label>
+                    <input 
+                      type="range" step="0.1" min="0" max="1"
+                      style={{ width: '100%', accentColor: '#22d3ee' }}
+                      value={editCard.truth_payload?.intensity || 0.5}
+                      onChange={e => setEditCard({...editCard, truth_payload: {...editCard.truth_payload, intensity: parseFloat(e.target.value)}})}
+                    />
+                    <div style={{ fontSize: '14px', fontWeight: '900', color: '#fff', fontFamily: 'monospace', textAlign: 'center' }}>
+                      {Number(editCard.truth_payload?.intensity || 0.5).toFixed(1)}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
-                  <label className="block text-xs text-slate-400 mb-2 uppercase tracking-wider">编写新文本变体 (New Content)</label>
-                  <textarea 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-md py-3 px-4 focus:outline-none focus:border-cyan-500 text-slate-200 min-h-[100px] text-sm leading-relaxed"
-                    placeholder="在这里输入新闻文案，它是最终玩家看到的内容..."
-                    id="new-variant-text"
-                  />
-                  <div className="flex justify-end mt-4">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '10px', color: '#22d3ee', fontWeight: '900' }}>BIAS_DIRECTION</label>
+                  <select 
+                    style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '10px', color: '#fff', fontSize: '13px', outline: 'none' }}
+                    value={editCard.truth_payload?.direction || 'STABLE'}
+                    onChange={e => setEditCard({...editCard, truth_payload: {...editCard.truth_payload, direction: e.target.value}})}
+                  >
+                    <option value="UP">BULLISH (▲)</option>
+                    <option value="DOWN">BEARISH (▼)</option>
+                    <option value="STABLE">STABLE (—)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* 4. Text Variant Area */}
+              <div style={{ background: 'rgba(10, 17, 34, 0.8)', border: '1px solid rgba(255,255,255,0.06)', padding: '24px', borderRadius: '12px', display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ fontSize: '10px', fontWeight: '900', color: '#22d3ee', letterSpacing: '2px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <Book size={14} /> 04_SIGNAL_VARIANTS
+                </h3>
+                <div style={{ position: 'relative', marginBottom: '20px' }}>
+                   <textarea 
+                      id="new-variant-text"
+                      placeholder="ENTER_NEW_SIGNAL_TEXT..."
+                      style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '12px', color: '#fff', fontSize: '13px', outline: 'none', minHeight: '100px', resize: 'none', lineHeight: '1.5' }}
+                    />
                     <button 
                       onClick={() => {
                         const area = document.getElementById('new-variant-text') as HTMLTextAreaElement;
-                        if (area && area.value) handleEmitVariant(area.value);
+                        if (area && area.value) {
+                          handleEmitVariant(area.value);
+                          area.value = '';
+                        }
                       }}
-                      className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-md font-bold transition-all shadow-[0_0_15px_rgba(79,70,229,0.3)]"
+                      style={{ position: 'absolute', bottom: '12px', right: '12px', padding: '6px 14px', background: 'rgba(34, 211, 238, 0.1)', border: '1px solid rgba(34, 211, 238, 0.3)', borderRadius: '4px', color: '#22d3ee', fontWeight: '900', fontSize: '10px', cursor: 'pointer', letterSpacing: '1px' }}
                     >
-                      <Plus size={18} /> 保存文本变体
+                      + DEPLOY
                     </button>
-                  </div>
                 </div>
 
-                <div className="space-y-4">
-                  {variants.length === 0 ? (
-                    <div className="p-8 border-2 border-dashed border-slate-800 rounded-xl text-center text-slate-600">
-                      该节点目前为空壳（无文本）。请在上方为其编写具体的显示内容。
-                    </div>
-                  ) : (
-                    variants.map((v, i) => (
-                      <div key={v.variant_id} className="relative group">
-                        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-cyan-500/50 transition-all flex gap-4 items-start group shadow-lg">
-                          <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
-                            <span className="text-cyan-400 font-bold">{variants.length - i}</span>
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="text-[10px] font-mono text-slate-500">VAR_ID: {v.variant_id.split('-')[0]}...</span>
-                            </div>
-                            <p className="text-slate-200 text-sm leading-relaxed mb-4">{v.text}</p>
-                          </div>
-                        </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto', scrollbarWidth: 'none' }}>
+                  {variants.map((v, i) => (
+                    <div key={v.variant_id} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.04)', padding: '12px', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                         <span style={{ fontSize: '9px', color: '#22d3ee', fontWeight: '900' }}>SIGNAL_#{variants.length - i}</span>
+                         <span style={{ fontSize: '9px', color: '#334155', fontFamily: 'monospace' }}>ID: {v.variant_id.split('-')[0].toUpperCase()}</span>
                       </div>
-                    ))
+                      <p style={{ fontSize: '13px', color: '#cbd5e1', margin: 0, lineHeight: '1.5', fontStyle: 'italic' }}>"{v.text}"</p>
+                    </div>
+                  ))}
+                  {variants.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#1e293b', fontSize: '10px', border: '1px dashed rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                      NO_SIGNAL_VARIANTS_INITIALIZED
+                    </div>
                   )}
                 </div>
-              </section>
-            )}
+              </div>
+
+            </div>
+
+            {/* Inspector Commit Actions */}
+            <div style={{ padding: '20px 24px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '12px', background: '#070a13' }}>
+              <button 
+                onClick={handleSaveCard}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  background: '#4f46e5',
+                  border: '1px solid rgba(129, 140, 248, 0.4)',
+                  color: '#fff',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '900',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  letterSpacing: '1px'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#6366f1'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#4f46e5'}
+              >
+                {loading ? <RefreshCw size={14} style={{ animation: 'spin 2s linear infinite' }} /> : <Save size={14} />}
+                COMMIT_TO_STREAMS
+              </button>
+            </div>
+
           </div>
         )}
       </div>
+
     </div>
   );
 };
