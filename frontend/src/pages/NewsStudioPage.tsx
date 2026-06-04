@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
-  Image as ImageIcon, 
   Save, 
   Zap,
   RefreshCw,
@@ -54,60 +53,58 @@ interface Scenario {
   name: string;
 }
 
-// 1. 自定义节点组件（符合游戏赛博/终端美术设计风格）
+// 1. 自定义节点组件（符合游戏整体 Slate/Blue 风格）
 const CyberNewsNode = ({ data, selected }: any) => {
   const card = data.card;
   const isSelected = selected;
   
   const kindColors: Record<string, string> = {
-    EARNINGS: '#4ade80',
-    MILITARY: '#f87171',
-    DEFAULT: '#60a5fa'
+    EARNINGS: '#10b981', // green
+    MILITARY: '#ef4444', // red
+    DEFAULT: '#3b82f6'  // blue
   };
   const color = kindColors[card.kind] || kindColors.DEFAULT;
 
   return (
     <div style={{
-      padding: '14px',
-      borderRadius: '8px',
-      background: isSelected ? 'rgba(34, 211, 238, 0.16)' : 'rgba(10, 15, 30, 0.85)',
-      border: `2px solid ${isSelected ? '#22d3ee' : 'rgba(59, 130, 246, 0.25)'}`,
-      boxShadow: isSelected ? '0 0 25px rgba(34, 211, 238, 0.4)' : '0 4px 12px rgba(0,0,0,0.5)',
-      color: '#fff',
+      padding: '12px',
+      borderRadius: '2px',
+      background: isSelected ? '#1e293b' : '#0f172a',
+      border: `1px solid ${isSelected ? '#3b82f6' : '#334155'}`,
+      boxShadow: isSelected ? '0 0 10px rgba(59, 130, 246, 0.3)' : 'none',
+      color: '#f1f5f9',
       width: '180px',
-      fontFamily: 'monospace',
-      backdropFilter: 'blur(8px)',
+      fontFamily: 'inherit',
       position: 'relative'
     }}>
-      <Handle type="target" position={Position.Left} style={{ background: '#22d3ee', width: 8, height: 8 }} />
+      <Handle type="target" position={Position.Left} style={{ background: '#3b82f6', width: 6, height: 6, borderRadius: 0 }} />
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
         <span style={{
-          fontSize: '8px',
-          padding: '2px 6px',
-          borderRadius: '3px',
-          background: `${color}20`,
-          border: `1px solid ${color}50`,
+          fontSize: '9px',
+          padding: '1px 4px',
+          borderRadius: '1px',
+          background: 'rgba(0,0,0,0.3)',
+          border: `1px solid ${color}`,
           color: color,
           fontWeight: 'bold',
           textTransform: 'uppercase'
         }}>
           {card.kind}
         </span>
-        <span style={{ fontSize: '10px', color: '#475569' }}>
+        <span style={{ fontSize: '10px', color: '#64748b' }}>
           T+{data.offsetSeconds}s
         </span>
       </div>
       
       <div style={{ 
         fontSize: '12px', 
-        fontWeight: '900', 
+        fontWeight: '600', 
         overflow: 'hidden', 
         textOverflow: 'ellipsis', 
         whiteSpace: 'nowrap', 
         marginBottom: '4px',
-        color: '#fff',
-        letterSpacing: '0.5px'
+        color: '#f1f5f9'
       }}>
         {card.text || `BLOCK_${card.card_id.split('-')[0].toUpperCase()}`}
       </div>
@@ -116,7 +113,7 @@ const CyberNewsNode = ({ data, selected }: any) => {
         {card.symbols?.join(', ') || 'NO_SYMBOLS'}
       </div>
 
-      <Handle type="source" position={Position.Right} style={{ background: '#22d3ee', width: 8, height: 8 }} />
+      <Handle type="source" position={Position.Right} style={{ background: '#3b82f6', width: 6, height: 6, borderRadius: 0 }} />
     </div>
   );
 };
@@ -405,53 +402,32 @@ const NewsStudioPage: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#020617', color: '#cbd5e1', overflow: 'hidden', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#0f172a', color: '#e2e8f0', overflow: 'hidden' }}>
       
       {/* 1. 剧本库 (Scenario Library) */}
-      <div style={{ width: '300px', borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', background: '#0a0f1e', flexShrink: 0 }}>
-        <div style={{ padding: '40px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <div style={{ width: '280px', borderRight: '1px solid #334155', display: 'flex', flexDirection: 'column', background: '#1e293b', flexShrink: 0 }}>
+        <div style={{ padding: '24px', borderBottom: '1px solid #334155' }}>
           <button 
             onClick={() => nav('/')}
+            className="cyber-button"
             style={{ 
               width: '100%', 
-              padding: '14px', 
-              background: 'rgba(59, 130, 246, 0.06)', 
-              border: '1px solid rgba(59, 130, 246, 0.25)', 
-              borderRadius: '8px', 
-              color: '#60a5fa', 
-              fontSize: '12px', 
-              fontWeight: '900', 
-              letterSpacing: '3px',
-              cursor: 'pointer',
-              marginBottom: '40px',
-              transition: 'all 0.3s ease',
+              padding: '8px', 
+              marginBottom: '24px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '10px',
-              textTransform: 'uppercase'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
-              e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
-              e.currentTarget.style.color = '#fff';
-              e.currentTarget.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.06)';
-              e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.25)';
-              e.currentTarget.style.color = '#60a5fa';
-              e.currentTarget.style.boxShadow = 'none';
+              gap: '8px'
             }}
           >
-            <ArrowRight size={16} style={{ transform: 'rotate(180deg)' }} /> EXIT_TO_SYSTEM
+            <ArrowRight size={14} style={{ transform: 'rotate(180deg)' }} /> EXIT_TO_SYSTEM
           </button>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: '11px', color: '#818cf8', fontWeight: '900', letterSpacing: '3px', marginBottom: '6px', fontFamily: 'monospace' }}>DATA_ARCHIVE</div>
-              <h2 style={{ fontSize: '20px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '12px', color: '#fff', margin: 0, letterSpacing: '-0.5px' }}>
-                <Book size={24} style={{ color: '#818cf8' }} /> SCENARIOS
+              <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', marginBottom: '4px' }}>DATA ARCHIVE</div>
+              <h2 style={{ fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', color: '#f1f5f9', margin: 0 }}>
+                <Book size={20} style={{ color: '#3b82f6' }} /> Scenarios
               </h2>
             </div>
             <button 
@@ -459,67 +435,63 @@ const NewsStudioPage: React.FC = () => {
                 const name = prompt('NEW SCENARIO IDENTIFIER:');
                 if (name) setSelectedScenarioId(name.toUpperCase());
               }}
-              style={{ background: 'rgba(129, 140, 248, 0.15)', border: '1px solid rgba(129, 140, 248, 0.3)', borderRadius: '8px', padding: '10px', color: '#818cf8', cursor: 'pointer', transition: 'all 0.2s' }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(129, 140, 248, 0.25)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(129, 140, 248, 0.15)'}
+              className="cyber-button"
+              style={{ padding: '6px' }}
             >
-              <Plus size={20} />
+              <Plus size={18} />
             </button>
           </div>
         </div>
 
-        <div style={{ padding: '24px' }}>
-          <div style={{ position: 'relative', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', right: '14px', top: '14px', color: '#334155' }}>
-              <RefreshCw size={14} />
-            </div>
+        <div style={{ padding: '16px' }}>
+          <div style={{ position: 'relative' }}>
             <input 
-              type="text" placeholder="FILTER_DB_BLUEPRINTS..." 
-              style={{ width: '100%', background: 'rgba(0,0,0,0.5)', border: 'none', padding: '14px 18px', fontSize: '12px', outline: 'none', color: '#fff', fontFamily: 'monospace' }}
+              type="text" placeholder="Filter scenarios..." 
+              className="cyber-input"
+              style={{ width: '100%', paddingRight: '32px' }}
               value={scenarioFilter}
               onChange={(e) => setScenarioFilter(e.target.value)}
             />
+            <div style={{ position: 'absolute', right: '10px', top: '7px', color: '#475569' }}>
+              <RefreshCw size={14} />
+            </div>
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 32px 24px', scrollbarWidth: 'none' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 24px 16px', scrollbarWidth: 'none' }}>
           <div 
             onClick={() => setSelectedScenarioId(null)}
             style={{
-              padding: '16px 20px',
-              borderRadius: '10px',
+              padding: '10px 12px',
+              borderRadius: '2px',
               cursor: 'pointer',
               fontSize: '13px',
-              fontWeight: '900',
-              marginBottom: '12px',
-              transition: 'all 0.2s',
-              background: selectedScenarioId === null ? 'rgba(129, 140, 248, 0.15)' : 'transparent',
-              border: `1px solid ${selectedScenarioId === null ? 'rgba(129, 140, 248, 0.5)' : 'transparent'}`,
-              color: selectedScenarioId === null ? '#fff' : '#475569',
-              letterSpacing: '1px'
+              marginBottom: '8px',
+              transition: 'all 0.1s',
+              background: selectedScenarioId === null ? '#334155' : 'transparent',
+              border: `1px solid ${selectedScenarioId === null ? '#3b82f6' : 'transparent'}`,
+              color: selectedScenarioId === null ? '#fff' : '#94a3b8'
             }}
           >
-            {'>'} UNLINKED_RECORDS
+            Unlinked Records
           </div>
           
-          <div style={{ margin: '40px 0 20px 0', fontSize: '11px', color: '#1e293b', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '4px', paddingLeft: '10px', borderLeft: '2px solid #1e293b' }}>Archives</div>
+          <div style={{ margin: '24px 0 12px 0', fontSize: '11px', color: '#475569', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>Archives</div>
           
           {scenarios.filter(s => s.name.toLowerCase().includes(scenarioFilter.toLowerCase())).map(s => (
             <div 
               key={s.id}
               onClick={() => setSelectedScenarioId(s.id)}
               style={{
-                padding: '16px 20px',
-                borderRadius: '10px',
+                padding: '10px 12px',
+                borderRadius: '2px',
                 cursor: 'pointer',
                 fontSize: '13px',
-                fontWeight: 'bold',
-                marginBottom: '8px',
-                transition: 'all 0.2s',
-                background: selectedScenarioId === s.id ? 'rgba(129, 140, 248, 0.15)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${selectedScenarioId === s.id ? 'rgba(129, 140, 248, 0.5)' : 'transparent'}`,
-                color: selectedScenarioId === s.id ? '#fff' : '#94a3b8',
-                letterSpacing: '0.5px'
+                marginBottom: '4px',
+                transition: 'all 0.1s',
+                background: selectedScenarioId === s.id ? '#334155' : 'transparent',
+                border: `1px solid ${selectedScenarioId === s.id ? '#3b82f6' : 'transparent'}`,
+                color: selectedScenarioId === s.id ? '#fff' : '#94a3b8'
               }}
             >
               {s.name}
@@ -529,64 +501,47 @@ const NewsStudioPage: React.FC = () => {
       </div>
 
       {/* 2. 蓝图逻辑树 (Node Blueprint Editor Workspace) */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#020617', position: 'relative' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0f172a', position: 'relative' }}>
         
-        {/* 工具栏：控制缩放拉伸，以及快速添加节点 */}
-        <div style={{ height: '70px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#070a13', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', zIndex: 10 }}>
+        {/* 工具栏 */}
+        <div style={{ height: '60px', borderBottom: '1px solid #334155', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', zIndex: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <GitBranch size={20} style={{ color: '#22d3ee' }} />
-              <span style={{ fontSize: '14px', fontWeight: '900', color: '#fff', letterSpacing: '1px' }}>SCENARIO_BLUEPRINT</span>
+              <GitBranch size={18} style={{ color: '#3b82f6' }} />
+              <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#f1f5f9' }}>BLUEPRINT EDITOR</span>
             </div>
             
-            {/* 横轴时间缩放滑块 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.02)', padding: '6px 16px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>TIMELINE_ZOOM:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '11px', color: '#64748b' }}>Zoom:</span>
               <input 
                 type="range" min="0.5" max="8.0" step="0.1"
-                style={{ width: '120px', accentColor: '#22d3ee' }}
+                style={{ width: '100px', accentColor: '#3b82f6' }}
                 value={timeScale}
                 onChange={e => setTimeScale(parseFloat(e.target.value))}
               />
-              <span style={{ fontSize: '10px', color: '#22d3ee', fontWeight: 'bold', width: '35px', fontFamily: 'monospace' }}>x{Number(timeScale || 0).toFixed(1)}</span>
+              <span style={{ fontSize: '11px', color: '#3b82f6', fontWeight: 'bold', width: '30px' }}>x{Number(timeScale || 0).toFixed(1)}</span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <button
-              onClick={handleCreateNewNode}
-              style={{
-                background: 'rgba(34, 211, 238, 0.1)',
-                border: '1px solid rgba(34, 211, 238, 0.3)',
-                color: '#22d3ee',
-                padding: '10px 20px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: '900',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(34, 211, 238, 0.2)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(34, 211, 238, 0.1)'}
-            >
-              <Plus size={16} /> + INITIALIZE_NEW_BLOCK
-            </button>
-          </div>
+          <button
+            onClick={handleCreateNewNode}
+            className="cyber-button active"
+            style={{ padding: '6px 16px' }}
+          >
+            <Plus size={16} /> New Block
+          </button>
         </div>
 
         {/* 蓝图可视画板 */}
         <div style={{ flex: 1, position: 'relative' }}>
           {cards.length === 0 ? (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
-              <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,255,255,0.02)', border: '2px dashed rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }}>
-                <GitBranch size={40} style={{ color: '#1e293b' }} />
+              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#1e293b', border: '1px dashed #334155', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
+                <GitBranch size={32} style={{ color: '#334155' }} />
               </div>
-              <p style={{ fontSize: '12px', color: '#475569', textTransform: 'uppercase', letterSpacing: '2px', textAlign: 'center', lineHeight: '2' }}>
-                {selectedScenarioId ? `Sequence [${selectedScenarioId}] is void.` : "Select or create a scenario archive."}
-                <br /><span style={{ color: '#22d3ee' }}>Click 'INITIALIZE_NEW_BLOCK' to deploy the root node.</span>
+              <p style={{ fontSize: '13px', color: '#475569', textAlign: 'center' }}>
+                {selectedScenarioId ? `Scenario [${selectedScenarioId}] is empty.` : "Select a scenario to begin."}
+                <br /><span style={{ color: '#3b82f6' }}>Click 'New Block' to start the sequence.</span>
               </p>
             </div>
           ) : (
@@ -602,68 +557,66 @@ const NewsStudioPage: React.FC = () => {
               fitView
               attributionPosition="bottom-left"
             >
-              <Background color="#0f172a" gap={24} size={1} />
-              <Controls />
-              <MiniMap style={{ background: '#0a0f1e' }} nodeColor={() => '#1e293b'} />
+              <Background color="#1e293b" gap={20} size={1} />
+              <Controls style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '2px' }} />
+              <MiniMap style={{ background: '#0f172a', border: '1px solid #334155' }} nodeColor={() => '#1e293b'} maskColor="rgba(15, 23, 42, 0.7)" />
             </ReactFlow>
           )}
         </div>
       </div>
 
       {/* 3. 核心节点参数编辑器 (Node Inspector Sidebar) */}
-      <div style={{ width: '420px', borderLeft: '1px solid rgba(255,255,255,0.05)', background: '#0a0f1e', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <div style={{ width: '400px', borderLeft: '1px solid #334155', background: '#1e293b', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         {!selectedCardId ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
-            <div style={{ width: '80px', height: '80px', borderRadius: '24px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }}>
-              <Zap size={32} style={{ color: '#1e293b' }} />
-            </div>
+            <Zap size={48} style={{ color: '#0f172a', marginBottom: '16px' }} />
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', fontWeight: '900', letterSpacing: '4px', color: '#1e293b', textTransform: 'uppercase', marginBottom: '8px' }}>NO_NODE_SELECTED</div>
-              <div style={{ fontSize: '10px', color: '#334155', letterSpacing: '1px', textTransform: 'uppercase' }}>Select a blueprint node to access protected parameters</div>
+              <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>No Node Selected</div>
+              <div style={{ fontSize: '11px', color: '#64748b' }}>Select a node to edit its parameters</div>
             </div>
           </div>
         ) : (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             
             {/* Inspector Header */}
-            <div style={{ padding: '32px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(15, 23, 42, 0.4)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#22d3ee', boxShadow: '0 0 10px rgba(34, 211, 238, 0.6)', transform: 'rotate(45deg)' }} />
-                <span style={{ fontSize: '10px', color: 'rgba(34, 211, 238, 0.8)', fontWeight: '900', letterSpacing: '2px', fontFamily: 'monospace' }}>NODE_INSPECTOR</span>
+            <div style={{ padding: '24px', borderBottom: '1px solid #334155', background: 'rgba(0,0,0,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ width: '6px', height: '6px', background: '#3b82f6' }} />
+                <span style={{ fontSize: '10px', color: '#3b82f6', fontWeight: 'bold', letterSpacing: '1px' }}>INSPECTOR</span>
               </div>
-              <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#fff', margin: 0, letterSpacing: '-0.5px' }}>
-                EDIT_PARAMETERS
+              <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: '#f1f5f9', margin: 0 }}>
+                Block Parameters
               </h1>
-              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                <div style={{ padding: '4px 10px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '4px', fontSize: '10px', fontFamily: 'monospace', color: '#64748b' }}>
-                  UID: <span style={{ color: '#94a3b8' }}>{editCard.card_id?.split('-')[0].toUpperCase()}</span>
-                </div>
+              <div style={{ marginTop: '12px' }}>
+                <span style={{ padding: '2px 6px', background: '#0f172a', border: '1px solid #334155', borderRadius: '2px', fontSize: '10px', color: '#64748b' }}>
+                  ID: {editCard.card_id?.split('-')[0].toUpperCase()}
+                </span>
               </div>
             </div>
 
-            {/* Inspector Body (Scrollable) */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            {/* Inspector Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
               
-              {/* 1. Core Config */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '24px', borderRadius: '12px' }}>
-                <h3 style={{ fontSize: '10px', fontWeight: '900', color: '#475569', letterSpacing: '2px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                   <Settings size={14} /> 01_CORE_ATTRIBUTES
+              {/* 1. Attributes */}
+              <div className="cyber-card">
+                <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <Settings size={14} /> CORE ATTRIBUTES
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>INTERNAL_BLOCK_LABEL</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '11px', color: '#94a3b8' }}>Block Label</label>
                     <input 
-                      type="text" placeholder="EX: MAJOR_BREAKTHROUGH"
-                      style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '10px', color: '#fff', fontSize: '13px', outline: 'none', fontFamily: 'monospace' }}
+                      type="text" placeholder="Internal name..."
+                      className="cyber-input"
                       value={editCard.text || ''}
                       onChange={e => setEditCard({...editCard, text: e.target.value})}
                     />
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>EVENT_CLASSIFICATION</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '11px', color: '#94a3b8' }}>Classification</label>
                     <select 
-                      style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '10px', color: '#fff', fontSize: '13px', outline: 'none' }}
+                      className="cyber-input"
                       value={editCard.kind}
                       onChange={e => setEditCard({...editCard, kind: e.target.value})}
                     >
@@ -671,72 +624,67 @@ const NewsStudioPage: React.FC = () => {
                     </select>
                   </div>
                   
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>TARGET_VECTORS (SYMBOLS)</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '11px', color: '#94a3b8' }}>Symbols</label>
                     <input 
-                      type="text" placeholder="EX: CIVILBANK, NEURALINK"
-                      style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '10px', color: '#fff', fontSize: '13px', outline: 'none', fontFamily: 'monospace' }}
+                      type="text" placeholder="CIVILBANK, NEURALINK..."
+                      className="cyber-input"
                       value={editCard.symbols?.join(', ')}
                       onChange={e => setEditCard({...editCard, symbols: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})}
                     />
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>IMAGE_RESOURCE_URI</label>
-                    <div style={{ position: 'relative' }}>
-                      <ImageIcon size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: '#334155' }} />
-                      <input 
-                        type="text" placeholder="HTTPS://ASSETS.FRONTIER.AI/HASH_ID..."
-                        style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '10px 10px 10px 32px', color: '#fff', fontSize: '13px', outline: 'none', fontFamily: 'monospace' }}
-                        value={editCard.image_uri || ''}
-                        onChange={e => setEditCard({...editCard, image_uri: e.target.value})}
-                      />
-                    </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '11px', color: '#94a3b8' }}>Image URI</label>
+                    <input 
+                      type="text" placeholder="https://..."
+                      className="cyber-input"
+                      value={editCard.image_uri || ''}
+                      onChange={e => setEditCard({...editCard, image_uri: e.target.value})}
+                    />
                   </div>
                 </div>
               </div>
 
-              {/* 2. Timing and Dependency */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '24px', borderRadius: '12px' }}>
-                <h3 style={{ fontSize: '10px', fontWeight: '900', color: '#475569', letterSpacing: '2px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                   <Clock size={14} /> 02_TIMING_AND_DEPENDENCY
+              {/* 2. Timing */}
+              <div className="cyber-card">
+                <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <Clock size={14} /> TRIGGER LOGIC
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>SCHEDULED_PATCH_TIME</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '11px', color: '#94a3b8' }}>Scheduled Time</label>
                     <input 
                       type="datetime-local"
-                      style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '10px', color: '#fff', fontSize: '13px', outline: 'none', fontFamily: 'monospace' }}
+                      className="cyber-input"
+                      style={{ colorScheme: 'dark' }}
                       value={editCard.scheduled_at?.slice(0, 16) || ''}
                       onChange={e => setEditCard({...editCard, scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : null})}
                     />
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>ACTIVATION_PROBABILITY</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(0,0,0,0.4)', padding: '8px 12px', borderRadius: '6px' }}>
-                      <input 
-                        type="range" min="0" max="1" step="0.1"
-                        style={{ flex: 1, accentColor: '#818cf8' }}
-                        value={editCard.activation_prob || 0}
-                        onChange={e => setEditCard({...editCard, activation_prob: parseFloat(e.target.value)})}
-                      />
-                      <span style={{ fontSize: '14px', fontWeight: '900', color: '#818cf8', fontFamily: 'monospace' }}>{Math.round((editCard.activation_prob || 0) * 100)}%</span>
-                    </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '11px', color: '#94a3b8' }}>Probability ({Math.round((editCard.activation_prob || 0) * 100)}%)</label>
+                    <input 
+                      type="range" min="0" max="1" step="0.1"
+                      style={{ width: '100%', accentColor: '#3b82f6' }}
+                      value={editCard.activation_prob || 0}
+                      onChange={e => setEditCard({...editCard, activation_prob: parseFloat(e.target.value)})}
+                    />
                   </div>
 
                   {editCard.parent_card_id && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '10px', color: '#818cf8', fontWeight: '900' }}>DEPENDS_ON_PARENT_BLOCK</label>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(34, 211, 238, 0.05)', border: '1px solid rgba(34, 211, 238, 0.15)', padding: '10px', borderRadius: '6px' }}>
-                        <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#22d3ee' }}>
-                          BLOCK: {editCard.parent_card_id.split('-')[0].toUpperCase()}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '11px', color: '#94a3b8' }}>Parent Block</label>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#0f172a', padding: '6px 10px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '11px', color: '#3b82f6' }}>
+                          ID: {editCard.parent_card_id.split('-')[0].toUpperCase()}
                         </span>
                         <button 
                           onClick={handleRemoveParent}
-                          style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '11px', cursor: 'pointer', fontFamily: 'monospace' }}
+                          style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '10px', cursor: 'pointer' }}
                         >
-                          [UNLINK]
+                          UNLINK
                         </button>
                       </div>
                     </div>
@@ -744,43 +692,37 @@ const NewsStudioPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 3. Market Payload */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '24px', borderRadius: '12px' }}>
-                <h3 style={{ fontSize: '10px', fontWeight: '900', color: '#475569', letterSpacing: '2px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                   <Zap size={14} /> 03_MARKET_IMPACT_PAYLOAD
+              {/* 3. Market Impact */}
+              <div className="cyber-card">
+                <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <Zap size={14} /> MARKET PAYLOAD
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '10px', color: '#22d3ee', fontWeight: '900' }}>IMPACT_MAGNITUDE</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '11px', color: '#94a3b8' }}>Impact ({Number(editCard.truth_payload?.impact || 0).toFixed(2)})</label>
                     <input 
                       type="range" step="0.01" min="-1" max="1"
-                      style={{ width: '100%', accentColor: '#22d3ee' }}
+                      style={{ width: '100%', accentColor: '#3b82f6' }}
                       value={editCard.truth_payload?.impact || 0}
                       onChange={e => setEditCard({...editCard, truth_payload: {...editCard.truth_payload, impact: parseFloat(e.target.value)}})}
                     />
-                    <div style={{ fontSize: '14px', fontWeight: '900', color: '#fff', fontFamily: 'monospace', textAlign: 'center' }}>
-                      {Number(editCard.truth_payload?.impact || 0).toFixed(2)}
-                    </div>
                   </div>
                   
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '10px', color: '#22d3ee', fontWeight: '900' }}>SIGNAL_INTENSITY</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '11px', color: '#94a3b8' }}>Intensity ({Number(editCard.truth_payload?.intensity || 0.5).toFixed(1)})</label>
                     <input 
                       type="range" step="0.1" min="0" max="1"
-                      style={{ width: '100%', accentColor: '#22d3ee' }}
+                      style={{ width: '100%', accentColor: '#3b82f6' }}
                       value={editCard.truth_payload?.intensity || 0.5}
                       onChange={e => setEditCard({...editCard, truth_payload: {...editCard.truth_payload, intensity: parseFloat(e.target.value)}})}
                     />
-                    <div style={{ fontSize: '14px', fontWeight: '900', color: '#fff', fontFamily: 'monospace', textAlign: 'center' }}>
-                      {Number(editCard.truth_payload?.intensity || 0.5).toFixed(1)}
-                    </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '10px', color: '#22d3ee', fontWeight: '900' }}>BIAS_DIRECTION</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '11px', color: '#94a3b8' }}>Bias Direction</label>
                   <select 
-                    style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '10px', color: '#fff', fontSize: '13px', outline: 'none' }}
+                    className="cyber-input"
                     value={editCard.truth_payload?.direction || 'STABLE'}
                     onChange={e => setEditCard({...editCard, truth_payload: {...editCard.truth_payload, direction: e.target.value}})}
                   >
@@ -791,16 +733,17 @@ const NewsStudioPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 4. Text Variant Area */}
-              <div style={{ background: 'rgba(10, 17, 34, 0.8)', border: '1px solid rgba(255,255,255,0.06)', padding: '24px', borderRadius: '12px', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontSize: '10px', fontWeight: '900', color: '#22d3ee', letterSpacing: '2px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                   <Book size={14} /> 04_SIGNAL_VARIANTS
+              {/* 4. Variants */}
+              <div className="cyber-card">
+                <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <Book size={14} /> SIGNAL VARIANTS
                 </h3>
-                <div style={{ position: 'relative', marginBottom: '20px' }}>
+                <div style={{ position: 'relative', marginBottom: '16px' }}>
                    <textarea 
                       id="new-variant-text"
-                      placeholder="ENTER_NEW_SIGNAL_TEXT..."
-                      style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '12px', color: '#fff', fontSize: '13px', outline: 'none', minHeight: '100px', resize: 'none', lineHeight: '1.5' }}
+                      placeholder="Enter variant text..."
+                      className="cyber-input"
+                      style={{ width: '100%', minHeight: '80px', resize: 'none' }}
                     />
                     <button 
                       onClick={() => {
@@ -810,25 +753,26 @@ const NewsStudioPage: React.FC = () => {
                           area.value = '';
                         }
                       }}
-                      style={{ position: 'absolute', bottom: '12px', right: '12px', padding: '6px 14px', background: 'rgba(34, 211, 238, 0.1)', border: '1px solid rgba(34, 211, 238, 0.3)', borderRadius: '4px', color: '#22d3ee', fontWeight: '900', fontSize: '10px', cursor: 'pointer', letterSpacing: '1px' }}
+                      className="cyber-button"
+                      style={{ position: 'absolute', bottom: '8px', right: '8px' }}
                     >
-                      + DEPLOY
+                      + Add
                     </button>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto', scrollbarWidth: 'none' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
                   {variants.map((v, i) => (
-                    <div key={v.variant_id} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.04)', padding: '12px', borderRadius: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                         <span style={{ fontSize: '9px', color: '#22d3ee', fontWeight: '900' }}>SIGNAL_#{variants.length - i}</span>
-                         <span style={{ fontSize: '9px', color: '#334155', fontFamily: 'monospace' }}>ID: {v.variant_id.split('-')[0].toUpperCase()}</span>
+                    <div key={v.variant_id} style={{ background: '#0f172a', border: '1px solid #334155', padding: '10px', borderRadius: '2px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                         <span style={{ fontSize: '9px', color: '#3b82f6', fontWeight: 'bold' }}>Variant #{variants.length - i}</span>
+                         <span style={{ fontSize: '9px', color: '#475569' }}>{v.variant_id.split('-')[0]}</span>
                       </div>
-                      <p style={{ fontSize: '13px', color: '#cbd5e1', margin: 0, lineHeight: '1.5', fontStyle: 'italic' }}>"{v.text}"</p>
+                      <p style={{ fontSize: '12px', color: '#cbd5e1', margin: 0, lineHeight: '1.4' }}>{v.text}</p>
                     </div>
                   ))}
                   {variants.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '40px', color: '#1e293b', fontSize: '10px', border: '1px dashed rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                      NO_SIGNAL_VARIANTS_INITIALIZED
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#475569', fontSize: '11px' }}>
+                      No variants defined.
                     </div>
                   )}
                 </div>
@@ -836,33 +780,24 @@ const NewsStudioPage: React.FC = () => {
 
             </div>
 
-            {/* Inspector Commit Actions */}
-            <div style={{ padding: '20px 24px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '12px', background: '#070a13' }}>
+            {/* Commit Actions */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #334155', background: '#1e293b' }}>
               <button 
                 onClick={handleSaveCard}
                 disabled={loading}
+                className="cyber-button active"
                 style={{
-                  flex: 1,
+                  width: '100%',
+                  padding: '10px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  background: '#4f46e5',
-                  border: '1px solid rgba(129, 140, 248, 0.4)',
-                  color: '#fff',
-                  padding: '12px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: '900',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  letterSpacing: '1px'
+                  fontSize: '13px'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#6366f1'}
-                onMouseLeave={(e) => e.currentTarget.style.background = '#4f46e5'}
               >
-                {loading ? <RefreshCw size={14} style={{ animation: 'spin 2s linear infinite' }} /> : <Save size={14} />}
-                COMMIT_TO_STREAMS
+                {loading ? <RefreshCw size={14} className="animate-spin" /> : <Save size={16} />}
+                SAVE CHANGES
               </button>
             </div>
 
