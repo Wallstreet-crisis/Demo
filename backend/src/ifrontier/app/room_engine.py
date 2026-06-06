@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Dict, List, Optional
 from ifrontier.infra.sqlite.db import room_id_var
 from ifrontier.infra.sqlite.schema import init_schema
@@ -13,6 +14,9 @@ from ifrontier.services.market_session_scheduler import MarketSessionScheduler
 from ifrontier.services.market_maker_scheduler import MarketMakerScheduler
 from ifrontier.services.hosting_scheduler import HostingScheduler
 from ifrontier.services.victory_scheduler import VictoryScheduler
+
+
+_log = logging.getLogger(__name__)
 
 
 class RoomEngine:
