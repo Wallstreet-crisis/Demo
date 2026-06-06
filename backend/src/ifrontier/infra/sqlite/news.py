@@ -165,6 +165,15 @@ def init_news_schema(conn: Optional[sqlite3.Connection] = None) -> None:
             expires_at TEXT NOT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS news_scenario_meta (
+            scenario_id TEXT PRIMARY KEY,
+            background_story TEXT NOT NULL DEFAULT '',
+            worldview_json TEXT NOT NULL DEFAULT '{}',
+            news_store_items_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
         """
     )
 
@@ -182,6 +191,14 @@ def init_news_schema(conn: Optional[sqlite3.Connection] = None) -> None:
     _add_column_if_not_exists(cur, "news", "failure_outcome_json", "TEXT")
     _add_column_if_not_exists(cur, "news", "scenario_id", "TEXT")
     _add_column_if_not_exists(cur, "news", "activated_at", "TEXT")
+
+    conn.commit()
+
+    _add_column_if_not_exists(cur, "news_scenario_meta", "background_story", "TEXT NOT NULL DEFAULT ''")
+    _add_column_if_not_exists(cur, "news_scenario_meta", "worldview_json", "TEXT NOT NULL DEFAULT '{}'" )
+    _add_column_if_not_exists(cur, "news_scenario_meta", "news_store_items_json", "TEXT NOT NULL DEFAULT '[]'" )
+    _add_column_if_not_exists(cur, "news_scenario_meta", "created_at", "TEXT")
+    _add_column_if_not_exists(cur, "news_scenario_meta", "updated_at", "TEXT")
 
     conn.commit()
 

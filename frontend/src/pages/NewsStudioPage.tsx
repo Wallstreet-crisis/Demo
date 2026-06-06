@@ -40,6 +40,14 @@ type NewsStoreItemConfig = {
   enabled: boolean;
 };
 
+type ScenarioWorldviewConfig = {
+  featured_symbols: string[];
+  market_open_note: string;
+  market_close_note: string;
+  holiday_note: string;
+  overview_note: string;
+};
+
 interface NewsCard {
   card_id: string;
   kind: string;
@@ -65,6 +73,22 @@ interface Scenario {
   id: string;
   name: string;
 }
+
+const createDefaultScenarioWorldview = (): ScenarioWorldviewConfig => ({
+  featured_symbols: [],
+  market_open_note: '',
+  market_close_note: '',
+  holiday_note: '',
+  overview_note: '',
+});
+
+const cloneScenarioWorldview = (worldview?: Partial<ScenarioWorldviewConfig> | null): ScenarioWorldviewConfig => ({
+  featured_symbols: [...(worldview?.featured_symbols || [])],
+  market_open_note: worldview?.market_open_note || '',
+  market_close_note: worldview?.market_close_note || '',
+  holiday_note: worldview?.holiday_note || '',
+  overview_note: worldview?.overview_note || '',
+});
 
 const createDefaultScenarioStoreItems = (): NewsStoreItemConfig[] => ([
   {
@@ -226,6 +250,7 @@ const NewsStudioPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [scenarioFilter, setScenarioFilter] = useState('');
   const [scenarioBackgroundStory, setScenarioBackgroundStory] = useState('');
+  const [scenarioWorldview, setScenarioWorldview] = useState<ScenarioWorldviewConfig>(() => createDefaultScenarioWorldview());
   const [scenarioStoreItems, setScenarioStoreItems] = useState<NewsStoreItemConfig[]>(() => createDefaultScenarioStoreItems());
   
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -313,12 +338,22 @@ const NewsStudioPage: React.FC = () => {
     try {
       const meta = await Api.globalStudioNewsScenarioMeta(scenarioId);
       setScenarioBackgroundStory(meta.background_story || '');
+      setScenarioWorldview(cloneScenarioWorldview(meta.worldview as any));
       setScenarioStoreItems(cloneScenarioStoreItems(meta.news_store_items as any));
     } catch (err) {
       console.error('Failed to load scenario meta:', err);
       setScenarioBackgroundStory('');
+      setScenarioWorldview(createDefaultScenarioWorldview());
       setScenarioStoreItems(createDefaultScenarioStoreItems());
     }
+  };
+
+  const updateScenarioWorldview = (patch: Partial<ScenarioWorldviewConfig>) => {
+    setScenarioWorldview((prev) => ({
+      ...prev,
+      ...patch,
+      featured_symbols: patch.featured_symbols ? [...patch.featured_symbols] : prev.featured_symbols,
+    }));
   };
 
   const updateScenarioStoreItem = (index: number, patch: Partial<NewsStoreItemConfig>) => {
@@ -367,9 +402,10 @@ const NewsStudioPage: React.FC = () => {
       await Api.globalStudioNewsUpdateScenarioMeta(selectedScenarioId, {
         actor_id: 'author',
         background_story: scenarioBackgroundStory,
+        worldview: scenarioWorldview,
         news_store_items: scenarioStoreItems.map(toNewsStoreItem),
       });
-      alert('Scenario meta saved');
+      alert('Scenario settings saved');
     } catch (err) {
       alert('保存场景元数据失败: ' + err);
     } finally {
@@ -671,7 +707,7 @@ const NewsStudioPage: React.FC = () => {
         <div style={{ padding: '16px 24px', borderBottom: '1px solid #334155', background: '#111827', zIndex: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div>
-              <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', marginBottom: '4px' }}>SCENARIO META</div>
+              <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', marginBottom: '4px' }}>SCENARIO STUDIO</div>
               <h3 style={{ margin: 0, color: '#f1f5f9', fontSize: '16px' }}>{selectedScenarioId ? selectedScenarioId : 'NO_SCENARIO_SELECTED'}</h3>
             </div>
             <button
@@ -680,15 +716,66 @@ const NewsStudioPage: React.FC = () => {
               className="cyber-button active"
               style={{ padding: '8px 14px' }}
             >
-              <Save size={14} /> SAVE_SCENARIO_META
+              <Save size={14} /> SAVE_SCENARIO_SETTINGS
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', gap: '16px' }}>
             <div className="cyber-card" style={{ margin: 0 }}>
               <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Book size={14} /> WORLD BACKGROUND STORY
+                <Book size={14} /> WORLDVIEW & BACKGROUND STORY
               </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>featured_symbols (comma separated)</span>
+                  <input
+                    className="cyber-input"
+                    value={(scenarioWorldview.featured_symbols || []).join(', ')}
+                    onChange={(e) => updateScenarioWorldview({ featured_symbols: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
+                    placeholder="CIVILBANK, NEURALINK"
+                  />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>overview_note</span>
+                  <textarea
+                    className="cyber-input"
+                    value={scenarioWorldview.overview_note}
+                    onChange={(e) => updateScenarioWorldview({ overview_note: e.target.value })}
+                    placeholder="High level worldview description..."
+                    style={{ width: '100%', minHeight: '80px', resize: 'vertical' }}
+                  />
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>market_open_note</span>
+                    <textarea
+                      className="cyber-input"
+                      value={scenarioWorldview.market_open_note}
+                      onChange={(e) => updateScenarioWorldview({ market_open_note: e.target.value })}
+                      style={{ width: '100%', minHeight: '72px', resize: 'vertical' }}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>market_close_note</span>
+                    <textarea
+                      className="cyber-input"
+                      value={scenarioWorldview.market_close_note}
+                      onChange={(e) => updateScenarioWorldview({ market_close_note: e.target.value })}
+                      style={{ width: '100%', minHeight: '72px', resize: 'vertical' }}
+                    />
+                  </label>
+                </div>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>holiday_note</span>
+                  <textarea
+                    className="cyber-input"
+                    value={scenarioWorldview.holiday_note}
+                    onChange={(e) => updateScenarioWorldview({ holiday_note: e.target.value })}
+                    style={{ width: '100%', minHeight: '72px', resize: 'vertical' }}
+                  />
+                </label>
+              </div>
+              <div style={{ height: '12px' }} />
               <textarea
                 className="cyber-input"
                 value={scenarioBackgroundStory}
@@ -754,7 +841,7 @@ const NewsStudioPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <GitBranch size={18} style={{ color: '#3b82f6' }} />
-              <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#f1f5f9' }}>BLUEPRINT EDITOR</span>
+              <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#f1f5f9' }}>BACKGROUND NEWS TREE</span>
             </div>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

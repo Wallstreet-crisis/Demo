@@ -2691,8 +2691,21 @@ def _get_global_news_db_conn():
     return conn
 
 
-def _scenario_meta_card_id(scenario_id: str) -> str:
-    return f"SCENARIO_META:{scenario_id}"
+class NewsScenarioWorldviewConfig(BaseModel):
+    featured_symbols: List[str] = Field(default_factory=list)
+    market_open_note: str = ""
+    market_close_note: str = ""
+    holiday_note: str = ""
+    overview_note: str = ""
+
+
+def _parse_scenario_worldview(raw: Any) -> NewsScenarioWorldviewConfig:
+    if isinstance(raw, dict):
+        try:
+            return NewsScenarioWorldviewConfig(**raw)
+        except Exception:
+            pass
+    return NewsScenarioWorldviewConfig()
 
 
 def _parse_scenario_store_items(raw: Any) -> List[RoomNewsStoreItemConfig]:
@@ -2714,7 +2727,17 @@ def _parse_scenario_store_items(raw: Any) -> List[RoomNewsStoreItemConfig]:
 async def global_studio_news_scenarios() -> List[Dict[str, Any]]:
     # 彻底开放，不再校验身份
     conn = _get_global_news_db_conn()
-    rows = conn.execute("SELECT DISTINCT scenario_id FROM news WHERE scenario_id IS NOT NULL").fetchall()
+    rows = conn.execute(
+        """
+        SELECT DISTINCT scenario_id
+        FROM (
+            SELECT scenario_id FROM news WHERE scenario_id IS NOT NULL
+            UNION
+            SELECT scenario_id FROM news_scenario_meta WHERE scenario_id IS NOT NULL
+        )
+        ORDER BY scenario_id
+        """
+    ).fetchall()
     return [{"id": r["scenario_id"], "name": r["scenario_id"]} for r in rows]
 
 
@@ -2722,7 +2745,7 @@ async def global_studio_news_scenarios() -> List[Dict[str, Any]]:
 async def global_studio_news_scenario_cards(scenario_id: str) -> List[Dict[str, Any]]:
     # 彻底开放，不再校验身份
     conn = _get_global_news_db_conn()
-    rows = conn.execute("SELECT * FROM news WHERE scenario_id = ? AND variant_id IS NULL AND kind != 'SCENARIO_META'", (scenario_id,)).fetchall()
+    rows = conn.execute("SELECT * FROM news WHERE scenario_id = ? AND variant_id IS NULL", (scenario_id,)).fetchall()
     from ifrontier.infra.sqlite.news import NewsRecord
     return [NewsRecord.from_row(r).__dict__ for r in rows]
 
@@ -2730,57 +2753,68 @@ async def global_studio_news_scenario_cards(scenario_id: str) -> List[Dict[str, 
 class NewsScenarioMetaRequest(BaseModel):
     actor_id: str
     background_story: str = ""
+    worldview: NewsScenarioWorldviewConfig = Field(default_factory=NewsScenarioWorldviewConfig)
     news_store_items: List[RoomNewsStoreItemConfig] = Field(default_factory=list)
     correlation_id: UUID | None = None
 
 
 class NewsScenarioMetaResponse(BaseModel):
     scenario_id: str
-    card_id: str
     background_story: str = ""
+    worldview: NewsScenarioWorldviewConfig = Field(default_factory=NewsScenarioWorldviewConfig)
     news_store_items: List[RoomNewsStoreItemConfig] = Field(default_factory=list)
+    created_at: str | None = None
     updated_at: str | None = None
 
 
 @router.get("/global/studio/news/scenarios/{scenario_id}/meta")
 async def global_studio_news_scenario_meta(scenario_id: str) -> NewsScenarioMetaResponse:
     conn = _get_global_news_db_conn()
-    card_id = _scenario_meta_card_id(scenario_id)
     row = conn.execute(
-        "SELECT * FROM news WHERE card_id = ? AND variant_id IS NULL AND kind = 'SCENARIO_META' LIMIT 1",
-        (card_id,),
+        "SELECT * FROM news_scenario_meta WHERE scenario_id = ? LIMIT 1",
+        (scenario_id,),
     ).fetchone()
     if row is None:
-        return NewsScenarioMetaResponse(scenario_id=scenario_id, card_id=card_id)
+        return NewsScenarioMetaResponse(scenario_id=scenario_id)
 
-    from ifrontier.infra.sqlite.news import NewsRecord
-
-    record = NewsRecord.from_row(row)
-    payload = record.truth_payload or {}
+    worldview_raw = row["worldview_json"] if "worldview_json" in row.keys() else None
+    store_items_raw = row["news_store_items_json"] if "news_store_items_json" in row.keys() else None
     return NewsScenarioMetaResponse(
         scenario_id=scenario_id,
-        card_id=record.card_id,
-        background_story=record.text or "",
-        news_store_items=_parse_scenario_store_items(payload.get("news_store_items")),
-        updated_at=record.created_at or None,
+        background_story=str(row["background_story"] or ""),
+        worldview=_parse_scenario_worldview(json.loads(worldview_raw) if worldview_raw else {}),
+        news_store_items=_parse_scenario_store_items(json.loads(store_items_raw) if store_items_raw else []),
+        created_at=row["created_at"] or None,
+        updated_at=row["updated_at"] or None,
     )
 
 
 @router.patch("/global/studio/news/scenarios/{scenario_id}/meta")
 async def global_studio_news_update_scenario_meta(scenario_id: str, req: NewsScenarioMetaRequest) -> NewsScenarioMetaResponse:
     _assert_studio_authorized(req.actor_id)
-    card_id = _scenario_meta_card_id(scenario_id)
-    save_news(
-        card_id=card_id,
-        kind="SCENARIO_META",
-        publisher_id=req.actor_id,
-        text=req.background_story,
-        symbols=[],
-        tags=["scenario_meta"],
-        truth_payload={"news_store_items": [item.model_dump() for item in req.news_store_items]},
-        author_id=req.actor_id,
-        scenario_id=scenario_id,
-    )
+    now = datetime.now(timezone.utc).isoformat()
+    conn = _get_global_news_db_conn()
+    world_json = json.dumps(req.worldview.model_dump(), ensure_ascii=False)
+    store_json = json.dumps([item.model_dump() for item in req.news_store_items], ensure_ascii=False)
+    existing = conn.execute(
+        "SELECT created_at FROM news_scenario_meta WHERE scenario_id = ? LIMIT 1",
+        (scenario_id,),
+    ).fetchone()
+    created_at = existing["created_at"] if existing is not None else now
+    with conn:
+        conn.execute(
+            """
+            INSERT INTO news_scenario_meta (
+                scenario_id, background_story, worldview_json, news_store_items_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(scenario_id) DO UPDATE SET
+                background_story=excluded.background_story,
+                worldview_json=excluded.worldview_json,
+                news_store_items_json=excluded.news_store_items_json,
+                updated_at=excluded.updated_at
+            """,
+            (scenario_id, req.background_story, world_json, store_json, created_at, now),
+        )
     return await global_studio_news_scenario_meta(scenario_id)
 
 

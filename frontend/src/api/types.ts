@@ -296,17 +296,26 @@ export type RoomNewsStoreItemConfig = {
   enabled?: boolean
 }
 
+export type NewsScenarioWorldviewConfig = {
+  featured_symbols?: string[]
+  market_open_note?: string
+  market_close_note?: string
+  holiday_note?: string
+  overview_note?: string
+}
+
 export type NewsScenarioMetaRequest = {
   actor_id: string
   background_story?: string
+  worldview?: NewsScenarioWorldviewConfig
   news_store_items?: RoomNewsStoreItemConfig[]
   correlation_id?: string | null
 }
 
 export type NewsScenarioMetaResponse = {
   scenario_id: string
-  card_id: string
   background_story: string
+  worldview: NewsScenarioWorldviewConfig
   news_store_items: RoomNewsStoreItemConfig[]
   updated_at?: string | null
 }
