@@ -21,7 +21,7 @@ from ifrontier.infra.sqlite.event_store import SqliteEventStore
 from ifrontier.infra.sqlite import news as news_db
 from ifrontier.services.game_time import game_time_now, load_game_time_config_from_env
 
-from ifrontier.domain.news.blueprints import IntelligenceBlueprint, registry as blueprint_registry
+from ifrontier.domain.news.prototypes import NewsPrototype, prototype_registry
 
 class NewsService:
     _REPEATABLE_DELIVERY_REASONS = {
@@ -32,14 +32,14 @@ class NewsService:
     def __init__(self, event_store: SqliteEventStore) -> None:
         self._event_store = event_store
 
-    def _get_primary_blueprint(self, kind: str) -> IntelligenceBlueprint | None:
-        pool = blueprint_registry.find_by_kind(str(kind or "").upper())
+    def _get_primary_blueprint(self, kind: str) -> NewsPrototype | None:
+        pool = prototype_registry.find_by_kind(str(kind or "").upper())
         return pool[0] if pool else None
 
     def _preset_templates(self) -> Dict[str, List[str]]:
-        """Deprecated: use blueprint_registry instead."""
+        """Deprecated: use prototype_registry instead."""
         out = {}
-        for bp in blueprint_registry.list_blueprints():
+        for bp in prototype_registry.list_blueprints():
             out[bp.kind] = bp.templates
         return out
 
@@ -195,7 +195,7 @@ class NewsService:
                     # 货架未过期，还原蓝图对象
                     items = []
                     for item in existing["items"]:
-                        bp = blueprint_registry.get_blueprint(item["blueprint_id"])
+                        bp = prototype_registry.get_blueprint(item["blueprint_id"])
                         if bp:
                             items.append((bp, float(item["price"])))
                     
@@ -203,7 +203,7 @@ class NewsService:
                         return {"items": items, "expires_at": existing["expires_at"]}
 
         # 2. 生成新货架
-        all_bps = blueprint_registry.list_blueprints()
+        all_bps = prototype_registry.list_blueprints()
         if not all_bps:
             return {"items": [], "expires_at": now.isoformat()}
 

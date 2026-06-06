@@ -37,7 +37,7 @@ from ifrontier.services.contract_agent import ContractAgent
 from ifrontier.services.chat import ChatService
 from ifrontier.services.news import NewsService
 from ifrontier.services.news_tick import NewsTickEngine
-from ifrontier.domain.news.blueprints import StoreTriggerMode, registry as blueprint_registry
+from ifrontier.domain.news.prototypes import StoreTriggerMode, prototype_registry
 from ifrontier.services.game_time import load_game_time_config_from_env
 from ifrontier.services.market_session import get_market_session
 from ifrontier.infra.sqlite.hosting import get_hosting_state, upsert_hosting_state
@@ -162,7 +162,7 @@ def _get_room_contract_service():
 # ==========================================
 
 from ifrontier.app.room_engine import room_manager
-from ifrontier.app.room_meta import RoomGameSettings, RoomNewsStoreItemConfig, get_local_rooms, create_or_update_room_meta, room_exists
+from ifrontier.app.room_meta import RoomGameSettings, RoomNewsStoreItemConfig, get_local_rooms, create_or_update_room_meta, room_exists, load_room_meta
 
 class CreateRoomRequest(BaseModel):
     room_id: Optional[str] = None
@@ -675,6 +675,108 @@ class NewsStoreCatalogResponse(BaseModel):
     items: List[NewsStoreCatalogItem]
     expires_at: str
 
+
+def _load_global_scenario_meta_record(scenario_id: str) -> Dict[str, Any] | None:
+    conn = _get_global_news_db_conn()
+    row = conn.execute(
+        "SELECT * FROM news_scenario_meta WHERE scenario_id = ? LIMIT 1",
+        (scenario_id,),
+    ).fetchone()
+    if row is None:
+        return None
+
+    worldview_raw = row["worldview_json"] if "worldview_json" in row.keys() else None
+    store_items_raw = row["news_store_items_json"] if "news_store_items_json" in row.keys() else None
+    return {
+        "scenario_id": scenario_id,
+        "background_story": str(row["background_story"] or ""),
+        "worldview": _parse_scenario_worldview(json.loads(worldview_raw) if worldview_raw else {}),
+        "news_store_items": _parse_scenario_store_items(json.loads(store_items_raw) if store_items_raw else []),
+        "created_at": row["created_at"] or None,
+        "updated_at": row["updated_at"] or None,
+    }
+
+
+def _resolve_active_news_store_items() -> tuple[str, list[RoomNewsStoreItemConfig], str | None]:
+    from ifrontier.infra.sqlite.db import room_id_var
+
+    room_id = room_id_var.get()
+    room_meta = load_room_meta(room_id)
+    if room_meta is None:
+        return "blueprint", [], None
+
+    scenario_id = room_meta.game_settings.scenario_id
+    if scenario_id:
+        scenario_meta = _load_global_scenario_meta_record(scenario_id)
+        scenario_items = []
+        if scenario_meta is not None:
+            scenario_items = [item for item in scenario_meta["news_store_items"] if bool(getattr(item, "enabled", True))]
+        if scenario_items:
+            return "scenario", scenario_items, scenario_id
+        return "scenario", [], scenario_id
+
+    room_items = [item for item in room_meta.game_settings.news_store_items if bool(getattr(item, "enabled", True))]
+    if room_items:
+        return "room", room_items, None
+
+    return "blueprint", [], None
+
+
+def _build_store_catalog_item_from_config(
+    *,
+    item: RoomNewsStoreItemConfig,
+    sec_symbols: list[str],
+) -> NewsStoreCatalogItem:
+    bp_pool = prototype_registry.find_by_kind(str(item.kind).upper())
+    bp = bp_pool[0] if bp_pool else None
+
+    assigned_symbol: str | None = None
+    if bool(getattr(item, "requires_symbols", False)):
+        assigned_symbol = str(sec_symbols[0]) if sec_symbols else None
+
+    preview_symbols = [assigned_symbol] if assigned_symbol else []
+    preview = str(item.description or item.kind)
+    if bp is not None:
+        presets_texts = _get_room_news_service().get_preset_templates(kind=str(item.kind), symbols=preview_symbols)
+        preview = (
+            random.choice(presets_texts)
+            if presets_texts
+            else _get_room_news_service().get_preset_template(kind=str(item.kind), symbols=preview_symbols)
+        )
+
+    return NewsStoreCatalogItem(
+        kind=str(item.kind),
+        price_cash=float(item.price_cash or 0.0),
+        requires_symbols=bool(item.requires_symbols),
+        trigger_mode=str(item.trigger_mode or "IMMEDIATE").upper(),
+        chain_kind=str(item.chain_kind or item.kind).upper(),
+        preview_text=str(preview),
+        description=str(item.description or ""),
+        rarity=str(item.rarity or (str(getattr(bp.rarity, "value", bp.rarity)) if bp else "COMMON")).upper(),
+        faction=bp.faction if bp else None,
+        default_ttl_hours=int(bp.default_ttl_hours if bp else 6),
+        preview_image_uri=(bp.image_pool[0] if bp and bp.image_pool else None),
+        tags=list(item.tags or []),
+        symbol=assigned_symbol,
+        chain_defaults=dict(item.chain_defaults or {}) or None,
+    )
+
+
+def _resolve_active_store_item(kind_key: str) -> tuple[str, RoomNewsStoreItemConfig | None, str | None, RoomNewsStoreItemConfig | None]:
+    source, items, scenario_id = _resolve_active_news_store_items()
+    kind_upper = str(kind_key or "").upper()
+    matched_item = next((item for item in items if str(item.kind or "").upper() == kind_upper), None)
+    if source != "blueprint":
+        return source, matched_item, scenario_id, None
+
+    from ifrontier.infra.sqlite.db import room_id_var
+
+    room_meta = load_room_meta(room_id_var.get())
+    legacy_item = None
+    if room_meta is not None:
+        legacy_item = next((item for item in room_meta.game_settings.news_store_items if str(item.kind or "").upper() == kind_upper), None)
+    return source, None, None, legacy_item
+
 @router.get("/news/store/catalog")
 async def news_store_catalog(user_id: str, force_refresh: bool = False) -> NewsStoreCatalogResponse:
     from ifrontier.infra.sqlite.securities import list_securities
@@ -686,47 +788,55 @@ async def news_store_catalog(user_id: str, force_refresh: bool = False) -> NewsS
     except Exception:
         player_net_worth = 0.0
 
-    # 2. 生成个性化货架
-    # shelf_data: {"items": [(bp, price), ...], "expires_at": str}
-    shelf_result = _get_room_news_service().generate_market_shelf(
-        player_id=user_id,
-        player_net_worth=player_net_worth,
-        shelf_size=8,
-        force_refresh=force_refresh
-    )
-    shelf_items = shelf_result.get("items", [])
-    expires_at = shelf_result.get("expires_at", "")
-
     sec_symbols = [s.symbol for s in list_securities()]
     if not sec_symbols:
         sec_symbols = ["BLUEGOLD"]
 
     out: List[NewsStoreCatalogItem] = []
-    for bp, price in shelf_items:
-        kind = str(bp.kind)
-        
-        assigned_symbol: str | None = None
-        if bool(getattr(bp, "store_requires_symbols", False)):
-            assigned_symbol = str(sec_symbols[0]) if sec_symbols else None
-
-        preview_symbols = [assigned_symbol] if assigned_symbol else []
-        presets_texts = _get_room_news_service().get_preset_templates(kind=kind, symbols=preview_symbols)
-        preview = (
-            random.choice(presets_texts)
-            if presets_texts
-            else _get_room_news_service().get_preset_template(kind=kind, symbols=preview_symbols)
+    source, active_items, _scenario_id = _resolve_active_news_store_items()
+    if source == "blueprint":
+        # 2. 仅在没有场景/房间配置时，回退到蓝图默认货架。
+        shelf_result = _get_room_news_service().generate_market_shelf(
+            player_id=user_id,
+            player_net_worth=player_net_worth,
+            shelf_size=8,
+            force_refresh=force_refresh,
         )
+        shelf_items = shelf_result.get("items", [])
+        expires_at = shelf_result.get("expires_at", "")
 
-        catalog_item = bp.resolve_store_catalog_item(price_cash=float(price), symbol=assigned_symbol)
-        catalog_item["preview_text"] = str(preview)
-        
-        out.append(
-            NewsStoreCatalogItem(
-                **catalog_item,
-                preview_text=str(preview),
+        for bp, price in shelf_items:
+            kind = str(bp.kind)
+
+            assigned_symbol: str | None = None
+            if bool(getattr(bp, "store_requires_symbols", False)):
+                assigned_symbol = str(sec_symbols[0]) if sec_symbols else None
+
+            preview_symbols = [assigned_symbol] if assigned_symbol else []
+            presets_texts = _get_room_news_service().get_preset_templates(kind=kind, symbols=preview_symbols)
+            preview = (
+                random.choice(presets_texts)
+                if presets_texts
+                else _get_room_news_service().get_preset_template(kind=kind, symbols=preview_symbols)
             )
-        )
 
+            catalog_item = bp.resolve_store_catalog_item(price_cash=float(price), symbol=assigned_symbol)
+            catalog_item["preview_text"] = str(preview)
+
+            out.append(
+                NewsStoreCatalogItem(
+                    **catalog_item,
+                    preview_text=str(preview),
+                )
+            )
+
+        return NewsStoreCatalogResponse(items=out, expires_at=expires_at)
+
+    # 场景/房间配置优先：仅返回配置的商品，不混入蓝图默认商店
+    for item in active_items:
+        out.append(_build_store_catalog_item_from_config(item=item, sec_symbols=sec_symbols))
+
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
     return NewsStoreCatalogResponse(items=out, expires_at=expires_at)
 
 class NewsInboxResponseItem(BaseModel):
@@ -2986,7 +3096,7 @@ async def news_activate_card(card_id: str, req: NewsActivateCardRequest) -> News
     if has_variant(card_id):
         raise HTTPException(status_code=400, detail="card already activated")
 
-    bp_pool = blueprint_registry.find_by_kind(str(card.kind))
+    bp_pool = prototype_registry.find_by_kind(str(card.kind))
     bp = bp_pool[0] if bp_pool else None
     trigger_mode = getattr(bp, "store_trigger_mode", StoreTriggerMode.IMMEDIATE) if bp else StoreTriggerMode.IMMEDIATE
     if not isinstance(trigger_mode, StoreTriggerMode):
@@ -3675,22 +3785,46 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     from ifrontier.infra.sqlite.securities import list_securities
 
     kind_key = str(req.kind).upper()
-    bp_pool = blueprint_registry.find_by_kind(kind_key)
-    bp = bp_pool[0] if bp_pool else None
-    if bp is None:
-        raise HTTPException(status_code=400, detail="unknown kind")
-
-    requires_symbols = bool(bp.store_requires_symbols)
-    trigger_mode = bp.resolve_store_trigger_mode()
-
-    req_price = float(req.price_cash) if req.price_cash is not None else 0.0
-    system_price = req_price if req_price > 0 else bp.resolve_store_price_cash()
-    if system_price <= 0:
-        raise HTTPException(status_code=400, detail="invalid system price")
-
     req_symbols = list(req.symbols or [])
-    if requires_symbols and not req_symbols:
-        raise HTTPException(status_code=400, detail="symbols required for this kind")
+
+    source, scenario_item, _scenario_id, legacy_item = _resolve_active_store_item(kind_key)
+    active_item = scenario_item or legacy_item
+
+    bp_pool = prototype_registry.find_by_kind(kind_key)
+    bp = bp_pool[0] if bp_pool else None
+
+    if source != "blueprint":
+        if active_item is None:
+            raise HTTPException(status_code=400, detail="unknown kind")
+        requires_symbols = bool(active_item.requires_symbols)
+        trigger_mode = StoreTriggerMode(str(active_item.trigger_mode or "IMMEDIATE").upper())
+        system_price = float(active_item.price_cash or 0.0)
+        if system_price <= 0:
+            raise HTTPException(status_code=400, detail="invalid system price")
+        if requires_symbols and not req_symbols:
+            raise HTTPException(status_code=400, detail="symbols required for this kind")
+        tags = list(active_item.tags or [])
+        rarity = str(active_item.rarity or (str(getattr(bp.rarity, "value", bp.rarity)) if bp else "COMMON")).upper()
+        chain_kind = str(active_item.chain_kind or kind_key).upper()
+        chain_defaults = dict(active_item.chain_defaults or {})
+    else:
+        if bp is None:
+            raise HTTPException(status_code=400, detail="unknown kind")
+
+        requires_symbols = bool(bp.store_requires_symbols)
+        trigger_mode = bp.resolve_store_trigger_mode()
+
+        req_price = float(req.price_cash) if req.price_cash is not None else 0.0
+        system_price = req_price if req_price > 0 else bp.resolve_store_price_cash()
+        if system_price <= 0:
+            raise HTTPException(status_code=400, detail="invalid system price")
+        if requires_symbols and not req_symbols:
+            raise HTTPException(status_code=400, detail="symbols required for this kind")
+
+        tags = list(getattr(bp, "tags", []) or [])
+        rarity = str(getattr(bp.rarity, "value", bp.rarity)).upper()
+        chain_kind = bp.resolve_store_chain_kind()
+        chain_defaults = bp.resolve_store_chain_defaults()
     
     purchase_event_id = str(uuid4())
     try:
@@ -3711,8 +3845,6 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
             if not sec_symbols:
                 sec_symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
 
-            chain_defaults = bp.resolve_store_chain_defaults()
-            chain_kind = bp.resolve_store_chain_kind()
             _log.info("Starting chain for %s -> %s, t0_at=%s, symbols=%s", req.kind, chain_kind, t0_at, req_symbols or sec_symbols)
             result = _news_tick_engine.start_chain(
                 kind=chain_kind,
@@ -3766,8 +3898,9 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
         image_uri=req.image_uri,
         truth_payload=req.truth_payload,
         symbols=symbols,
-        tags=req.tags,
+        tags=tags if source != "blueprint" else req.tags,
         actor_id=req.buyer_user_id,
+        rarity=rarity,
         correlation_id=req.correlation_id,
     )
     await hub.broadcast_many(["events", str(EventType.NEWS_CARD_CREATED)], card_event.model_dump())
@@ -3796,7 +3929,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     variant_id, variant_event = _get_room_news_service().emit_variant(
         card_id=card_id,
         author_id=req.buyer_user_id,
-        text=initial_text,
+        text=initial_text or (active_item.description if active_item is not None else ""),
         parent_variant_id=None,
         influence_cost=0.0,
         risk_roll=None,

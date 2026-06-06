@@ -1,16 +1,18 @@
 from __future__ import annotations
+
 import json
-import os
-import glob
+import random
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 
 class StoreTriggerMode(str, Enum):
     IMMEDIATE = "IMMEDIATE"
     MANUAL = "MANUAL"
     AUTO_CHAIN = "AUTO_CHAIN"
+
 
 class CardRarity(str, Enum):
     COMMON = "COMMON"
@@ -19,22 +21,23 @@ class CardRarity(str, Enum):
     EPIC = "EPIC"
     LEGENDARY = "LEGENDARY"
 
+
 @dataclass
-class IntelligenceBlueprint:
+class NewsPrototype:
     kind: str
     id: str
     templates: List[str]
     description: str
-    namespace: str = "base" # 增加命名空间
+    namespace: str = "base"
     rarity: CardRarity = CardRarity.COMMON
-    weight: float = 1.0  # 出现权重
-    faction: Optional[str] = None # 所属势力
+    weight: float = 1.0
+    faction: Optional[str] = None
     default_intensity: float = 0.5
     default_ttl_hours: int = 6
     image_pool: List[str] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
     behavior_bindings: Dict[str, Any] = field(default_factory=dict)
-    price_modifier: float = 1.0 # 价格修正系数
+    price_modifier: float = 1.0
     store_price_cash: float = 0.0
     store_requires_symbols: bool = False
     store_trigger_mode: StoreTriggerMode = StoreTriggerMode.IMMEDIATE
@@ -46,16 +49,16 @@ class IntelligenceBlueprint:
         return f"{self.namespace}:{self.id}"
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any], namespace: str = "base") -> IntelligenceBlueprint:
-        if "rarity" in data:
-            data["rarity"] = CardRarity(str(data["rarity"]).upper())
-        if "store_trigger_mode" in data:
-            data["store_trigger_mode"] = StoreTriggerMode(str(data["store_trigger_mode"]).upper())
-        if "store_chain_kind" in data and data["store_chain_kind"] is not None:
-            data["store_chain_kind"] = str(data["store_chain_kind"]).upper()
-        if "namespace" not in data:
-            data["namespace"] = namespace
-        return cls(**data)
+    def from_dict(cls, data: Dict[str, Any], namespace: str = "base") -> NewsPrototype:
+        payload = dict(data)
+        if "rarity" in payload:
+            payload["rarity"] = CardRarity(str(payload["rarity"]).upper())
+        if "store_trigger_mode" in payload:
+            payload["store_trigger_mode"] = StoreTriggerMode(str(payload["store_trigger_mode"]).upper())
+        if "store_chain_kind" in payload and payload["store_chain_kind"] is not None:
+            payload["store_chain_kind"] = str(payload["store_chain_kind"]).upper()
+        payload.setdefault("namespace", namespace)
+        return cls(**payload)
 
     def resolve_store_price_cash(self, fallback: float | None = None) -> float:
         value = self.store_price_cash if self.store_price_cash is not None else fallback
@@ -91,28 +94,17 @@ class IntelligenceBlueprint:
             "chain_defaults": self.resolve_store_chain_defaults() or None,
         }
 
-@dataclass
-class BlueprintPack:
-    name: str
-    version: str
-    author: str
-    description: str
-    namespace: str
-    blueprints: List[IntelligenceBlueprint] = field(default_factory=list)
 
-class BlueprintRegistry:
+class NewsPrototypeRegistry:
     def __init__(self):
-        self._blueprints: Dict[str, IntelligenceBlueprint] = {} # full_id -> bp
-        self._kind_map: Dict[str, List[IntelligenceBlueprint]] = {}
-        self._packs: Dict[str, BlueprintPack] = {}
+        self._prototypes: Dict[str, NewsPrototype] = {}
+        self._kind_map: Dict[str, List[NewsPrototype]] = {}
         self._load_defaults()
         self._load_from_mods()
 
-    def _load_defaults(self):
-        # 基础默认模板
+    def _load_defaults(self) -> None:
         namespace = "base"
         defaults = [
-            # ... (same as before, but with namespace logic)
             {
                 "kind": "RUMOR",
                 "id": "rumor_base",
@@ -133,8 +125,8 @@ class BlueprintRegistry:
                 "image_pool": ["/assets/news/rumor_1.webp", "/assets/news/rumor_2.webp"],
                 "behavior_bindings": {
                     "market_volatility": 0.05,
-                    "sentiment_shift": "UNSTABLE"
-                }
+                    "sentiment_shift": "UNSTABLE",
+                },
             },
             {
                 "kind": "LEAK",
@@ -155,8 +147,8 @@ class BlueprintRegistry:
                 "image_pool": ["/assets/news/leak_1.webp"],
                 "behavior_bindings": {
                     "price_impact": 0.15,
-                    "insider_trading_signal": True
-                }
+                    "insider_trading_signal": True,
+                },
             },
             {
                 "kind": "ANALYST_REPORT",
@@ -175,8 +167,8 @@ class BlueprintRegistry:
                 "store_trigger_mode": "IMMEDIATE",
                 "behavior_bindings": {
                     "institutional_bias": 0.08,
-                    "target_price_modifier": 1.15
-                }
+                    "target_price_modifier": 1.15,
+                },
             },
             {
                 "kind": "MAJOR_EVENT",
@@ -202,8 +194,8 @@ class BlueprintRegistry:
                 },
                 "behavior_bindings": {
                     "sector_wide_impact": True,
-                    "fundamental_shift": 0.25
-                }
+                    "fundamental_shift": 0.25,
+                },
             },
             {
                 "kind": "WORLD_EVENT",
@@ -229,85 +221,48 @@ class BlueprintRegistry:
                 },
                 "behavior_bindings": {
                     "macro_regime_change": True,
-                    "global_liquidity_delta": 0.1
-                }
-            }
+                    "global_liquidity_delta": 0.1,
+                },
+            },
         ]
-        
-        pack = BlueprintPack(
-            name="Base Pack",
-            version="1.0.0",
-            author="System",
-            description="Core game news blueprints",
-            namespace=namespace,
-            blueprints=[]
-        )
-        
+
         for data in defaults:
-            bp = IntelligenceBlueprint.from_dict(data, namespace=namespace)
-            self.register(bp)
-            pack.blueprints.append(bp)
-        
-        self._packs[namespace] = pack
+            self.register(NewsPrototype.from_dict(data, namespace=namespace))
 
-    def _load_from_mods(self):
-        # 尝试从 mods/news 目录加载 JSON 蓝图包
-        # 期待结构: mods/news/my_mod/pack.json
+    def _load_from_mods(self) -> None:
         mod_root = Path("mods/news")
-        if not mod_root.exists():
-            try: mod_root.mkdir(parents=True, exist_ok=True)
-            except: return
-
+        mod_root.mkdir(parents=True, exist_ok=True)
         for pack_dir in mod_root.iterdir():
-            if not pack_dir.is_dir(): continue
-            
-            pack_file = pack_dir / "pack.json"
-            if not pack_file.exists(): continue
-            
-            try:
-                with open(pack_file, "r", encoding="utf-8") as f:
-                    pack_data = json.load(f)
-                    namespace = pack_data.get("namespace", pack_dir.name)
-                    
-                    pack = BlueprintPack(
-                        name=pack_data.get("name", namespace),
-                        version=pack_data.get("version", "0.1.0"),
-                        author=pack_data.get("author", "Unknown"),
-                        description=pack_data.get("description", ""),
-                        namespace=namespace,
-                        blueprints=[]
-                    )
-                    
-                    # 加载该包下的所有蓝图文件
-                    for json_file in pack_dir.glob("blueprints/*.json"):
-                        with open(json_file, "r", encoding="utf-8") as bf:
-                            bp_data = json.load(bf)
-                            items = bp_data if isinstance(bp_data, list) else [bp_data]
-                            for item in items:
-                                bp = IntelligenceBlueprint.from_dict(item, namespace=namespace)
-                                self.register(bp)
-                                pack.blueprints.append(bp)
-                    
-                    self._packs[namespace] = pack
-                    print(f"Loaded news pack: {pack.name} ({len(pack.blueprints)} blueprints)")
-            except Exception as e:
-                print(f"Failed to load news pack from {pack_dir}: {e}")
+            if not pack_dir.is_dir():
+                continue
+            for json_file in pack_dir.glob("blueprints/*.json"):
+                try:
+                    with open(json_file, "r", encoding="utf-8") as f:
+                        payload = json.load(f)
+                    items = payload if isinstance(payload, list) else [payload]
+                    for item in items:
+                        self.register(NewsPrototype.from_dict(item, namespace=pack_dir.name))
+                except Exception:
+                    continue
 
-    def register(self, bp: IntelligenceBlueprint):
-        self._blueprints[bp.full_id] = bp
-        k = bp.kind.upper()
-        if k not in self._kind_map:
-            self._kind_map[k] = []
-        self._kind_map[k].append(bp)
+    def register(self, prototype: NewsPrototype) -> None:
+        self._prototypes[prototype.full_id] = prototype
+        kind_key = prototype.kind.upper()
+        self._kind_map.setdefault(kind_key, []).append(prototype)
 
-    def get_blueprint(self, full_id: str) -> Optional[IntelligenceBlueprint]:
-        return self._blueprints.get(full_id)
+    def get_blueprint(self, full_id: str) -> Optional[NewsPrototype]:
+        return self._prototypes.get(full_id)
 
-    def find_by_kind(self, kind: str) -> List[IntelligenceBlueprint]:
-        return self._kind_map.get(kind.upper(), [])
+    def find_by_kind(self, kind: str) -> List[NewsPrototype]:
+        return self._kind_map.get(str(kind or "").upper(), [])
 
-    def list_blueprints(self) -> List[IntelligenceBlueprint]:
-        return list(self._blueprints.values())
+    def list_blueprints(self) -> List[NewsPrototype]:
+        return list(self._prototypes.values())
 
-# Global registry instance
-registry = BlueprintRegistry()
+
+prototype_registry = NewsPrototypeRegistry()
+
+# compatibility aliases
+IntelligenceBlueprint = NewsPrototype
+BlueprintRegistry = NewsPrototypeRegistry
+registry = prototype_registry

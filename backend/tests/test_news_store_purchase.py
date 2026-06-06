@@ -13,7 +13,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from ifrontier.app.main import app
-from ifrontier.domain.news.blueprints import StoreTriggerMode, registry as blueprint_registry
+from ifrontier.domain.news.prototypes import StoreTriggerMode, prototype_registry
 from ifrontier.infra.sqlite.ledger import create_account, get_snapshot
 from ifrontier.infra.sqlite.news import get_main_card
 
@@ -146,7 +146,7 @@ def test_news_store_purchase_manual_item_activates_only_when_requested() -> None
     buyer = f"user:purchase:manual:{uuid4()}"
     create_account(buyer, owner_type="user", initial_cash=100000.0)
 
-    rumor_bp = blueprint_registry.find_by_kind("RUMOR")[0]
+    rumor_bp = prototype_registry.find_by_kind("RUMOR")[0]
     original_trigger_mode = rumor_bp.store_trigger_mode
     try:
         rumor_bp.store_trigger_mode = StoreTriggerMode.MANUAL
@@ -225,7 +225,7 @@ def test_news_store_purchase_auto_chain_can_bind_other_chain_kind(monkeypatch) -
     buyer = f"user:purchase:auto-chain:{uuid4()}"
     create_account(buyer, owner_type="user", initial_cash=200000.0)
 
-    rumor_bp = blueprint_registry.find_by_kind("RUMOR")[0]
+    rumor_bp = prototype_registry.find_by_kind("RUMOR")[0]
     original_trigger_mode = rumor_bp.store_trigger_mode
     original_chain_kind = rumor_bp.store_chain_kind
     calls: list[dict[str, object]] = []
