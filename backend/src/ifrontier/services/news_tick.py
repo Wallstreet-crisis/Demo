@@ -55,6 +55,7 @@ class NewsTickEngine:
             market_data_provider=get_market_trends,
             broadcaster=broadcaster,
         )
+        self._tick_lock = asyncio.Lock()
         # 初始化为过去的某个时间，确保启动后立即触发首轮投放
         past = datetime.now(timezone.utc) - timedelta(hours=1)
         self._last_small_news_at: datetime | None = past
@@ -207,27 +208,28 @@ class NewsTickEngine:
         now: datetime | None = None,
         limit: int = 50,
     ) -> Dict[str, Any]:
-        if now is None:
-            now = datetime.now(timezone.utc)
+        async with self._tick_lock:
+            if now is None:
+                now = datetime.now(timezone.utc)
 
-        # 0) 定期生成新的系统新闻
-        spawn_events = await self._periodic_spawn(now=now)
+            # 0) 定期生成新的系统新闻
+            spawn_events = await self._periodic_spawn(now=now)
 
-        # 0.5) 处理剧情树节点 (Scenario Nodes)
-        scenario_events = await self._tick_scenario_cards(now=now, limit=limit)
-        spawn_events.extend(scenario_events)
+            # 0.5) 处理剧情树节点 (Scenario Nodes)
+            scenario_events = await self._tick_scenario_cards(now=now, limit=limit)
+            spawn_events.extend(scenario_events)
 
-        chains = await self._list_active_chains(now=now, limit=limit)
+            chains = await self._list_active_chains(now=now, limit=limit)
 
-        results: List[Dict[str, Any]] = []
-        for c in chains:
-            results.append(await self._tick_one_chain(now=now, chain=dict(c)))
+            results: List[Dict[str, Any]] = []
+            for c in chains:
+                results.append(await self._tick_one_chain(now=now, chain=dict(c)))
 
-        return {
-            "now": now.isoformat(), 
-            "chains": results,
-            "spawned_events": spawn_events
-        }
+            return {
+                "now": now.isoformat(), 
+                "chains": results,
+                "spawned_events": spawn_events
+            }
 
     async def _periodic_spawn(self, *, now: datetime) -> List[Dict[str, Any]]:
         """系统自动投放逻辑：每隔一段时间尝试生成一条新闻"""
@@ -439,7 +441,13 @@ class NewsTickEngine:
 
     async def _tick_scenario_cards(self, *, now: datetime, limit: int = 50) -> List[Dict[str, Any]]:
         """处理基于剧情树（scenario）定义的定时、依赖、概率触发逻辑"""
-        from ifrontier.infra.sqlite.news import list_pending_scenario_cards, has_variant, suppress_news
+        from ifrontier.infra.sqlite.news import (
+            claim_scenario_card,
+            has_variant,
+            list_pending_scenario_cards,
+            release_scenario_card,
+            suppress_news,
+        )
         
         pending = await asyncio.to_thread(list_pending_scenario_cards, limit=limit)
         events = []
@@ -479,6 +487,11 @@ class NewsTickEngine:
                     await asyncio.to_thread(suppress_news, card.card_id, "PROBABILITY_FAILURE")
                     _log.info("Scenario Card %s failed probability check (prob=%f)", card.card_id, prob)
                     continue
+
+            claimed = await asyncio.to_thread(claim_scenario_card, card.card_id)
+            if not claimed:
+                _log.info("Scenario Card %s already claimed by another tick", card.card_id)
+                continue
             
             # 4. 执行发布 (Emission)
             _log.info("Activating scenario card %s (kind=%s, scenario=%s)", card.card_id, card.kind, card.scenario_id)
@@ -489,12 +502,16 @@ class NewsTickEngine:
                 text = self._news.get_preset_template(kind=card.kind, symbols=card.symbols)
             
             # 发布变体
-            variant_id, var_ev = await asyncio.to_thread(
-                self._news.emit_variant,
-                card_id=card.card_id,
-                author_id=card.publisher_id or "system",
-                text=text
-            )
+            try:
+                variant_id, var_ev = await asyncio.to_thread(
+                    self._news.emit_variant,
+                    card_id=card.card_id,
+                    author_id=card.publisher_id or "system",
+                    text=text
+                )
+            except Exception:
+                await asyncio.to_thread(release_scenario_card, card.card_id)
+                raise
             events.append(var_ev.model_dump(mode="json"))
             
             # 如果是重大新闻，自动广播给全体玩家

@@ -126,6 +126,22 @@ export class ApiClient {
     return (await readJsonSafe(res)) as T
   }
 
+  async patch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+    const res = await fetch(this.url(path), {
+      method: 'PATCH',
+      headers: this.buildHeaders(options, true),
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+    if (!res.ok) {
+      const errBody = (await readJsonSafe(res)) as ApiErrorBody | unknown
+      const msg = (errBody as ApiErrorBody | undefined)?.detail ?? `HTTP ${res.status}`
+      throw new ApiError(res.status, msg, errBody)
+    }
+
+    return (await readJsonSafe(res)) as T
+  }
+
   async delete<T>(path: string, options?: RequestOptions): Promise<T> {
     const res = await fetch(this.url(path), {
       method: 'DELETE',

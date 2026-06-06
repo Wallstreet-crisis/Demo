@@ -24,6 +24,7 @@ class NewsRecord:
     suppression_reason: Optional[str]
     truth_payload: Dict[str, Any]
     image_uri: Optional[str]
+    image_anchor_id: Optional[str]
     preset_id: Optional[str]
     created_at: str = ""
     author_id: Optional[str] = None
@@ -36,6 +37,7 @@ class NewsRecord:
     success_criteria: Dict[str, Any] = None
     failure_outcome: Dict[str, Any] = None
     scenario_id: Optional[str] = None
+    activated_at: Optional[str] = None
 
     @staticmethod
     def from_row(row: Any) -> NewsRecord:
@@ -89,6 +91,7 @@ class NewsRecord:
             suppression_reason=get_v("suppression_reason"),
             truth_payload=truth_payload,
             image_uri=get_v("image_uri"),
+            image_anchor_id=get_v("image_anchor_id"),
             preset_id=get_v("preset_id"),
             created_at=get_v("created_at", ""),
             author_id=get_v("author_id"),
@@ -101,6 +104,7 @@ class NewsRecord:
             success_criteria=success_criteria,
             failure_outcome=failure_outcome,
             scenario_id=get_v("scenario_id"),
+            activated_at=get_v("activated_at"),
         )
 
 
@@ -109,6 +113,13 @@ def _add_column_if_not_exists(cur, table: str, column: str, type_def: str):
         cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {type_def}")
     except:
         pass
+
+
+def _ensure_news_column(conn: sqlite3.Connection, column: str, type_def: str) -> None:
+    info = conn.execute("PRAGMA table_info(news)").fetchall()
+    columns = {str(row[1]) for row in info}
+    if column not in columns:
+        conn.execute(f"ALTER TABLE news ADD COLUMN {column} {type_def}")
 
 
 def init_news_schema(conn: Optional[sqlite3.Connection] = None) -> None:
@@ -137,7 +148,8 @@ def init_news_schema(conn: Optional[sqlite3.Connection] = None) -> None:
             author_id TEXT,
             parent_variant_id TEXT,
             rarity TEXT DEFAULT 'COMMON',
-            faction TEXT
+            faction TEXT,
+            activated_at TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_news_card_id ON news(card_id);
         CREATE INDEX IF NOT EXISTS idx_news_variant_id ON news(variant_id);
@@ -169,6 +181,7 @@ def init_news_schema(conn: Optional[sqlite3.Connection] = None) -> None:
     _add_column_if_not_exists(cur, "news", "success_criteria_json", "TEXT")
     _add_column_if_not_exists(cur, "news", "failure_outcome_json", "TEXT")
     _add_column_if_not_exists(cur, "news", "scenario_id", "TEXT")
+    _add_column_if_not_exists(cur, "news", "activated_at", "TEXT")
 
     conn.commit()
 
@@ -183,6 +196,7 @@ def init_news_schema(conn: Optional[sqlite3.Connection] = None) -> None:
         ("mutation_depth", "INTEGER DEFAULT 0"),
         ("influence_cost", "REAL DEFAULT 0.0"),
         ("risk_roll_json", "TEXT"),
+        ("activated_at", "TEXT"),
     ]
     
     for col_name, col_def in migrations:
@@ -218,13 +232,24 @@ def save_news(
     success_criteria: Optional[Dict[str, Any]] = None,
     failure_outcome: Optional[Dict[str, Any]] = None,
     scenario_id: Optional[str] = None,
+    activated_at: Optional[str] = None,
 ) -> None:
     conn = get_connection()
     now = datetime.now(timezone.utc).isoformat()
+
+    _ensure_news_column(conn, "activated_at", "TEXT")
     
     pub_at = published_at
     if pub_at is None and variant_id is not None:
         pass
+
+    if activated_at is None and variant_id is None:
+        existing = conn.execute(
+            "SELECT activated_at FROM news WHERE card_id = ? AND variant_id IS NULL LIMIT 1",
+            (card_id,),
+        ).fetchone()
+        if existing is not None:
+            activated_at = existing["activated_at"]
 
     with conn:
         conn.execute(
@@ -235,8 +260,8 @@ def save_news(
                 truth_payload_json, image_uri, image_anchor_id, preset_id, rarity, faction, created_at,
                 author_id, parent_variant_id, mutation_depth, influence_cost, risk_roll_json,
                 parent_card_id, activation_prob, scheduled_at, success_criteria_json, failure_outcome_json,
-                scenario_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                scenario_id, activated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 card_id,
@@ -267,6 +292,7 @@ def save_news(
                 json.dumps(success_criteria or {}, ensure_ascii=False),
                 json.dumps(failure_outcome or {}, ensure_ascii=False),
                 scenario_id,
+                activated_at,
             ),
         )
 
@@ -296,6 +322,17 @@ def get_news(card_id: str, variant_id: Optional[str] = None) -> Optional[NewsRec
     return NewsRecord.from_row(row)
 
 
+def get_main_card(card_id: str) -> Optional[NewsRecord]:
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM news WHERE card_id = ? AND variant_id IS NULL LIMIT 1",
+        (card_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return NewsRecord.from_row(row)
+
+
 def get_variant(variant_id: str) -> Optional[Dict[str, Any]]:
     conn = get_connection()
     row = conn.execute(
@@ -313,6 +350,47 @@ def list_news(limit: int = 50, offset: int = 0) -> List[NewsRecord]:
         (limit, offset),
     ).fetchall()
     return [NewsRecord.from_row(r) for r in rows]
+
+
+def claim_scenario_card(card_id: str) -> bool:
+    conn = get_connection()
+    now = datetime.now(timezone.utc).isoformat()
+    _ensure_news_column(conn, "activated_at", "TEXT")
+    with conn:
+        cur = conn.execute(
+            """
+            UPDATE news
+            SET activated_at = ?
+            WHERE card_id = ?
+              AND variant_id IS NULL
+              AND activated_at IS NULL
+              AND is_suppressed = 0
+              AND scheduled_at IS NOT NULL
+            """,
+            (now, card_id),
+        )
+        return cur.rowcount > 0
+
+
+def release_scenario_card(card_id: str) -> None:
+    conn = get_connection()
+    _ensure_news_column(conn, "activated_at", "TEXT")
+    with conn:
+        conn.execute(
+            """
+            UPDATE news
+            SET activated_at = NULL
+            WHERE card_id = ?
+              AND variant_id IS NULL
+              AND activated_at IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM news v
+                  WHERE v.card_id = news.card_id
+                    AND v.variant_id IS NOT NULL
+              )
+            """,
+            (card_id,),
+        )
 
 
 def list_news_by_symbol(symbol: str, limit: int = 50) -> List[NewsRecord]:
@@ -402,7 +480,17 @@ def init_news_relationships_schema(conn: Optional[sqlite3.Connection] = None) ->
         CREATE INDEX IF NOT EXISTS idx_deliveries_variant ON news_deliveries(variant_id);
         """
     )
+    _ensure_news_deliveries_card_id_column(conn)
     conn.commit()
+
+
+def _ensure_news_deliveries_card_id_column(conn: sqlite3.Connection) -> None:
+    row = conn.execute("PRAGMA table_info(news_deliveries)").fetchall()
+    column_names = {str(r[1]) for r in row}
+    if "card_id" in column_names:
+        return
+    with conn:
+        conn.execute("ALTER TABLE news_deliveries ADD COLUMN card_id TEXT")
 
 
 def create_user(user_id: str) -> None:
@@ -489,6 +577,7 @@ def list_owned_cards(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
 
 def list_pending_scenario_cards(limit: int = 50) -> List[NewsRecord]:
     conn = get_connection()
+    _ensure_news_column(conn, "activated_at", "TEXT")
     # Find cards that:
     # 1. Have no variant (not yet emitted)
     # 2. Are not suppressed
@@ -500,6 +589,7 @@ def list_pending_scenario_cards(limit: int = 50) -> List[NewsRecord]:
         WHERE n.variant_id IS NULL 
         AND n.is_suppressed = 0 
         AND n.scheduled_at IS NOT NULL
+        AND n.activated_at IS NULL
         AND NOT EXISTS (
             SELECT 1 FROM news v 
             WHERE v.card_id = n.card_id 

@@ -21,7 +21,7 @@ def test_news_mutate_spends_cash_by_char_count(monkeypatch) -> None:
     monkeypatch.setenv("IF_NEWS_MUTATE_CASH_PER_CHAR", "0.5")
 
     editor = f"user:mutate:editor:{uuid4()}"
-    create_account(editor, owner_type="user", initial_cash=10.0)
+    create_account(editor, owner_type="user", initial_cash=3000.0)
 
     # Create a card + initial variant (GM/system-only endpoint)
     resp = client.post(
@@ -46,7 +46,7 @@ def test_news_mutate_spends_cash_by_char_count(monkeypatch) -> None:
     assert resp.status_code == 200
 
     snap = get_snapshot(editor)
-    assert abs(float(snap.cash) - 8.0) < 1e-6
+    assert abs(float(snap.cash) - 2998.0) < 1e-6
 
 
 def test_news_propagate_cost_increases_with_mutation_depth(monkeypatch) -> None:
@@ -58,7 +58,7 @@ def test_news_propagate_cost_increases_with_mutation_depth(monkeypatch) -> None:
     f1 = f"user:prop:f1:{uuid4()}"
     f2 = f"user:prop:f2:{uuid4()}"
 
-    create_account(actor, owner_type="user", initial_cash=10.0)
+    create_account(actor, owner_type="user", initial_cash=3000.0)
 
     # Build follower graph
     r = client.post("/social/follow", json={"follower_id": f1, "followee_id": actor})
@@ -105,5 +105,5 @@ def test_news_propagate_cost_increases_with_mutation_depth(monkeypatch) -> None:
     assert resp.json()["delivered"] == 1
 
     snap = get_snapshot(actor)
-    # 10 - 0.01(mutate) - 1.5(propagate) = 8.49
-    assert abs(float(snap.cash) - 8.49) < 1e-6
+    # 3000 - 0.01(mutate) - 1.5(propagate) = 2998.49
+    assert abs(float(snap.cash) - 2998.49) < 1e-6

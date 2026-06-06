@@ -16,7 +16,7 @@ _log = get_logger(__name__)
 
 from fastapi.concurrency import run_in_threadpool
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, Field, RootModel
 
 from ifrontier.app.ws import hub
 from ifrontier.domain.events.envelope import EventActor, EventEnvelope, EventEnvelopeJson
@@ -37,13 +37,14 @@ from ifrontier.services.contract_agent import ContractAgent
 from ifrontier.services.chat import ChatService
 from ifrontier.services.news import NewsService
 from ifrontier.services.news_tick import NewsTickEngine
-from ifrontier.domain.news.blueprints import registry as blueprint_registry
+from ifrontier.domain.news.blueprints import StoreTriggerMode, registry as blueprint_registry
 from ifrontier.services.game_time import load_game_time_config_from_env
 from ifrontier.services.market_session import get_market_session
 from ifrontier.infra.sqlite.hosting import get_hosting_state, upsert_hosting_state
 from ifrontier.services.hosting_scheduler import HostingScheduler
 from ifrontier.services.user_capabilities import UserCapabilityFacade
 from ifrontier.infra.sqlite.securities import load_securities_pool_from_env, set_status
+from ifrontier.infra.sqlite.news import get_card_owner, get_main_card, has_variant, save_news
 from ifrontier.services.market_maker import MarketMaker, MarketMakerConfig
 from ifrontier.infra.llm.client import LlmClient, LlmConfig, LlmError, extract_first_message_text
 from ifrontier.services.app_settings import (
@@ -161,7 +162,7 @@ def _get_room_contract_service():
 # ==========================================
 
 from ifrontier.app.room_engine import room_manager
-from ifrontier.app.room_meta import RoomGameSettings, get_local_rooms, create_or_update_room_meta, room_exists
+from ifrontier.app.room_meta import RoomGameSettings, RoomNewsStoreItemConfig, get_local_rooms, create_or_update_room_meta, room_exists
 
 class CreateRoomRequest(BaseModel):
     room_id: Optional[str] = None
@@ -658,6 +659,8 @@ class NewsStoreCatalogItem(BaseModel):
     kind: str
     price_cash: float
     requires_symbols: bool
+    trigger_mode: str
+    chain_kind: str
     preview_text: str
     description: str
     rarity: str
@@ -666,6 +669,7 @@ class NewsStoreCatalogItem(BaseModel):
     preview_image_uri: str | None = None
     tags: List[str] = []
     symbol: str | None = None
+    chain_defaults: Dict[str, Any] | None = None
 
 class NewsStoreCatalogResponse(BaseModel):
     items: List[NewsStoreCatalogItem]
@@ -697,30 +701,13 @@ async def news_store_catalog(user_id: str, force_refresh: bool = False) -> NewsS
     if not sec_symbols:
         sec_symbols = ["BLUEGOLD"]
 
-    default_symbol_by_kind: Dict[str, List[str]] = {
-        "LEAK": ["CIVILBANK", "NEURALINK", "FOODMART", "BLUEGOLD"],
-        "ANALYST_REPORT": ["NEURALINK", "CIVILBANK", "FOODMART", "BLUEGOLD"],
-        "OMEN": ["BLUEGOLD", "CIVILBANK", "NEURALINK", "FOODMART"],
-        "DISCLOSURE": ["CIVILBANK", "BLUEGOLD", "NEURALINK", "FOODMART"],
-        "EARNINGS": ["NEURALINK", "CIVILBANK", "FOODMART", "BLUEGOLD"],
-        "MAJOR_EVENT": ["BLUEGOLD", "NEURALINK", "CIVILBANK", "FOODMART"],
-    }
-
     out: List[NewsStoreCatalogItem] = []
     for bp, price in shelf_items:
-        kind = bp.kind
-        # 某些类型强制需要 symbols
-        requires_symbols = kind not in ["RUMOR", "WORLD_EVENT", "SYSTEM"]
+        kind = str(bp.kind)
         
         assigned_symbol: str | None = None
-        if requires_symbols:
-            preferred = default_symbol_by_kind.get(kind, [])
-            # 随机从推荐列表中选一个，或者回退到第一个
-            available = [p for p in preferred if p in sec_symbols]
-            if available:
-                assigned_symbol = random.choice(available)
-            else:
-                assigned_symbol = str(sec_symbols[0])
+        if bool(getattr(bp, "store_requires_symbols", False)):
+            assigned_symbol = str(sec_symbols[0]) if sec_symbols else None
 
         preview_symbols = [assigned_symbol] if assigned_symbol else []
         presets_texts = _get_room_news_service().get_preset_templates(kind=kind, symbols=preview_symbols)
@@ -729,20 +716,14 @@ async def news_store_catalog(user_id: str, force_refresh: bool = False) -> NewsS
             if presets_texts
             else _get_room_news_service().get_preset_template(kind=kind, symbols=preview_symbols)
         )
+
+        catalog_item = bp.resolve_store_catalog_item(price_cash=float(price), symbol=assigned_symbol)
+        catalog_item["preview_text"] = str(preview)
         
         out.append(
             NewsStoreCatalogItem(
-                kind=kind,
-                price_cash=price,
-                requires_symbols=requires_symbols,
+                **catalog_item,
                 preview_text=str(preview),
-                description=str(bp.description),
-                rarity=str(getattr(bp.rarity, "value", bp.rarity)),
-                faction=bp.faction,
-                default_ttl_hours=int(bp.default_ttl_hours),
-                preview_image_uri=(bp.image_pool[0] if bp.image_pool else None),
-                tags=list(bp.tags),
-                symbol=assigned_symbol,
             )
         )
 
@@ -2710,6 +2691,25 @@ def _get_global_news_db_conn():
     return conn
 
 
+def _scenario_meta_card_id(scenario_id: str) -> str:
+    return f"SCENARIO_META:{scenario_id}"
+
+
+def _parse_scenario_store_items(raw: Any) -> List[RoomNewsStoreItemConfig]:
+    if not isinstance(raw, list):
+        return []
+    items: List[RoomNewsStoreItemConfig] = []
+    for entry in raw:
+        try:
+            if isinstance(entry, RoomNewsStoreItemConfig):
+                items.append(entry)
+            elif isinstance(entry, dict):
+                items.append(RoomNewsStoreItemConfig(**entry))
+        except Exception:
+            continue
+    return items
+
+
 @router.get("/global/studio/news/scenarios")
 async def global_studio_news_scenarios() -> List[Dict[str, Any]]:
     # 彻底开放，不再校验身份
@@ -2722,9 +2722,66 @@ async def global_studio_news_scenarios() -> List[Dict[str, Any]]:
 async def global_studio_news_scenario_cards(scenario_id: str) -> List[Dict[str, Any]]:
     # 彻底开放，不再校验身份
     conn = _get_global_news_db_conn()
-    rows = conn.execute("SELECT * FROM news WHERE scenario_id = ? AND variant_id IS NULL", (scenario_id,)).fetchall()
+    rows = conn.execute("SELECT * FROM news WHERE scenario_id = ? AND variant_id IS NULL AND kind != 'SCENARIO_META'", (scenario_id,)).fetchall()
     from ifrontier.infra.sqlite.news import NewsRecord
     return [NewsRecord.from_row(r).__dict__ for r in rows]
+
+
+class NewsScenarioMetaRequest(BaseModel):
+    actor_id: str
+    background_story: str = ""
+    news_store_items: List[RoomNewsStoreItemConfig] = Field(default_factory=list)
+    correlation_id: UUID | None = None
+
+
+class NewsScenarioMetaResponse(BaseModel):
+    scenario_id: str
+    card_id: str
+    background_story: str = ""
+    news_store_items: List[RoomNewsStoreItemConfig] = Field(default_factory=list)
+    updated_at: str | None = None
+
+
+@router.get("/global/studio/news/scenarios/{scenario_id}/meta")
+async def global_studio_news_scenario_meta(scenario_id: str) -> NewsScenarioMetaResponse:
+    conn = _get_global_news_db_conn()
+    card_id = _scenario_meta_card_id(scenario_id)
+    row = conn.execute(
+        "SELECT * FROM news WHERE card_id = ? AND variant_id IS NULL AND kind = 'SCENARIO_META' LIMIT 1",
+        (card_id,),
+    ).fetchone()
+    if row is None:
+        return NewsScenarioMetaResponse(scenario_id=scenario_id, card_id=card_id)
+
+    from ifrontier.infra.sqlite.news import NewsRecord
+
+    record = NewsRecord.from_row(row)
+    payload = record.truth_payload or {}
+    return NewsScenarioMetaResponse(
+        scenario_id=scenario_id,
+        card_id=record.card_id,
+        background_story=record.text or "",
+        news_store_items=_parse_scenario_store_items(payload.get("news_store_items")),
+        updated_at=record.created_at or None,
+    )
+
+
+@router.patch("/global/studio/news/scenarios/{scenario_id}/meta")
+async def global_studio_news_update_scenario_meta(scenario_id: str, req: NewsScenarioMetaRequest) -> NewsScenarioMetaResponse:
+    _assert_studio_authorized(req.actor_id)
+    card_id = _scenario_meta_card_id(scenario_id)
+    save_news(
+        card_id=card_id,
+        kind="SCENARIO_META",
+        publisher_id=req.actor_id,
+        text=req.background_story,
+        symbols=[],
+        tags=["scenario_meta"],
+        truth_payload={"news_store_items": [item.model_dump() for item in req.news_store_items]},
+        author_id=req.actor_id,
+        scenario_id=scenario_id,
+    )
+    return await global_studio_news_scenario_meta(scenario_id)
 
 
 
@@ -2741,6 +2798,7 @@ class NewsCreateCardRequest(BaseModel):
     card_id: str | None = None
     image_anchor_id: str | None = None
     image_uri: str | None = None
+    text: str | None = None
     truth_payload: Dict[str, Any] | None = None
     symbols: list[str] = []
     tags: list[str] = []
@@ -2752,6 +2810,43 @@ class NewsCreateCardRequest(BaseModel):
     success_criteria: Dict[str, Any] | None = None
     failure_outcome: Dict[str, Any] | None = None
     scenario_id: str | None = None
+
+
+class NewsUpdateCardRequest(BaseModel):
+    actor_id: str
+    kind: str | None = None
+    image_anchor_id: str | None = None
+    image_uri: str | None = None
+    truth_payload: Dict[str, Any] | None = None
+    symbols: list[str] | None = None
+    tags: list[str] | None = None
+    parent_card_id: str | None = None
+    activation_prob: float | None = None
+    scheduled_at: str | None = None
+    success_criteria: Dict[str, Any] | None = None
+    failure_outcome: Dict[str, Any] | None = None
+    scenario_id: str | None = None
+    correlation_id: UUID | None = None
+
+
+class NewsUpdateCardResponse(BaseModel):
+    card_id: str
+    event_id: UUID | None = None
+    correlation_id: UUID | None = None
+
+
+class NewsActivateCardRequest(BaseModel):
+    actor_id: str
+    text: str | None = None
+    correlation_id: UUID | None = None
+
+
+class NewsActivateCardResponse(BaseModel):
+    card_id: str
+    variant_id: str | None = None
+    delivery_id: str | None = None
+    event_id: UUID | None = None
+    correlation_id: UUID | None = None
 
 
 @router.post("/global/studio/news/cards")
@@ -2776,7 +2871,7 @@ async def global_studio_news_create_card(req: NewsCreateCardRequest) -> NewsCrea
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    card_id, None, req.kind, None, json.dumps(req.symbols), json.dumps([]),
+                    card_id, None, req.kind, req.text, json.dumps(req.symbols), json.dumps([]),
                     req.actor_id, None, 0, None, json.dumps(req.truth_payload or {}),
                     req.image_uri, req.image_anchor_id, None, "COMMON", None, now,
                     req.actor_id, None, 0, 0.0, json.dumps({}),
@@ -2795,6 +2890,114 @@ async def global_studio_news_create_card(req: NewsCreateCardRequest) -> NewsCrea
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@router.patch("/studio/news/cards/{card_id}")
+async def studio_news_update_card(card_id: str, req: NewsUpdateCardRequest) -> NewsUpdateCardResponse:
+    _assert_studio_authorized(req.actor_id)
+    card = get_main_card(card_id)
+    if card is None:
+        raise HTTPException(status_code=404, detail="card not found")
+    if card.variant_id is not None:
+        raise HTTPException(status_code=400, detail="only main cards can be updated")
+    if has_variant(card_id):
+        raise HTTPException(status_code=400, detail="card already has variants and cannot be edited safely")
+
+    updated_kind = str(req.kind or card.kind)
+    updated_truth = dict(card.truth_payload or {})
+    if req.truth_payload:
+        updated_truth = dict(req.truth_payload)
+
+    updated_symbols = list(req.symbols if req.symbols is not None else card.symbols or [])
+    updated_tags = list(req.tags if req.tags is not None else card.tags or [])
+
+    save_news(
+        card_id=card.card_id,
+        kind=updated_kind,
+        publisher_id=card.publisher_id,
+        text=card.text,
+        symbols=updated_symbols,
+        tags=updated_tags,
+        truth_payload=updated_truth,
+        image_uri=req.image_uri if req.image_uri is not None else card.image_uri,
+        image_anchor_id=req.image_anchor_id if req.image_anchor_id is not None else card.image_anchor_id,
+        preset_id=card.preset_id,
+        rarity=card.rarity,
+        author_id=card.author_id,
+        parent_variant_id=card.parent_variant_id,
+        mutation_depth=0,
+        influence_cost=0.0,
+        risk_roll=None,
+        faction=card.faction,
+        parent_card_id=req.parent_card_id if req.parent_card_id is not None else card.parent_card_id,
+        activation_prob=float(req.activation_prob if req.activation_prob is not None else card.activation_prob),
+        scheduled_at=req.scheduled_at if req.scheduled_at is not None else card.scheduled_at,
+        success_criteria=req.success_criteria if req.success_criteria is not None else card.success_criteria,
+        failure_outcome=req.failure_outcome if req.failure_outcome is not None else card.failure_outcome,
+        scenario_id=req.scenario_id if req.scenario_id is not None else card.scenario_id,
+        activated_at=card.activated_at,
+    )
+
+    return NewsUpdateCardResponse(card_id=card.card_id, correlation_id=req.correlation_id)
+
+
+@router.post("/news/cards/{card_id}/activate")
+async def news_activate_card(card_id: str, req: NewsActivateCardRequest) -> NewsActivateCardResponse:
+    assert_player_can_act(req.actor_id)
+    card = get_main_card(card_id)
+    if card is None:
+        raise HTTPException(status_code=404, detail="card not found")
+    if card.variant_id is not None:
+        raise HTTPException(status_code=400, detail="only main cards can be activated")
+    if has_variant(card_id):
+        raise HTTPException(status_code=400, detail="card already activated")
+
+    bp_pool = blueprint_registry.find_by_kind(str(card.kind))
+    bp = bp_pool[0] if bp_pool else None
+    trigger_mode = getattr(bp, "store_trigger_mode", StoreTriggerMode.IMMEDIATE) if bp else StoreTriggerMode.IMMEDIATE
+    if not isinstance(trigger_mode, StoreTriggerMode):
+        trigger_mode = StoreTriggerMode(str(trigger_mode))
+    if trigger_mode == StoreTriggerMode.AUTO_CHAIN:
+        raise HTTPException(status_code=400, detail="auto-chain cards activate through purchase")
+
+    owner_id = get_card_owner(card_id)
+    privileged_actor = req.actor_id == "system" or req.actor_id == "author" or str(req.actor_id).startswith("gm:")
+    if owner_id is not None and owner_id != req.actor_id and not privileged_actor:
+        raise HTTPException(status_code=403, detail="only the owner can activate this card")
+    if owner_id is None and not privileged_actor:
+        raise HTTPException(status_code=403, detail="card has no owner")
+
+    text = req.text or card.text or _get_room_news_service().get_preset_template(kind=card.kind, symbols=card.symbols)
+    variant_id, variant_event = _get_room_news_service().emit_variant(
+        card_id=card.card_id,
+        author_id=req.actor_id,
+        text=text,
+        parent_variant_id=None,
+        influence_cost=0.0,
+        risk_roll=None,
+        correlation_id=req.correlation_id,
+    )
+    await hub.broadcast_many(["events", str(EventType.NEWS_VARIANT_EMITTED)], variant_event.model_dump())
+
+    delivery_target = owner_id or req.actor_id
+    delivery_id, delivered_event = _get_room_news_service().deliver_variant(
+        variant_id=variant_id,
+        to_player_id=str(delivery_target),
+        from_actor_id=req.actor_id,
+        visibility_level="NORMAL",
+        delivery_reason="MANUAL_ACTIVATION",
+        correlation_id=req.correlation_id,
+    )
+    if delivered_event is not None:
+        await hub.broadcast_many(["events", str(EventType.NEWS_DELIVERED)], delivered_event.model_dump())
+
+    return NewsActivateCardResponse(
+        card_id=card.card_id,
+        variant_id=variant_id,
+        delivery_id=delivery_id,
+        event_id=variant_event.event_id,
+        correlation_id=variant_event.correlation_id,
+    )
 
 
 
@@ -2998,7 +3201,7 @@ class NewsMutateVariantResponse(BaseModel):
 
 @router.post("/news/variants/mutate")
 async def news_mutate_variant(req: NewsMutateVariantRequest) -> NewsMutateVariantResponse:
-    assert_player_can_act(req.actor_id)
+    assert_player_can_act(req.editor_id)
     cash_cost = 0.0
     if req.spend_cash is not None and req.spend_cash > 0:
         cash_cost = float(req.spend_cash)
@@ -3115,7 +3318,7 @@ async def news_propagate_quote(req: NewsPropagateQuoteRequest) -> NewsPropagateQ
 
 @router.post("/news/propagate")
 async def news_propagate(req: NewsPropagateRequest) -> NewsPropagateResponse:
-    assert_player_can_act(req.actor_id)
+    assert_player_can_act(req.from_actor_id)
     requested_limit = int(req.limit)
     if requested_limit <= 0:
         return NewsPropagateResponse(delivered=0, correlation_id=req.correlation_id)
@@ -3437,28 +3640,23 @@ class NewsStorePurchaseResponse(BaseModel):
 async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchaseResponse:
     from ifrontier.infra.sqlite.securities import list_securities
 
-    items_cfg: List[Dict[str, Any]] = [
-        {"kind": "RUMOR", "price_cash": 2000.0, "requires_symbols": False},
-        {"kind": "LEAK", "price_cash": 15000.0, "requires_symbols": True},
-        {"kind": "ANALYST_REPORT", "price_cash": 8000.0, "requires_symbols": True},
-        {"kind": "OMEN", "price_cash": 25000.0, "requires_symbols": True},
-        {"kind": "DISCLOSURE", "price_cash": 45000.0, "requires_symbols": True},
-        {"kind": "EARNINGS", "price_cash": 35000.0, "requires_symbols": True},
-        {"kind": "MAJOR_EVENT", "price_cash": 100000.0, "requires_symbols": True},
-        {"kind": "WORLD_EVENT", "price_cash": 500000.0, "requires_symbols": False},
-    ]
-    kind_key = str(req.kind)
-    cfg = next((x for x in items_cfg if str(x.get("kind")) == kind_key), None)
-    if cfg is None:
+    kind_key = str(req.kind).upper()
+    bp_pool = blueprint_registry.find_by_kind(kind_key)
+    bp = bp_pool[0] if bp_pool else None
+    if bp is None:
         raise HTTPException(status_code=400, detail="unknown kind")
 
-    # 优先使用请求中的 price_cash；否则使用系统定价。
+    requires_symbols = bool(bp.store_requires_symbols)
+    trigger_mode = bp.resolve_store_trigger_mode()
+
     req_price = float(req.price_cash) if req.price_cash is not None else 0.0
-    system_price = req_price if req_price > 0 else float(cfg.get("price_cash") or 0.0)
+    system_price = req_price if req_price > 0 else bp.resolve_store_price_cash()
     if system_price <= 0:
         raise HTTPException(status_code=400, detail="invalid system price")
 
     req_symbols = list(req.symbols or [])
+    if requires_symbols and not req_symbols:
+        raise HTTPException(status_code=400, detail="symbols required for this kind")
     
     purchase_event_id = str(uuid4())
     try:
@@ -3466,8 +3664,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # MAJOR_EVENT / WORLD_EVENT
-    if str(req.kind) in {"MAJOR_EVENT", "WORLD_EVENT"}:
+    if trigger_mode == StoreTriggerMode.AUTO_CHAIN:
         try:
             t0_at = None
             if req.t0_at and str(req.t0_at).strip():
@@ -3475,29 +3672,36 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
                     t0_at = datetime.fromisoformat(str(req.t0_at).strip())
                 except ValueError:
                     t0_at = None
-            
+
             sec_symbols = [s.symbol for s in list_securities(status="TRADABLE")]
             if not sec_symbols:
                 sec_symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
-            
-            _log.info("Starting chain for %s, t0_at=%s, symbols=%s", req.kind, t0_at, req_symbols or sec_symbols)
-            # v0.1: 瀵逛簬娴嬭瘯闃舵锛屽皢榛樿鍊掕鏃朵粠 60s 缂╃煭鑷?15s锛屾彁楂樺弽棣堥€熷害
-            default_delay = 15 if str(req.kind) == "WORLD_EVENT" else 60
+
+            chain_defaults = bp.resolve_store_chain_defaults()
+            chain_kind = bp.resolve_store_chain_kind()
+            _log.info("Starting chain for %s -> %s, t0_at=%s, symbols=%s", req.kind, chain_kind, t0_at, req_symbols or sec_symbols)
             result = _news_tick_engine.start_chain(
-                kind=req.kind,
+                kind=chain_kind,
                 actor_id=req.buyer_user_id,
-                t0_seconds=int(req.t0_seconds if req.t0_seconds is not None else default_delay),
+                t0_seconds=int(chain_defaults.get("t0_seconds", req.t0_seconds)),
                 t0_at=t0_at,
-                omen_interval_seconds=int(req.omen_interval_seconds or 10),
-                abort_probability=float(req.abort_probability if req.abort_probability is not None else 0.3),
-                grant_count=int(req.grant_count if req.grant_count is not None else 2),
-                seed=int(req.seed if req.seed is not None else 1),
+                omen_interval_seconds=int(chain_defaults.get("omen_interval_seconds", req.omen_interval_seconds)),
+                abort_probability=float(chain_defaults.get("abort_probability", req.abort_probability)),
+                grant_count=int(chain_defaults.get("grant_count", req.grant_count)),
+                seed=int(chain_defaults.get("seed", req.seed)),
                 symbols=req_symbols if req_symbols else sec_symbols,
                 correlation_id=req.correlation_id,
             )
         except Exception as exc:
             _log.warning("Failed to start chain: %s", exc)
             raise HTTPException(status_code=400, detail=f"failed to start news chain: {str(exc)}")
+
+        card_event = result.get("card_created_event")
+        chain_event = result.get("chain_started_event")
+        if card_event is not None:
+            await hub.broadcast_many(["events", str(EventType.NEWS_CARD_CREATED)], card_event.model_dump())
+        if chain_event is not None:
+            await hub.broadcast_many(["events", str(EventType.NEWS_CHAIN_STARTED)], chain_event.model_dump())
 
         major_card_id = str(result["major_card_id"])
         # 璐拱鑰呰幏寰椾富浜嬩欢鍗℃墍鏈夋潈
@@ -3519,7 +3723,6 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
             variant_id=None,
         )
 
-    # 普通卡等效为“随机捡到”的新闻，先投递给购买者，后续再由其手动助推传播。
     symbols = req_symbols
     initial_text = req.initial_text
 
@@ -3535,6 +3738,27 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
     )
     await hub.broadcast_many(["events", str(EventType.NEWS_CARD_CREATED)], card_event.model_dump())
 
+    if trigger_mode == StoreTriggerMode.MANUAL:
+        try:
+            ownership_event = _get_room_news_service().grant_ownership(
+                card_id=card_id,
+                to_user_id=req.buyer_user_id,
+                granter_id="system",
+                correlation_id=req.correlation_id,
+            )
+            await hub.broadcast_many(["events", str(EventType.NEWS_OWNERSHIP_GRANTED)], ownership_event.model_dump())
+        except ValueError:
+            pass
+
+        return NewsStorePurchaseResponse(
+            kind=str(req.kind),
+            buyer_user_id=str(req.buyer_user_id),
+            card_id=str(card_id),
+            variant_id=None,
+            chain_id=None,
+        )
+
+    # 普通卡等效为“随机捡到”的新闻，先投递给购买者，后续再由其手动助推传播。
     variant_id, variant_event = _get_room_news_service().emit_variant(
         card_id=card_id,
         author_id=req.buyer_user_id,

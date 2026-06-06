@@ -27,6 +27,19 @@ import '@xyflow/react/dist/style.css';
 import { Api } from '../api';
 import { useAppSession } from '../app/context';
 
+type NewsStoreItemConfig = {
+  kind: string;
+  price_cash: number;
+  description: string;
+  requires_symbols: boolean;
+  trigger_mode: 'IMMEDIATE' | 'MANUAL' | 'AUTO_CHAIN';
+  tags: string[];
+  rarity: string;
+  chain_kind: string | null;
+  chain_defaults: Record<string, any>;
+  enabled: boolean;
+};
+
 interface NewsCard {
   card_id: string;
   kind: string;
@@ -52,6 +65,86 @@ interface Scenario {
   id: string;
   name: string;
 }
+
+const createDefaultScenarioStoreItems = (): NewsStoreItemConfig[] => ([
+  {
+    kind: 'RUMOR',
+    price_cash: 2000,
+    description: '来源不明的非官方消息，传播力强但可信度存疑。',
+    requires_symbols: false,
+    trigger_mode: 'IMMEDIATE',
+    tags: ['news', 'base'],
+    rarity: 'COMMON',
+    chain_kind: null,
+    chain_defaults: {},
+    enabled: true,
+  },
+  {
+    kind: 'LEAK',
+    price_cash: 15000,
+    description: '内部流出的机密文件，极具杀伤力。',
+    requires_symbols: true,
+    trigger_mode: 'IMMEDIATE',
+    tags: ['news', 'base'],
+    rarity: 'RARE',
+    chain_kind: null,
+    chain_defaults: {},
+    enabled: true,
+  },
+  {
+    kind: 'ANALYST_REPORT',
+    price_cash: 8000,
+    description: '机构发布的专业分析，对市场预期有显著引导。',
+    requires_symbols: true,
+    trigger_mode: 'IMMEDIATE',
+    tags: ['news', 'base'],
+    rarity: 'UNCOMMON',
+    chain_kind: null,
+    chain_defaults: {},
+    enabled: true,
+  },
+  {
+    kind: 'MAJOR_EVENT',
+    price_cash: 100000,
+    description: '足以改变行业格局的重大突发事件。',
+    requires_symbols: true,
+    trigger_mode: 'AUTO_CHAIN',
+    tags: ['news', 'chain'],
+    rarity: 'EPIC',
+    chain_kind: 'MAJOR_EVENT',
+    chain_defaults: { t0_seconds: 60, omen_interval_seconds: 10, abort_probability: 0.3, grant_count: 2, seed: 1 },
+    enabled: true,
+  },
+  {
+    kind: 'WORLD_EVENT',
+    price_cash: 500000,
+    description: '影响所有参与者的宏观系统性事件。',
+    requires_symbols: false,
+    trigger_mode: 'AUTO_CHAIN',
+    tags: ['news', 'chain'],
+    rarity: 'LEGENDARY',
+    chain_kind: 'WORLD_EVENT',
+    chain_defaults: { t0_seconds: 15, omen_interval_seconds: 10, abort_probability: 0.3, grant_count: 2, seed: 1 },
+    enabled: true,
+  },
+]);
+
+const cloneScenarioStoreItems = (items?: NewsStoreItemConfig[] | null): NewsStoreItemConfig[] => {
+  if (!items || items.length === 0) return createDefaultScenarioStoreItems();
+  return items.map((item) => ({
+    ...item,
+    tags: [...(item.tags || [])],
+    chain_defaults: { ...(item.chain_defaults || {}) },
+  }));
+};
+
+const toNewsStoreItem = (item: NewsStoreItemConfig) => ({
+  ...item,
+  price_cash: Number(item.price_cash || 0),
+  requires_symbols: !!item.requires_symbols,
+  chain_kind: item.chain_kind || null,
+  enabled: item.enabled !== false,
+});
 
 // 1. 自定义节点组件（符合游戏整体 Slate/Blue 风格）
 const CyberNewsNode = ({ data, selected }: any) => {
@@ -132,6 +225,8 @@ const NewsStudioPage: React.FC = () => {
   const [presets, setPresets] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
   const [scenarioFilter, setScenarioFilter] = useState('');
+  const [scenarioBackgroundStory, setScenarioBackgroundStory] = useState('');
+  const [scenarioStoreItems, setScenarioStoreItems] = useState<NewsStoreItemConfig[]>(() => createDefaultScenarioStoreItems());
   
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -167,8 +262,11 @@ const NewsStudioPage: React.FC = () => {
   useEffect(() => {
     if (selectedScenarioId) {
       loadScenarioCards(selectedScenarioId);
+      loadScenarioMeta(selectedScenarioId);
     } else {
       loadAllCards();
+      setScenarioBackgroundStory('');
+      setScenarioStoreItems(createDefaultScenarioStoreItems());
     }
     setSelectedCardId(null);
   }, [selectedScenarioId]);
@@ -209,6 +307,74 @@ const NewsStudioPage: React.FC = () => {
       const data = await Api.globalStudioNewsScenarios();
       setScenarios(data);
     } catch (err) { console.error('Failed to load scenarios:', err); }
+  };
+
+  const loadScenarioMeta = async (scenarioId: string) => {
+    try {
+      const meta = await Api.globalStudioNewsScenarioMeta(scenarioId);
+      setScenarioBackgroundStory(meta.background_story || '');
+      setScenarioStoreItems(cloneScenarioStoreItems(meta.news_store_items as any));
+    } catch (err) {
+      console.error('Failed to load scenario meta:', err);
+      setScenarioBackgroundStory('');
+      setScenarioStoreItems(createDefaultScenarioStoreItems());
+    }
+  };
+
+  const updateScenarioStoreItem = (index: number, patch: Partial<NewsStoreItemConfig>) => {
+    setScenarioStoreItems((items: NewsStoreItemConfig[]) => items.map((item: NewsStoreItemConfig, idx: number) => (idx === index ? { ...item, ...patch } : item)));
+  };
+
+  const updateScenarioStoreItemChainDefault = (index: number, key: string, value: string | number | boolean) => {
+    setScenarioStoreItems((items: NewsStoreItemConfig[]) => items.map((item: NewsStoreItemConfig, idx: number) => {
+      if (idx !== index) return item;
+      return {
+        ...item,
+        chain_defaults: {
+          ...(item.chain_defaults || {}),
+          [key]: value,
+        },
+      };
+    }));
+  };
+
+  const addScenarioStoreItem = () => {
+    setScenarioStoreItems((items: NewsStoreItemConfig[]) => ([
+      ...items,
+      {
+        kind: 'RUMOR',
+        price_cash: 0,
+        description: '',
+        requires_symbols: false,
+        trigger_mode: 'IMMEDIATE',
+        tags: [],
+        rarity: 'COMMON',
+        chain_kind: null,
+        chain_defaults: {},
+        enabled: true,
+      },
+    ]));
+  };
+
+  const removeScenarioStoreItem = (index: number) => {
+    setScenarioStoreItems((items: NewsStoreItemConfig[]) => items.filter((_: NewsStoreItemConfig, idx: number) => idx !== index));
+  };
+
+  const handleSaveScenarioMeta = async () => {
+    if (!selectedScenarioId) return;
+    try {
+      setLoading(true);
+      await Api.globalStudioNewsUpdateScenarioMeta(selectedScenarioId, {
+        actor_id: 'author',
+        background_story: scenarioBackgroundStory,
+        news_store_items: scenarioStoreItems.map(toNewsStoreItem),
+      });
+      alert('Scenario meta saved');
+    } catch (err) {
+      alert('保存场景元数据失败: ' + err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadAllCards = async () => {
@@ -502,6 +668,86 @@ const NewsStudioPage: React.FC = () => {
 
       {/* 2. 蓝图逻辑树 (Node Blueprint Editor Workspace) */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0f172a', position: 'relative' }}>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid #334155', background: '#111827', zIndex: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div>
+              <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', marginBottom: '4px' }}>SCENARIO META</div>
+              <h3 style={{ margin: 0, color: '#f1f5f9', fontSize: '16px' }}>{selectedScenarioId ? selectedScenarioId : 'NO_SCENARIO_SELECTED'}</h3>
+            </div>
+            <button
+              onClick={handleSaveScenarioMeta}
+              disabled={!selectedScenarioId || loading}
+              className="cyber-button active"
+              style={{ padding: '8px 14px' }}
+            >
+              <Save size={14} /> SAVE_SCENARIO_META
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="cyber-card" style={{ margin: 0 }}>
+              <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Book size={14} /> WORLD BACKGROUND STORY
+              </h3>
+              <textarea
+                className="cyber-input"
+                value={scenarioBackgroundStory}
+                onChange={(e) => setScenarioBackgroundStory(e.target.value)}
+                placeholder="Write the scenario background story here..."
+                style={{ width: '100%', minHeight: '120px', resize: 'vertical' }}
+              />
+            </div>
+
+            <div className="cyber-card" style={{ margin: 0 }}>
+              <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <GitBranch size={14} /> SCENARIO STORE CONFIG
+              </h3>
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '12px' }}>
+                商店配置跟随 scenario 保存，与背景故事属于同一层元数据。
+              </div>
+              <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {scenarioStoreItems.map((item, index) => (
+                  <div key={`${item.kind}-${index}`} style={{ border: '1px solid #334155', padding: '10px', background: 'rgba(0,0,0,0.2)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '8px', marginBottom: '8px' }}>
+                      <input className="cyber-input" value={item.kind} onChange={(e) => updateScenarioStoreItem(index, { kind: e.target.value.toUpperCase() })} />
+                      <input type="number" className="cyber-input" value={item.price_cash ?? 0} onChange={(e) => updateScenarioStoreItem(index, { price_cash: Number(e.target.value) })} />
+                    </div>
+                    <textarea className="cyber-input" value={item.description || ''} onChange={(e) => updateScenarioStoreItem(index, { description: e.target.value })} style={{ width: '100%', minHeight: '60px', resize: 'vertical', marginBottom: '8px' }} />
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                      <label style={{ fontSize: '11px', color: '#cbd5e1' }}><input type="checkbox" checked={!!item.requires_symbols} onChange={(e) => updateScenarioStoreItem(index, { requires_symbols: e.target.checked })} /> requires_symbols</label>
+                      <label style={{ fontSize: '11px', color: '#cbd5e1' }}><input type="checkbox" checked={item.enabled !== false} onChange={(e) => updateScenarioStoreItem(index, { enabled: e.target.checked })} /> enabled</label>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <select className="cyber-input" value={item.trigger_mode} onChange={(e) => updateScenarioStoreItem(index, { trigger_mode: e.target.value as any })}>
+                        <option value="IMMEDIATE">IMMEDIATE</option>
+                        <option value="MANUAL">MANUAL</option>
+                        <option value="AUTO_CHAIN">AUTO_CHAIN</option>
+                      </select>
+                      <select className="cyber-input" value={item.rarity || 'COMMON'} onChange={(e) => updateScenarioStoreItem(index, { rarity: e.target.value })}>
+                        <option value="COMMON">COMMON</option>
+                        <option value="UNCOMMON">UNCOMMON</option>
+                        <option value="RARE">RARE</option>
+                        <option value="EPIC">EPIC</option>
+                        <option value="LEGENDARY">LEGENDARY</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
+                      <input className="cyber-input" value={item.chain_kind || ''} onChange={(e) => updateScenarioStoreItem(index, { chain_kind: e.target.value ? e.target.value.toUpperCase() : null })} placeholder="chain_kind" />
+                      <input className="cyber-input" value={(item.tags || []).join(', ')} onChange={(e) => updateScenarioStoreItem(index, { tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} placeholder="tags" />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '8px' }}>
+                      <input type="number" className="cyber-input" value={Number(item.chain_defaults?.t0_seconds ?? 0)} onChange={(e) => updateScenarioStoreItemChainDefault(index, 't0_seconds', Number(e.target.value))} placeholder="t0" />
+                      <input type="number" className="cyber-input" value={Number(item.chain_defaults?.omen_interval_seconds ?? 0)} onChange={(e) => updateScenarioStoreItemChainDefault(index, 'omen_interval_seconds', Number(e.target.value))} placeholder="omen" />
+                      <input type="number" step="0.01" className="cyber-input" value={Number(item.chain_defaults?.abort_probability ?? 0)} onChange={(e) => updateScenarioStoreItemChainDefault(index, 'abort_probability', Number(e.target.value))} placeholder="abort" />
+                    </div>
+                    <button onClick={() => removeScenarioStoreItem(index)} style={{ marginTop: '8px', background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '11px' }}>REMOVE</button>
+                  </div>
+                ))}
+              </div>
+              <button onClick={addScenarioStoreItem} type="button" className="cyber-button" style={{ marginTop: '10px', width: '100%' }}>+ ADD_STORE_ITEM</button>
+            </div>
+          </div>
+        </div>
         
         {/* 工具栏 */}
         <div style={{ height: '60px', borderBottom: '1px solid #334155', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', zIndex: 10 }}>

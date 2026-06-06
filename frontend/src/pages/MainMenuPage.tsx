@@ -4,7 +4,6 @@ import { Api } from '../api'
 import { useAppSession } from '../app/context'
 import SettingsModal from '../components/SettingsModal'
 
-
 export default function MainMenuPage() {
   const nav = useNavigate()
   const { setPlayerId: setGlobalPlayerId, setCasteId, setRoomId } = useAppSession()
@@ -14,8 +13,6 @@ export default function MainMenuPage() {
   const [localRooms, setLocalRooms] = useState<any[]>([])
   const [remoteRooms, setRemoteRooms] = useState<any[]>([])
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
-  const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
-  const [editingName, setEditingName] = useState('')
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [networkScanning, setNetworkScanning] = useState(false)
@@ -33,6 +30,26 @@ export default function MainMenuPage() {
     } catch (e) {
       console.error('Failed to load global scenarios:', e)
     }
+  }
+
+  const syncRoomEditorFromMeta = (room: any) => {
+    const settings = room?.game_settings || {}
+    setRoomTimeLimitEnabled(!!settings.time_limit_seconds)
+    setRoomTimeLimitMinutes(String(Math.max(5, Math.round((settings.time_limit_seconds || 1800) / 60))))
+    setSelectedScenario(settings.scenario_id || '')
+  }
+
+  const buildRoomGameSettings = () => {
+    const minutes = Number(roomTimeLimitMinutes)
+    const game_settings: any = {
+      scenario_id: selectedScenario || undefined,
+    }
+    if (roomTimeLimitEnabled && Number.isFinite(minutes) && minutes > 0) {
+      game_settings.time_limit_seconds = Math.round(minutes * 60)
+    } else {
+      game_settings.time_limit_seconds = null
+    }
+    return game_settings
   }
 
   const fetchLocalRooms = async () => {
@@ -56,7 +73,6 @@ export default function MainMenuPage() {
       fetchLocalRooms()
       fetchGlobalScenarios()
       setSelectedRoomId(null)
-      setEditingRoomId(null)
     } else if (activeView === 'NETWORK') {
       setRemoteRooms([])
       setSelectedRoomId(null)
@@ -77,17 +93,6 @@ export default function MainMenuPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [activeView, showSettings])
-
-  const handleRenameSave = async (roomId: string, newName: string) => {
-    if (!newName.trim()) return
-    try {
-      await Api.updateRoomMeta(roomId, newName.trim())
-      setEditingRoomId(null)
-      fetchLocalRooms()
-    } catch (e) {
-      console.error('Failed to rename room:', e)
-    }
-  }
 
   const handleDeleteSave = async (roomId: string) => {
     if (!window.confirm('Are you sure you want to permanently delete this simulation data?')) return
@@ -111,13 +116,7 @@ export default function MainMenuPage() {
     if (activeView === 'LOCAL') {
       localStorage.removeItem('if_network_target')
     }
-    const minutes = Number(roomTimeLimitMinutes)
-    const game_settings: any = {
-      scenario_id: selectedScenario || undefined
-    }
-    if (roomTimeLimitEnabled && Number.isFinite(minutes) && minutes > 0) {
-      game_settings.time_limit_seconds = Math.round(minutes * 60)
-    }
+    const game_settings = buildRoomGameSettings()
     
     // 我们暂时使用 HOST 作为创建者标识
     const createRoomPromise = Api.createRoom({ player_id: 'HOST', game_settings })
@@ -148,15 +147,7 @@ export default function MainMenuPage() {
     const room = (activeView === 'LOCAL' ? localRooms : remoteRooms).find(r => r.room_id === selectedRoomId)
     if (!room) return
 
-    const minutes = Number(roomTimeLimitMinutes)
-    const game_settings: any = {
-      scenario_id: selectedScenario || undefined
-    }
-    if (roomTimeLimitEnabled && Number.isFinite(minutes) && minutes > 0) {
-      game_settings.time_limit_seconds = Math.round(minutes * 60)
-    } else {
-      game_settings.time_limit_seconds = null
-    }
+    const game_settings = buildRoomGameSettings()
 
     try {
       const res = await Api.updateRoomMeta(selectedRoomId, room.name, game_settings)
@@ -245,7 +236,7 @@ export default function MainMenuPage() {
           color: '#64748b',
           fontFamily: 'monospace' 
         }}>
-          01_ENVIRONMENT_STABILITY
+          {isEdit ? '01_ENVIRONMENT_STABILITY // EDIT' : '01_ENVIRONMENT_STABILITY // CREATE'}
         </div>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#fff', marginBottom: '16px', cursor: 'pointer' }}>
@@ -300,7 +291,7 @@ export default function MainMenuPage() {
         </div>
       </div>
 
-      {/* 模块2: 剧本选择与设计 */}
+      {/* 模块3: 剧本选择与设计 */}
       <div style={{ 
         padding: '16px', 
         border: '1px solid var(--terminal-border)', 
@@ -317,7 +308,7 @@ export default function MainMenuPage() {
           color: '#64748b',
           fontFamily: 'monospace' 
         }}>
-          02_SIMULATION_BLUEPRINT
+          03_SIMULATION_BLUEPRINT
         </div>
 
         <div style={{ marginBottom: '16px' }}>
@@ -665,9 +656,7 @@ export default function MainMenuPage() {
                             onClick={(e) => {
                               e.stopPropagation()
                               setSelectedRoomId(room.room_id)
-                              setRoomTimeLimitEnabled(!!room.game_settings?.time_limit_seconds)
-                              setRoomTimeLimitMinutes(String(Math.round((room.game_settings?.time_limit_seconds || 1800) / 60)))
-                              setSelectedScenario(room.game_settings?.scenario_id || '')
+                              syncRoomEditorFromMeta(room)
                               setActiveLocalView('EDIT')
                             }}
                             style={{ background: 'transparent', border: 'none', color: 'var(--terminal-info)', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline', fontFamily: 'monospace' }}
@@ -714,7 +703,7 @@ export default function MainMenuPage() {
               {/* 2. 创建/编辑模式 */}
               {(activeLocalView === 'CREATE' || activeLocalView === 'EDIT') && (
                 <div style={{ padding: '4px' }}>
-                  {renderRoomSettings()}
+                  {renderRoomSettings(activeLocalView === 'EDIT')}
                   <div style={{ marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <MenuButton 
                       onClick={activeLocalView === 'CREATE' ? handleCreateNewSimulation : handleUpdateRoomSettings} 
@@ -727,7 +716,7 @@ export default function MainMenuPage() {
               )}
 
               {/* 3. 加入模式 */}
-              {(activeLocalView === 'JOIN' || (activeLocalView === 'LOAD' && selectedRoomId)) && activeLocalView !== 'EDIT' && (
+              {(activeLocalView === 'JOIN' || (activeLocalView === 'LOAD' && selectedRoomId)) && (
                 <div style={{ maxWidth: '440px', margin: '40px auto' }}>
                   <div style={{ marginBottom: '32px' }}>
                     <div style={{ fontSize: '12px', color: 'var(--terminal-info)', marginBottom: '12px', fontFamily: 'monospace', textAlign: 'center', letterSpacing: '2px' }}>AUTHENTICATING PLAYER_ID</div>

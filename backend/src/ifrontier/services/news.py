@@ -43,6 +43,15 @@ class NewsService:
             out[bp.kind] = bp.templates
         return out
 
+    def list_users(self, limit: int = 5000) -> List[str]:
+        return news_db.list_all_users(limit=int(limit))
+
+    def follow(self, *, follower_id: str, followee_id: str) -> None:
+        news_db.follow(follower_id=str(follower_id), followee_id=str(followee_id))
+
+    def _now_game_utc(self) -> datetime:
+        return datetime.now(timezone.utc)
+
     def get_preset_news_params(self, *, kind: str, theme: str | None = None) -> Dict[str, Any]:
         kind_key = str(kind or "UNKNOWN").upper()
         
@@ -226,7 +235,7 @@ class NewsService:
         final_items_for_return = []
         
         for bp in selected_bps:
-            base_price = 2000.0
+            base_price = float(getattr(bp, "store_price_cash", 0.0) or 2000.0)
             rarity_key = str(getattr(bp.rarity, "value", bp.rarity))
             rarity_mult = rarity_multipliers.get(rarity_key, 1.0)
             
@@ -265,6 +274,7 @@ class NewsService:
         scheduled_at: str | None = None,
         success_criteria: Dict[str, Any] | None = None,
         failure_outcome: Dict[str, Any] | None = None,
+        scenario_id: str | None = None,
     ) -> tuple[str, EventEnvelopeJson]:
         now = datetime.now(timezone.utc)
         card_id = str(uuid4())
@@ -301,6 +311,7 @@ class NewsService:
             scheduled_at=scheduled_at,
             success_criteria=success_criteria,
             failure_outcome=failure_outcome,
+            scenario_id=scenario_id,
         )
 
         payload = NewsCardCreatedPayload(

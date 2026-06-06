@@ -254,6 +254,7 @@ export type NewsCreateCardRequest = {
   kind: string
   image_anchor_id?: string | null
   image_uri?: string | null
+  text?: string | null
   truth_payload?: Record<string, unknown> | null
   symbols?: string[]
   tags?: string[]
@@ -280,6 +281,34 @@ export type NewsEmitVariantResponse = {
   variant_id: string
   event_id: string
   correlation_id: string | null
+}
+
+export type RoomNewsStoreItemConfig = {
+  kind: string
+  price_cash?: number
+  description?: string
+  requires_symbols?: boolean
+  trigger_mode?: 'IMMEDIATE' | 'MANUAL' | 'AUTO_CHAIN' | string
+  tags?: string[]
+  rarity?: string
+  chain_kind?: string | null
+  chain_defaults?: Record<string, unknown>
+  enabled?: boolean
+}
+
+export type NewsScenarioMetaRequest = {
+  actor_id: string
+  background_story?: string
+  news_store_items?: RoomNewsStoreItemConfig[]
+  correlation_id?: string | null
+}
+
+export type NewsScenarioMetaResponse = {
+  scenario_id: string
+  card_id: string
+  background_story: string
+  news_store_items: RoomNewsStoreItemConfig[]
+  updated_at?: string | null
 }
 
 export type NewsMutateVariantRequest = {

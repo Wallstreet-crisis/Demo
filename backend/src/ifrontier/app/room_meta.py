@@ -5,12 +5,26 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+class RoomNewsStoreItemConfig(BaseModel):
+    kind: str
+    price_cash: float = 0.0
+    description: str = ""
+    requires_symbols: bool = False
+    trigger_mode: str = "IMMEDIATE"
+    tags: List[str] = Field(default_factory=list)
+    rarity: str = "COMMON"
+    chain_kind: Optional[str] = None
+    chain_defaults: Dict[str, Any] = Field(default_factory=dict)
+    enabled: bool = True
+
+
 class RoomGameSettings(BaseModel):
     time_limit_seconds: Optional[int] = None
     ultimate_owner_threshold: Optional[float] = None
     mass_bankruptcy_mode: Optional[bool] = None
     min_active_players: Optional[int] = None
     scenario_id: Optional[str] = None
+    news_store_items: List[RoomNewsStoreItemConfig] = Field(default_factory=list)
 
 
 class RoomMeta(BaseModel):

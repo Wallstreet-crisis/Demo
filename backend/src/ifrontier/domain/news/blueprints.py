@@ -7,6 +7,11 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 
+class StoreTriggerMode(str, Enum):
+    IMMEDIATE = "IMMEDIATE"
+    MANUAL = "MANUAL"
+    AUTO_CHAIN = "AUTO_CHAIN"
+
 class CardRarity(str, Enum):
     COMMON = "COMMON"
     UNCOMMON = "UNCOMMON"
@@ -30,6 +35,11 @@ class IntelligenceBlueprint:
     tags: List[str] = field(default_factory=list)
     behavior_bindings: Dict[str, Any] = field(default_factory=dict)
     price_modifier: float = 1.0 # 价格修正系数
+    store_price_cash: float = 0.0
+    store_requires_symbols: bool = False
+    store_trigger_mode: StoreTriggerMode = StoreTriggerMode.IMMEDIATE
+    store_chain_kind: Optional[str] = None
+    store_chain_defaults: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def full_id(self) -> str:
@@ -38,10 +48,48 @@ class IntelligenceBlueprint:
     @classmethod
     def from_dict(cls, data: Dict[str, Any], namespace: str = "base") -> IntelligenceBlueprint:
         if "rarity" in data:
-            data["rarity"] = CardRarity(data["rarity"])
+            data["rarity"] = CardRarity(str(data["rarity"]).upper())
+        if "store_trigger_mode" in data:
+            data["store_trigger_mode"] = StoreTriggerMode(str(data["store_trigger_mode"]).upper())
+        if "store_chain_kind" in data and data["store_chain_kind"] is not None:
+            data["store_chain_kind"] = str(data["store_chain_kind"]).upper()
         if "namespace" not in data:
             data["namespace"] = namespace
         return cls(**data)
+
+    def resolve_store_price_cash(self, fallback: float | None = None) -> float:
+        value = self.store_price_cash if self.store_price_cash is not None else fallback
+        return float(value or 0.0)
+
+    def resolve_store_trigger_mode(self) -> StoreTriggerMode:
+        mode = self.store_trigger_mode
+        if isinstance(mode, StoreTriggerMode):
+            return mode
+        return StoreTriggerMode(str(mode).upper())
+
+    def resolve_store_chain_defaults(self) -> Dict[str, Any]:
+        return dict(self.store_chain_defaults or {})
+
+    def resolve_store_chain_kind(self) -> str:
+        return str(self.store_chain_kind or self.kind).upper()
+
+    def resolve_store_catalog_item(self, *, price_cash: float, symbol: str | None = None) -> Dict[str, Any]:
+        return {
+            "kind": str(self.kind),
+            "price_cash": float(price_cash),
+            "requires_symbols": bool(self.store_requires_symbols),
+            "trigger_mode": self.resolve_store_trigger_mode().value,
+            "chain_kind": self.resolve_store_chain_kind(),
+            "preview_text": "",
+            "description": str(self.description),
+            "rarity": str(getattr(self.rarity, "value", self.rarity)),
+            "faction": self.faction,
+            "default_ttl_hours": int(self.default_ttl_hours),
+            "preview_image_uri": self.image_pool[0] if self.image_pool else None,
+            "tags": list(self.tags),
+            "symbol": symbol,
+            "chain_defaults": self.resolve_store_chain_defaults() or None,
+        }
 
 @dataclass
 class BlueprintPack:
@@ -79,6 +127,9 @@ class BlueprintRegistry:
                 "weight": 10.0,
                 "faction": "NEUTRAL",
                 "default_ttl_hours": 6,
+                "store_price_cash": 2000.0,
+                "store_requires_symbols": False,
+                "store_trigger_mode": "IMMEDIATE",
                 "image_pool": ["/assets/news/rumor_1.webp", "/assets/news/rumor_2.webp"],
                 "behavior_bindings": {
                     "market_volatility": 0.05,
@@ -98,6 +149,9 @@ class BlueprintRegistry:
                 "weight": 5.0,
                 "faction": "HACKER",
                 "default_ttl_hours": 12,
+                "store_price_cash": 15000.0,
+                "store_requires_symbols": True,
+                "store_trigger_mode": "IMMEDIATE",
                 "image_pool": ["/assets/news/leak_1.webp"],
                 "behavior_bindings": {
                     "price_impact": 0.15,
@@ -116,6 +170,9 @@ class BlueprintRegistry:
                 "weight": 8.0,
                 "faction": "CORPORATE",
                 "default_ttl_hours": 24,
+                "store_price_cash": 8000.0,
+                "store_requires_symbols": True,
+                "store_trigger_mode": "IMMEDIATE",
                 "behavior_bindings": {
                     "institutional_bias": 0.08,
                     "target_price_modifier": 1.15
@@ -133,6 +190,16 @@ class BlueprintRegistry:
                 "weight": 2.0,
                 "faction": "CORPORATE",
                 "default_ttl_hours": 48,
+                "store_price_cash": 100000.0,
+                "store_requires_symbols": True,
+                "store_trigger_mode": "AUTO_CHAIN",
+                "store_chain_defaults": {
+                    "t0_seconds": 60,
+                    "omen_interval_seconds": 10,
+                    "abort_probability": 0.3,
+                    "grant_count": 2,
+                    "seed": 1,
+                },
                 "behavior_bindings": {
                     "sector_wide_impact": True,
                     "fundamental_shift": 0.25
@@ -150,6 +217,16 @@ class BlueprintRegistry:
                 "weight": 1.0,
                 "faction": "GOVERNMENT",
                 "default_ttl_hours": 72,
+                "store_price_cash": 500000.0,
+                "store_requires_symbols": False,
+                "store_trigger_mode": "AUTO_CHAIN",
+                "store_chain_defaults": {
+                    "t0_seconds": 15,
+                    "omen_interval_seconds": 10,
+                    "abort_probability": 0.3,
+                    "grant_count": 2,
+                    "seed": 1,
+                },
                 "behavior_bindings": {
                     "macro_regime_change": True,
                     "global_liquidity_delta": 0.1

@@ -23,7 +23,7 @@ def test_news_card_variant_mutate_propagate_and_inbox() -> None:
     u_follower = f"user:follower:{uuid4()}"
 
     # Cash-backed costs are explicit: mutation/propagation may consume cash.
-    create_account(u_author, owner_type="user", initial_cash=100.0)
+    create_account(u_author, owner_type="user", initial_cash=3000.0)
 
     # follower follows author, so author can propagate to follower
     resp = client.post(

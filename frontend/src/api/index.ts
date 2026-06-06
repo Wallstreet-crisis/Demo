@@ -79,6 +79,8 @@ import type {
   NewsSuppressResponse,
   NewsTickRequest,
   NewsTickResponse,
+  NewsScenarioMetaRequest,
+  NewsScenarioMetaResponse,
   PlayerAccountResponse,
   ContractResponse,
   PlayerBootstrapRequest,
@@ -95,6 +97,7 @@ import type {
   DebugEmitEventResponse,
   PlayerListResponse,
   ContractListResponse,
+  RoomNewsStoreItemConfig,
 } from './types'
 
 export type CreateRoomRequest = {
@@ -109,6 +112,8 @@ export type RoomGameSettings = {
   ultimate_owner_threshold?: number | null
   mass_bankruptcy_mode?: boolean | null
   min_active_players?: number | null
+  scenario_id?: string | null
+  news_store_items?: RoomNewsStoreItemConfig[]
 }
 
 export type CreateRoomResponse = {
@@ -288,7 +293,10 @@ export const Api = {
 
   globalStudioNewsScenarios: () => api.get<any[]>('/global/studio/news/scenarios'),
   globalStudioNewsScenarioCards: (scenarioId: string) => api.get<any[]>(`/global/studio/news/scenarios/${encodeURIComponent(scenarioId)}/cards`),
+  globalStudioNewsScenarioMeta: (scenarioId: string) => api.get<NewsScenarioMetaResponse>(`/global/studio/news/scenarios/${encodeURIComponent(scenarioId)}/meta`),
   globalStudioNewsCreateCard: (req: any) => api.post<any>('/global/studio/news/cards', req),
+  globalStudioNewsUpdateScenarioMeta: (scenarioId: string, req: NewsScenarioMetaRequest) =>
+    api.patch<NewsScenarioMetaResponse>(`/global/studio/news/scenarios/${encodeURIComponent(scenarioId)}/meta`, req),
   globalStudioNewsVariants: (cardId: string) => api.get<any[]>(`/global/studio/news/cards/${encodeURIComponent(cardId)}/variants`),
   globalStudioNewsEmitVariant: (req: any) => api.post<any>('/global/studio/news/variants/emit', req),
 
