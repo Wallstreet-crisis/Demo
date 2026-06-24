@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
@@ -27,6 +27,18 @@ import '@xyflow/react/dist/style.css';
 import { Api } from '../api';
 import { useAppSession } from '../app/context';
 
+type NewsStoreChainTreeNode = {
+  node_id: string;
+  kind: string;
+  text: string;
+  scheduled_delay_seconds: number;
+  activation_prob: number;
+  symbols: string[];
+  tags: string[];
+  truth_payload: Record<string, any>;
+  parent_node_id: string | null;
+};
+
 type NewsStoreItemConfig = {
   kind: string;
   price_cash: number;
@@ -37,6 +49,7 @@ type NewsStoreItemConfig = {
   rarity: string;
   chain_kind: string | null;
   chain_defaults: Record<string, any>;
+  chain_tree: NewsStoreChainTreeNode[];
   enabled: boolean;
 };
 
@@ -101,6 +114,7 @@ const createDefaultScenarioStoreItems = (): NewsStoreItemConfig[] => ([
     rarity: 'COMMON',
     chain_kind: null,
     chain_defaults: {},
+    chain_tree: [],
     enabled: true,
   },
   {
@@ -113,10 +127,11 @@ const createDefaultScenarioStoreItems = (): NewsStoreItemConfig[] => ([
     rarity: 'RARE',
     chain_kind: null,
     chain_defaults: {},
+    chain_tree: [],
     enabled: true,
   },
   {
-    kind: 'ANALYST_REPORT',
+    kind: 'REPORT',
     price_cash: 8000,
     description: '机构发布的专业分析，对市场预期有显著引导。',
     requires_symbols: true,
@@ -125,6 +140,7 @@ const createDefaultScenarioStoreItems = (): NewsStoreItemConfig[] => ([
     rarity: 'UNCOMMON',
     chain_kind: null,
     chain_defaults: {},
+    chain_tree: [],
     enabled: true,
   },
   {
@@ -137,6 +153,7 @@ const createDefaultScenarioStoreItems = (): NewsStoreItemConfig[] => ([
     rarity: 'EPIC',
     chain_kind: 'MAJOR_EVENT',
     chain_defaults: { t0_seconds: 60, omen_interval_seconds: 10, abort_probability: 0.3, grant_count: 2, seed: 1 },
+    chain_tree: [],
     enabled: true,
   },
   {
@@ -149,6 +166,7 @@ const createDefaultScenarioStoreItems = (): NewsStoreItemConfig[] => ([
     rarity: 'LEGENDARY',
     chain_kind: 'WORLD_EVENT',
     chain_defaults: { t0_seconds: 15, omen_interval_seconds: 10, abort_probability: 0.3, grant_count: 2, seed: 1 },
+    chain_tree: [],
     enabled: true,
   },
 ]);
@@ -159,6 +177,7 @@ const cloneScenarioStoreItems = (items?: NewsStoreItemConfig[] | null): NewsStor
     ...item,
     tags: [...(item.tags || [])],
     chain_defaults: { ...(item.chain_defaults || {}) },
+    chain_tree: (item.chain_tree || []).map((n) => ({ ...n, symbols: [...(n.symbols || [])], tags: [...(n.tags || [])], truth_payload: { ...(n.truth_payload || {}) } })),
   }));
 };
 
@@ -166,6 +185,17 @@ const toNewsStoreItem = (item: NewsStoreItemConfig) => ({
   ...item,
   price_cash: Number(item.price_cash || 0),
   requires_symbols: !!item.requires_symbols,
+  chain_tree: (item.chain_tree || []).map((n) => ({
+    node_id: n.node_id,
+    kind: n.kind,
+    text: n.text || '',
+    scheduled_delay_seconds: Number(n.scheduled_delay_seconds || 0),
+    activation_prob: Number(n.activation_prob ?? 1.0),
+    symbols: [...(n.symbols || [])],
+    tags: [...(n.tags || [])],
+    truth_payload: { ...(n.truth_payload || {}) },
+    parent_node_id: n.parent_node_id || null,
+  })),
   chain_kind: item.chain_kind || null,
   enabled: item.enabled !== false,
 });
@@ -248,6 +278,7 @@ const NewsStudioPage: React.FC = () => {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [presets, setPresets] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
   const [scenarioFilter, setScenarioFilter] = useState('');
   const [scenarioBackgroundStory, setScenarioBackgroundStory] = useState('');
   const [scenarioWorldview, setScenarioWorldview] = useState<ScenarioWorldviewConfig>(() => createDefaultScenarioWorldview());
@@ -373,6 +404,46 @@ const NewsStudioPage: React.FC = () => {
     }));
   };
 
+  const generateNodeId = () => `node_${Math.random().toString(36).slice(2, 9)}_${Date.now().toString(36)}`;
+
+  const addChainTreeNode = (itemIndex: number, parentNodeId: string | null = null) => {
+    setScenarioStoreItems((items: NewsStoreItemConfig[]) => items.map((item: NewsStoreItemConfig, idx: number) => {
+      if (idx !== itemIndex) return item;
+      const newNode: NewsStoreChainTreeNode = {
+        node_id: generateNodeId(),
+        kind: item.kind || 'RUMOR',
+        text: '',
+        scheduled_delay_seconds: 60,
+        activation_prob: 1.0,
+        symbols: [],
+        tags: [],
+        truth_payload: {},
+        parent_node_id: parentNodeId,
+      };
+      return { ...item, chain_tree: [...(item.chain_tree || []), newNode] };
+    }));
+  };
+
+  const removeChainTreeNode = (itemIndex: number, nodeId: string) => {
+    setScenarioStoreItems((items: NewsStoreItemConfig[]) => items.map((item: NewsStoreItemConfig, idx: number) => {
+      if (idx !== itemIndex) return item;
+      const remaining = (item.chain_tree || []).filter((n) => n.node_id !== nodeId);
+      // also clear references to removed node as parent
+      const cleaned = remaining.map((n) => (n.parent_node_id === nodeId ? { ...n, parent_node_id: null } : n));
+      return { ...item, chain_tree: cleaned };
+    }));
+  };
+
+  const updateChainTreeNode = (itemIndex: number, nodeId: string, patch: Partial<NewsStoreChainTreeNode>) => {
+    setScenarioStoreItems((items: NewsStoreItemConfig[]) => items.map((item: NewsStoreItemConfig, idx: number) => {
+      if (idx !== itemIndex) return item;
+      return {
+        ...item,
+        chain_tree: (item.chain_tree || []).map((n) => (n.node_id === nodeId ? { ...n, ...patch } : n)),
+      };
+    }));
+  };
+
   const addScenarioStoreItem = () => {
     setScenarioStoreItems((items: NewsStoreItemConfig[]) => ([
       ...items,
@@ -386,6 +457,7 @@ const NewsStudioPage: React.FC = () => {
         rarity: 'COMMON',
         chain_kind: null,
         chain_defaults: {},
+        chain_tree: [],
         enabled: true,
       },
     ]));
@@ -408,6 +480,45 @@ const NewsStudioPage: React.FC = () => {
       alert('Scenario settings saved');
     } catch (err) {
       alert('保存场景元数据失败: ' + err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportPackage = async () => {
+    if (!selectedScenarioId) return;
+    try {
+      setLoading(true);
+      const pkg = await Api.globalStudioNewsExportPackage(selectedScenarioId);
+      const blob = new Blob([JSON.stringify(pkg, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${pkg.scenario_id || selectedScenarioId}_world.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('导出世界包失败: ' + err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImportPackage = async (file: File) => {
+    if (!selectedScenarioId) return;
+    try {
+      setLoading(true);
+      const text = await file.text();
+      const pkg = JSON.parse(text);
+      await Api.globalStudioNewsImportPackage(selectedScenarioId, {
+        actor_id: 'author',
+        package: pkg,
+      });
+      await loadScenarioMeta(selectedScenarioId);
+      await loadScenarioCards(selectedScenarioId);
+      alert('世界包导入成功');
+    } catch (err) {
+      alert('导入世界包失败: ' + err);
     } finally {
       setLoading(false);
     }
@@ -710,14 +821,43 @@ const NewsStudioPage: React.FC = () => {
               <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', marginBottom: '4px' }}>SCENARIO STUDIO</div>
               <h3 style={{ margin: 0, color: '#f1f5f9', fontSize: '16px' }}>{selectedScenarioId ? selectedScenarioId : 'NO_SCENARIO_SELECTED'}</h3>
             </div>
-            <button
-              onClick={handleSaveScenarioMeta}
-              disabled={!selectedScenarioId || loading}
-              className="cyber-button active"
-              style={{ padding: '8px 14px' }}
-            >
-              <Save size={14} /> SAVE_SCENARIO_SETTINGS
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={handleExportPackage}
+                disabled={!selectedScenarioId || loading}
+                className="cyber-button"
+                style={{ padding: '8px 14px' }}
+              >
+                EXPORT_WORLD
+              </button>
+              <button
+                onClick={() => importFileRef.current?.click()}
+                disabled={!selectedScenarioId || loading}
+                className="cyber-button"
+                style={{ padding: '8px 14px' }}
+              >
+                IMPORT_WORLD
+              </button>
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".json,application/json"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImportPackage(file);
+                  e.target.value = '';
+                }}
+              />
+              <button
+                onClick={handleSaveScenarioMeta}
+                disabled={!selectedScenarioId || loading}
+                className="cyber-button active"
+                style={{ padding: '8px 14px' }}
+              >
+                <Save size={14} /> SAVE_SCENARIO_SETTINGS
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', gap: '16px' }}>
@@ -827,6 +967,31 @@ const NewsStudioPage: React.FC = () => {
                       <input type="number" className="cyber-input" value={Number(item.chain_defaults?.omen_interval_seconds ?? 0)} onChange={(e) => updateScenarioStoreItemChainDefault(index, 'omen_interval_seconds', Number(e.target.value))} placeholder="omen" />
                       <input type="number" step="0.01" className="cyber-input" value={Number(item.chain_defaults?.abort_probability ?? 0)} onChange={(e) => updateScenarioStoreItemChainDefault(index, 'abort_probability', Number(e.target.value))} placeholder="abort" />
                     </div>
+                    {item.trigger_mode === 'AUTO_CHAIN' && (
+                      <div style={{ marginTop: '8px', border: '1px dashed #334155', padding: '8px', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px' }}>CHAIN TREE (after purchase)</div>
+                        {(item.chain_tree || []).map((node) => (
+                          <div key={node.node_id} style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px', padding: '6px', background: 'rgba(0,0,0,0.2)' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                              <input className="cyber-input" value={node.kind} onChange={(e) => updateChainTreeNode(index, node.node_id, { kind: e.target.value.toUpperCase() })} placeholder="kind" />
+                              <input type="number" className="cyber-input" value={node.scheduled_delay_seconds} onChange={(e) => updateChainTreeNode(index, node.node_id, { scheduled_delay_seconds: Number(e.target.value) })} placeholder="delay(s)" />
+                            </div>
+                            <textarea className="cyber-input" value={node.text || ''} onChange={(e) => updateChainTreeNode(index, node.node_id, { text: e.target.value })} placeholder="text" style={{ width: '100%', minHeight: '40px', resize: 'vertical' }} />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                              <input type="number" step="0.01" className="cyber-input" value={node.activation_prob} onChange={(e) => updateChainTreeNode(index, node.node_id, { activation_prob: Number(e.target.value) })} placeholder="prob" />
+                              <select className="cyber-input" value={node.parent_node_id || ''} onChange={(e) => updateChainTreeNode(index, node.node_id, { parent_node_id: e.target.value || null })}>
+                                <option value="">-- root --</option>
+                                {(item.chain_tree || []).filter((n) => n.node_id !== node.node_id).map((n) => (
+                                  <option key={n.node_id} value={n.node_id}>{n.kind} ({n.node_id.slice(-4)})</option>
+                                ))}
+                              </select>
+                            </div>
+                            <button onClick={() => removeChainTreeNode(index, node.node_id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '10px' }}>REMOVE NODE</button>
+                          </div>
+                        ))}
+                        <button onClick={() => addChainTreeNode(index, (item.chain_tree || [])[(item.chain_tree || []).length - 1]?.node_id || null)} type="button" style={{ width: '100%', background: 'transparent', border: '1px solid #334155', color: '#cbd5e1', padding: '4px', cursor: 'pointer', fontSize: '11px' }}>+ ADD CHAIN NODE</button>
+                      </div>
+                    )}
                     <button onClick={() => removeScenarioStoreItem(index)} style={{ marginTop: '8px', background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '11px' }}>REMOVE</button>
                   </div>
                 ))}

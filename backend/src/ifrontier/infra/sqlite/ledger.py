@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from ifrontier.infra.sqlite.db import get_connection
+from ifrontier.infra.sqlite.db import get_connection, is_transaction_active
 
 
 @dataclass
@@ -156,17 +156,16 @@ def apply_trade_executed(
                 raise ValueError("negative position after trade")
 
 
-def spend_cash(*, account_id: str, amount: float, event_id: str) -> None:
+def spend_cash(*, account_id: str, amount: float, event_id: str, connection=None) -> None:
     if amount <= 0:
         raise ValueError("amount must be positive")
 
     account_id = str(account_id).lower()
 
-    conn = get_connection()
+    conn = connection if connection is not None else get_connection()
     now = datetime.now(timezone.utc).isoformat()
 
-    with conn:
-        cur = conn.cursor()
+    def _do_spend(cur) -> None:
         cur.execute(
             "INSERT OR IGNORE INTO accounts(account_id, owner_type, cash) VALUES (?, ?, 0)",
             (account_id, "user"),
@@ -184,6 +183,12 @@ def spend_cash(*, account_id: str, amount: float, event_id: str) -> None:
             "UPDATE accounts SET cash = cash - ? WHERE account_id = ?",
             (float(amount), account_id),
         )
+
+    if connection is not None or is_transaction_active():
+        _do_spend(conn.cursor())
+    else:
+        with conn:
+            _do_spend(conn.cursor())
 
 
 def _insert_ledger(cur, account_id: str, asset_type: str, symbol: str, delta: float, event_id: str, created_at: str) -> None:

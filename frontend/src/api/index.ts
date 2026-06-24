@@ -81,6 +81,8 @@ import type {
   NewsTickResponse,
   NewsScenarioMetaRequest,
   NewsScenarioMetaResponse,
+  NewsScenarioPackage,
+  NewsScenarioPackageImportRequest,
   PlayerAccountResponse,
   ContractResponse,
   PlayerBootstrapRequest,
@@ -299,6 +301,9 @@ export const Api = {
     api.patch<NewsScenarioMetaResponse>(`/global/studio/news/scenarios/${encodeURIComponent(scenarioId)}/meta`, req),
   globalStudioNewsVariants: (cardId: string) => api.get<any[]>(`/global/studio/news/cards/${encodeURIComponent(cardId)}/variants`),
   globalStudioNewsEmitVariant: (req: any) => api.post<any>('/global/studio/news/variants/emit', req),
+  globalStudioNewsExportPackage: (scenarioId: string) => api.get<NewsScenarioPackage>(`/global/studio/news/scenarios/${encodeURIComponent(scenarioId)}/package`),
+  globalStudioNewsImportPackage: (scenarioId: string, req: NewsScenarioPackageImportRequest) =>
+    api.post<NewsScenarioMetaResponse>(`/global/studio/news/scenarios/${encodeURIComponent(scenarioId)}/package`, req),
 
   hostingEnable: (user_id: string) => api.post<HostingEnableResponse>(`/hosting/${encodeURIComponent(user_id)}/enable`, undefined, roomRequest),
   hostingDisable: (user_id: string) => api.post<HostingDisableResponse>(`/hosting/${encodeURIComponent(user_id)}/disable`, undefined, roomRequest),

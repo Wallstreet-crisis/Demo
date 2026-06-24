@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from time import sleep
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -64,6 +65,9 @@ def test_scenario_store_catalog_overrides_blueprint_defaults_and_purchase_uses_c
     assert meta_resp.status_code == 200, meta_resp.text
 
     create_or_update_room_meta(room_id, "author", game_settings={"scenario_id": scenario_id})
+
+    # 避免房间激活全局冷却导致 429
+    sleep(2.5)
 
     catalog_resp = client.get(
         "/news/store/catalog",

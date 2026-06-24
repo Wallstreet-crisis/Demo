@@ -283,6 +283,18 @@ export type NewsEmitVariantResponse = {
   correlation_id: string | null
 }
 
+export type NewsStoreChainTreeNode = {
+  node_id: string
+  kind: string
+  text?: string
+  scheduled_delay_seconds?: number
+  activation_prob?: number
+  symbols?: string[]
+  tags?: string[]
+  truth_payload?: Record<string, unknown>
+  parent_node_id?: string | null
+}
+
 export type RoomNewsStoreItemConfig = {
   kind: string
   price_cash?: number
@@ -293,6 +305,7 @@ export type RoomNewsStoreItemConfig = {
   rarity?: string
   chain_kind?: string | null
   chain_defaults?: Record<string, unknown>
+  chain_tree?: NewsStoreChainTreeNode[]
   enabled?: boolean
 }
 
@@ -318,6 +331,22 @@ export type NewsScenarioMetaResponse = {
   worldview: NewsScenarioWorldviewConfig
   news_store_items: RoomNewsStoreItemConfig[]
   updated_at?: string | null
+}
+
+export type NewsScenarioPackage = {
+  scenario_id: string
+  background_story: string
+  worldview: NewsScenarioWorldviewConfig
+  news_store_items: RoomNewsStoreItemConfig[]
+  cards: any[]
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type NewsScenarioPackageImportRequest = {
+  actor_id: string
+  package: NewsScenarioPackage
+  correlation_id?: string | null
 }
 
 export type NewsMutateVariantRequest = {

@@ -31,7 +31,7 @@ from ifrontier.services.matching import submit_limit_order, submit_market_order
 from ifrontier.services.market_analytics import get_market_trends, get_quote
 from ifrontier.services.valuation import value_account
 from ifrontier.domain.players.caste import get_caste_config
-from ifrontier.infra.sqlite.db import get_connection
+from ifrontier.infra.sqlite.db import get_connection, transaction
 from ifrontier.services.contracts import ContractService
 from ifrontier.services.contract_agent import ContractAgent
 from ifrontier.services.chat import ChatService
@@ -162,7 +162,7 @@ def _get_room_contract_service():
 # ==========================================
 
 from ifrontier.app.room_engine import room_manager
-from ifrontier.app.room_meta import RoomGameSettings, RoomNewsStoreItemConfig, get_local_rooms, create_or_update_room_meta, room_exists, load_room_meta
+from ifrontier.app.room_meta import RoomGameSettings, RoomNewsStoreItemConfig, NewsStoreChainTreeNode, get_local_rooms, create_or_update_room_meta, room_exists, load_room_meta
 
 class CreateRoomRequest(BaseModel):
     room_id: Optional[str] = None
@@ -2928,6 +2928,85 @@ async def global_studio_news_update_scenario_meta(scenario_id: str, req: NewsSce
     return await global_studio_news_scenario_meta(scenario_id)
 
 
+class NewsScenarioPackage(BaseModel):
+    scenario_id: str
+    background_story: str = ""
+    worldview: NewsScenarioWorldviewConfig = Field(default_factory=NewsScenarioWorldviewConfig)
+    news_store_items: List[RoomNewsStoreItemConfig] = Field(default_factory=list)
+    cards: List[Dict[str, Any]] = Field(default_factory=list)
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class NewsScenarioPackageImportRequest(BaseModel):
+    actor_id: str
+    package: NewsScenarioPackage
+    correlation_id: UUID | None = None
+
+
+@router.get("/global/studio/news/scenarios/{scenario_id}/package")
+async def global_studio_news_export_package(scenario_id: str) -> NewsScenarioPackage:
+    """导出世界包：包含 scenario meta 和所有主卡。"""
+    meta = await global_studio_news_scenario_meta(scenario_id)
+    cards = await global_studio_news_scenario_cards(scenario_id)
+    return NewsScenarioPackage(
+        scenario_id=scenario_id,
+        background_story=meta.background_story,
+        worldview=meta.worldview,
+        news_store_items=list(meta.news_store_items),
+        cards=cards,
+        created_at=meta.created_at,
+        updated_at=meta.updated_at,
+    )
+
+
+@router.post("/global/studio/news/scenarios/{scenario_id}/package")
+async def global_studio_news_import_package(scenario_id: str, req: NewsScenarioPackageImportRequest) -> NewsScenarioMetaResponse:
+    """导入世界包：覆盖 scenario meta 并重建主卡。"""
+    _assert_studio_authorized(req.actor_id)
+    pkg = req.package
+    now = datetime.now(timezone.utc).isoformat()
+
+    # 1) 写入/更新 meta
+    meta_req = NewsScenarioMetaRequest(
+        actor_id=req.actor_id,
+        background_story=pkg.background_story,
+        worldview=pkg.worldview,
+        news_store_items=pkg.news_store_items,
+        correlation_id=req.correlation_id,
+    )
+    await global_studio_news_update_scenario_meta(scenario_id, meta_req)
+
+    conn = _get_global_news_db_conn()
+    # 2) 删除旧主卡并写入新主卡，使用同一连接避免 database locked
+    with conn:
+        conn.execute("DELETE FROM news WHERE scenario_id = ? AND variant_id IS NULL", (scenario_id,))
+        for card in pkg.cards:
+            card_id = card.get("card_id") or str(uuid4())
+            now = datetime.now(timezone.utc).isoformat()
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO news (
+                    card_id, variant_id, kind, text, symbols_json, tags_json,
+                    publisher_id, published_at, is_suppressed, suppression_reason,
+                    truth_payload_json, image_uri, image_anchor_id, preset_id, rarity, faction, created_at,
+                    author_id, parent_variant_id, mutation_depth, influence_cost, risk_roll_json,
+                    parent_card_id, activation_prob, scheduled_at, success_criteria_json, failure_outcome_json,
+                    scenario_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    card_id, None, str(card.get("kind") or "RUMOR"), card.get("text"), json.dumps(list(card.get("symbols") or [])), json.dumps(list(card.get("tags") or [])),
+                    req.actor_id, None, 0, None, json.dumps(card.get("truth_payload") or {}),
+                    card.get("image_uri"), card.get("image_anchor_id"), None, "COMMON", None, now,
+                    req.actor_id, None, 0, 0.0, json.dumps({}),
+                    card.get("parent_card_id"), float(card.get("activation_prob", 1.0)), card.get("scheduled_at"),
+                    json.dumps(card.get("success_criteria") or {}), json.dumps(card.get("failure_outcome") or {}),
+                    scenario_id
+                )
+            )
+
+    return await global_studio_news_scenario_meta(scenario_id)
 
 
 class NewsCreateCardResponse(BaseModel):
@@ -3780,6 +3859,87 @@ class NewsStorePurchaseResponse(BaseModel):
     chain_id: str | None = None
 
 
+def _topo_sort_chain_tree(nodes: list[NewsStoreChainTreeNode]) -> list[NewsStoreChainTreeNode]:
+    """对链树节点按 parent_node_id 做拓扑排序，根节点在前。"""
+    node_by_id = {n.node_id: n for n in nodes}
+    visited: set[str] = set()
+    ordered: list[NewsStoreChainTreeNode] = []
+
+    def _visit(node: NewsStoreChainTreeNode) -> None:
+        if node.node_id in visited:
+            return
+        visited.add(node.node_id)
+        parent_id = node.parent_node_id
+        if parent_id and parent_id in node_by_id:
+            _visit(node_by_id[parent_id])
+        ordered.append(node)
+
+    for n in nodes:
+        _visit(n)
+    return ordered
+
+
+def _expand_store_chain_tree(
+    *,
+    chain_tree: list[NewsStoreChainTreeNode],
+    root_card_id: str,
+    buyer_user_id: str,
+    purchase_event_id: str,
+    base_time: datetime,
+    req_symbols: list[str],
+    active_item: RoomNewsStoreItemConfig | None,
+    correlation_id: UUID | None,
+) -> list[tuple[str, EventEnvelopeJson]]:
+    """把商品链树展开成一组 scheduled news 卡片，返回 (card_id, card_created_event) 列表。"""
+    if not chain_tree:
+        return []
+
+    ordered = _topo_sort_chain_tree(chain_tree)
+    # 建立 parent_node_id -> generated card_id 映射
+    node_id_to_card_id: dict[str, str] = {}
+    created_events: list[tuple[str, EventEnvelopeJson]] = []
+    cumulative_delay: dict[str, int] = {}
+
+    for node in ordered:
+        parent_node_id = node.parent_node_id
+        if parent_node_id and parent_node_id in node_id_to_card_id:
+            parent_card_id = node_id_to_card_id[parent_node_id]
+            cumulative_delay[node.node_id] = cumulative_delay.get(parent_node_id, 0) + (node.scheduled_delay_seconds or 0)
+        else:
+            parent_card_id = root_card_id
+            cumulative_delay[node.node_id] = node.scheduled_delay_seconds or 0
+
+        node_symbols = list(node.symbols or req_symbols or [])
+        node_tags = list(node.tags or active_item.tags if active_item else [])
+        node_tags.append("store_chain")
+        node_truth = dict(node.truth_payload or {})
+        node_truth.update({
+            "purchase_event_id": purchase_event_id,
+            "chain_node_id": node.node_id,
+            "parent_chain_node_id": parent_node_id,
+        })
+
+        scheduled_at = (base_time + timedelta(seconds=cumulative_delay[node.node_id])).isoformat()
+        card_id, card_event = _get_room_news_service().create_card(
+            kind=str(node.kind).upper(),
+            image_anchor_id=None,
+            image_uri=None,
+            truth_payload=node_truth,
+            symbols=node_symbols,
+            tags=node_tags,
+            actor_id=buyer_user_id,
+            rarity="COMMON",
+            correlation_id=correlation_id,
+            parent_card_id=parent_card_id,
+            activation_prob=float(node.activation_prob or 1.0),
+            scheduled_at=scheduled_at,
+        )
+        node_id_to_card_id[node.node_id] = card_id
+        created_events.append((card_id, card_event))
+
+    return created_events
+
+
 @router.post("/news/store/purchase")
 async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchaseResponse:
     from ifrontier.infra.sqlite.securities import list_securities
@@ -3807,6 +3967,7 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
         rarity = str(active_item.rarity or (str(getattr(bp.rarity, "value", bp.rarity)) if bp else "COMMON")).upper()
         chain_kind = str(active_item.chain_kind or kind_key).upper()
         chain_defaults = dict(active_item.chain_defaults or {})
+        chain_tree = list(active_item.chain_tree or [])
     else:
         if bp is None:
             raise HTTPException(status_code=400, detail="unknown kind")
@@ -3825,146 +3986,236 @@ async def news_store_purchase(req: NewsStorePurchaseRequest) -> NewsStorePurchas
         rarity = str(getattr(bp.rarity, "value", bp.rarity)).upper()
         chain_kind = bp.resolve_store_chain_kind()
         chain_defaults = bp.resolve_store_chain_defaults()
-    
+        chain_tree = []
+
     purchase_event_id = str(uuid4())
-    try:
-        spend_cash(account_id=req.buyer_user_id, amount=float(system_price), event_id=purchase_event_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    broadcast_queue: list[tuple[EventType, EventEnvelopeJson]] = []
 
-    if trigger_mode == StoreTriggerMode.AUTO_CHAIN:
-        try:
-            t0_at = None
-            if req.t0_at and str(req.t0_at).strip():
-                try:
-                    t0_at = datetime.fromisoformat(str(req.t0_at).strip())
-                except ValueError:
+    try:
+        with transaction():
+            # 1) 先扣款；若后续失败，整个事务回滚，资金不会丢失。
+            spend_cash(account_id=req.buyer_user_id, amount=float(system_price), event_id=purchase_event_id)
+
+            if trigger_mode == StoreTriggerMode.AUTO_CHAIN:
+                # 如果商家配置了链树，优先用链树展开；否则回退到旧版 start_chain。
+                if chain_tree:
+                    root_text = req.initial_text or (active_item.description if active_item is not None else "")
+                    root_card_id, root_card_event = _get_room_news_service().create_card(
+                        kind=kind_key,
+                        image_anchor_id=req.image_anchor_id,
+                        image_uri=req.image_uri,
+                        truth_payload=dict(req.truth_payload or {}),
+                        symbols=req_symbols,
+                        tags=[*tags, "store_chain_root"],
+                        actor_id=req.buyer_user_id,
+                        rarity=rarity,
+                        correlation_id=req.correlation_id,
+                    )
+                    broadcast_queue.append((EventType.NEWS_CARD_CREATED, root_card_event))
+
+                    # emit 根卡，让子节点可以通过 has_variant 依赖它
+                    root_variant_id, root_variant_event = _get_room_news_service().emit_variant(
+                        card_id=root_card_id,
+                        author_id=req.buyer_user_id,
+                        text=root_text,
+                        parent_variant_id=None,
+                        influence_cost=0.0,
+                        risk_roll=None,
+                        correlation_id=req.correlation_id,
+                    )
+                    broadcast_queue.append((EventType.NEWS_VARIANT_EMITTED, root_variant_event))
+
+                    # 重要事件全局广播
+                    if kind_key in {"MAJOR_EVENT", "WORLD_EVENT", "EARNINGS", "DISCLOSURE"}:
+                        broadcasted_count, broadcast_event = _get_room_news_service().broadcast_variant(
+                            variant_id=root_variant_id,
+                            channel="GLOBAL_MANDATORY",
+                            visibility_level="NORMAL",
+                            actor_id=req.buyer_user_id,
+                            limit_users=5000,
+                            correlation_id=req.correlation_id,
+                        )
+                        if broadcast_event is not None:
+                            broadcast_queue.append((EventType.NEWS_DELIVERED, broadcast_event))
+
+                    try:
+                        ownership_event = _get_room_news_service().grant_ownership(
+                            card_id=root_card_id,
+                            to_user_id=req.buyer_user_id,
+                            granter_id="system",
+                            correlation_id=req.correlation_id,
+                        )
+                        broadcast_queue.append((EventType.NEWS_OWNERSHIP_GRANTED, ownership_event))
+                    except ValueError:
+                        pass
+
+                    base_time = datetime.now(timezone.utc)
+                    chain_events = _expand_store_chain_tree(
+                        chain_tree=chain_tree,
+                        root_card_id=root_card_id,
+                        buyer_user_id=req.buyer_user_id,
+                        purchase_event_id=purchase_event_id,
+                        base_time=base_time,
+                        req_symbols=req_symbols,
+                        active_item=active_item,
+                        correlation_id=req.correlation_id,
+                    )
+                    for _cid, ev in chain_events:
+                        broadcast_queue.append((EventType.NEWS_CARD_CREATED, ev))
+
+                    response = NewsStorePurchaseResponse(
+                        kind=str(req.kind),
+                        buyer_user_id=str(req.buyer_user_id),
+                        card_id=root_card_id,
+                        variant_id=root_variant_id,
+                        chain_id=None,
+                    )
+                else:
                     t0_at = None
+                    if req.t0_at and str(req.t0_at).strip():
+                        try:
+                            t0_at = datetime.fromisoformat(str(req.t0_at).strip())
+                        except ValueError:
+                            t0_at = None
 
-            sec_symbols = [s.symbol for s in list_securities(status="TRADABLE")]
-            if not sec_symbols:
-                sec_symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
+                    sec_symbols = [s.symbol for s in list_securities(status="TRADABLE")]
+                    if not sec_symbols:
+                        sec_symbols = ["BLUEGOLD", "MARS_GEN", "CIVILBANK", "NEURALINK"]
 
-            _log.info("Starting chain for %s -> %s, t0_at=%s, symbols=%s", req.kind, chain_kind, t0_at, req_symbols or sec_symbols)
-            result = _news_tick_engine.start_chain(
-                kind=chain_kind,
-                actor_id=req.buyer_user_id,
-                t0_seconds=int(chain_defaults.get("t0_seconds", req.t0_seconds)),
-                t0_at=t0_at,
-                omen_interval_seconds=int(chain_defaults.get("omen_interval_seconds", req.omen_interval_seconds)),
-                abort_probability=float(chain_defaults.get("abort_probability", req.abort_probability)),
-                grant_count=int(chain_defaults.get("grant_count", req.grant_count)),
-                seed=int(chain_defaults.get("seed", req.seed)),
-                symbols=req_symbols if req_symbols else sec_symbols,
-                correlation_id=req.correlation_id,
-            )
-        except Exception as exc:
-            _log.warning("Failed to start chain: %s", exc)
-            raise HTTPException(status_code=400, detail=f"failed to start news chain: {str(exc)}")
+                    _log.info("Starting chain for %s -> %s, t0_at=%s, symbols=%s", req.kind, chain_kind, t0_at, req_symbols or sec_symbols)
+                    result = _news_tick_engine.start_chain(
+                        kind=chain_kind,
+                        actor_id=req.buyer_user_id,
+                        t0_seconds=int(chain_defaults.get("t0_seconds", req.t0_seconds)),
+                        t0_at=t0_at,
+                        omen_interval_seconds=int(chain_defaults.get("omen_interval_seconds", req.omen_interval_seconds)),
+                        abort_probability=float(chain_defaults.get("abort_probability", req.abort_probability)),
+                        grant_count=int(chain_defaults.get("grant_count", req.grant_count)),
+                        seed=int(chain_defaults.get("seed", req.seed)),
+                        symbols=req_symbols if req_symbols else sec_symbols,
+                        correlation_id=req.correlation_id,
+                    )
 
-        card_event = result.get("card_created_event")
-        chain_event = result.get("chain_started_event")
-        if card_event is not None:
-            await hub.broadcast_many(["events", str(EventType.NEWS_CARD_CREATED)], card_event.model_dump())
-        if chain_event is not None:
-            await hub.broadcast_many(["events", str(EventType.NEWS_CHAIN_STARTED)], chain_event.model_dump())
+                    card_event = result.get("card_created_event")
+                    chain_event = result.get("chain_started_event")
+                    if card_event is not None:
+                        broadcast_queue.append((EventType.NEWS_CARD_CREATED, card_event))
+                    if chain_event is not None:
+                        broadcast_queue.append((EventType.NEWS_CHAIN_STARTED, chain_event))
 
-        major_card_id = str(result["major_card_id"])
-        # 璐拱鑰呰幏寰椾富浜嬩欢鍗℃墍鏈夋潈
-        try:
-            _get_room_news_service().grant_ownership(
-                card_id=major_card_id,
-                to_user_id=req.buyer_user_id,
-                granter_id="system",
-                correlation_id=req.correlation_id,
-            )
-        except ValueError:
-            pass
+                    major_card_id = str(result["major_card_id"])
+                    try:
+                        ownership_event = _get_room_news_service().grant_ownership(
+                            card_id=major_card_id,
+                            to_user_id=req.buyer_user_id,
+                            granter_id="system",
+                            correlation_id=req.correlation_id,
+                        )
+                        broadcast_queue.append((EventType.NEWS_OWNERSHIP_GRANTED, ownership_event))
+                    except ValueError:
+                        pass
 
-        return NewsStorePurchaseResponse(
-            kind=str(req.kind),
-            buyer_user_id=str(req.buyer_user_id),
-            chain_id=str(result["chain_id"]),
-            card_id=major_card_id,
-            variant_id=None,
-        )
+                    response = NewsStorePurchaseResponse(
+                        kind=str(req.kind),
+                        buyer_user_id=str(req.buyer_user_id),
+                        chain_id=str(result["chain_id"]),
+                        card_id=major_card_id,
+                        variant_id=None,
+                    )
+            elif trigger_mode == StoreTriggerMode.MANUAL:
+                card_id, card_event = _get_room_news_service().create_card(
+                    kind=req.kind,
+                    image_anchor_id=req.image_anchor_id,
+                    image_uri=req.image_uri,
+                    truth_payload=req.truth_payload,
+                    symbols=req_symbols,
+                    tags=tags if source != "blueprint" else req.tags,
+                    actor_id=req.buyer_user_id,
+                    rarity=rarity,
+                    correlation_id=req.correlation_id,
+                )
+                broadcast_queue.append((EventType.NEWS_CARD_CREATED, card_event))
 
-    symbols = req_symbols
-    initial_text = req.initial_text
+                try:
+                    ownership_event = _get_room_news_service().grant_ownership(
+                        card_id=card_id,
+                        to_user_id=req.buyer_user_id,
+                        granter_id="system",
+                        correlation_id=req.correlation_id,
+                    )
+                    broadcast_queue.append((EventType.NEWS_OWNERSHIP_GRANTED, ownership_event))
+                except ValueError:
+                    pass
 
-    card_id, card_event = _get_room_news_service().create_card(
-        kind=req.kind,
-        image_anchor_id=req.image_anchor_id,
-        image_uri=req.image_uri,
-        truth_payload=req.truth_payload,
-        symbols=symbols,
-        tags=tags if source != "blueprint" else req.tags,
-        actor_id=req.buyer_user_id,
-        rarity=rarity,
-        correlation_id=req.correlation_id,
-    )
-    await hub.broadcast_many(["events", str(EventType.NEWS_CARD_CREATED)], card_event.model_dump())
+                response = NewsStorePurchaseResponse(
+                    kind=str(req.kind),
+                    buyer_user_id=str(req.buyer_user_id),
+                    card_id=str(card_id),
+                    variant_id=None,
+                    chain_id=None,
+                )
+            else:
+                # IMMEDIATE: 等效为“随机捡到”的新闻，先投递给购买者。
+                initial_text = req.initial_text
 
-    if trigger_mode == StoreTriggerMode.MANUAL:
-        try:
-            ownership_event = _get_room_news_service().grant_ownership(
-                card_id=card_id,
-                to_user_id=req.buyer_user_id,
-                granter_id="system",
-                correlation_id=req.correlation_id,
-            )
-            await hub.broadcast_many(["events", str(EventType.NEWS_OWNERSHIP_GRANTED)], ownership_event.model_dump())
-        except ValueError:
-            pass
+                card_id, card_event = _get_room_news_service().create_card(
+                    kind=req.kind,
+                    image_anchor_id=req.image_anchor_id,
+                    image_uri=req.image_uri,
+                    truth_payload=req.truth_payload,
+                    symbols=req_symbols,
+                    tags=tags if source != "blueprint" else req.tags,
+                    actor_id=req.buyer_user_id,
+                    rarity=rarity,
+                    correlation_id=req.correlation_id,
+                )
+                broadcast_queue.append((EventType.NEWS_CARD_CREATED, card_event))
 
-        return NewsStorePurchaseResponse(
-            kind=str(req.kind),
-            buyer_user_id=str(req.buyer_user_id),
-            card_id=str(card_id),
-            variant_id=None,
-            chain_id=None,
-        )
+                variant_id, variant_event = _get_room_news_service().emit_variant(
+                    card_id=card_id,
+                    author_id=req.buyer_user_id,
+                    text=initial_text or (active_item.description if active_item is not None else ""),
+                    parent_variant_id=None,
+                    influence_cost=0.0,
+                    risk_roll=None,
+                    correlation_id=req.correlation_id,
+                )
+                broadcast_queue.append((EventType.NEWS_VARIANT_EMITTED, variant_event))
 
-    # 普通卡等效为“随机捡到”的新闻，先投递给购买者，后续再由其手动助推传播。
-    variant_id, variant_event = _get_room_news_service().emit_variant(
-        card_id=card_id,
-        author_id=req.buyer_user_id,
-        text=initial_text or (active_item.description if active_item is not None else ""),
-        parent_variant_id=None,
-        influence_cost=0.0,
-        risk_roll=None,
-        correlation_id=req.correlation_id,
-    )
-    await hub.broadcast_many(["events", str(EventType.NEWS_VARIANT_EMITTED)], variant_event.model_dump())
+                try:
+                    ownership_event = _get_room_news_service().grant_ownership(
+                        card_id=card_id,
+                        to_user_id=req.buyer_user_id,
+                        granter_id="system",
+                        correlation_id=req.correlation_id,
+                    )
+                    broadcast_queue.append((EventType.NEWS_OWNERSHIP_GRANTED, ownership_event))
+                except ValueError:
+                    pass
 
-    try:
-        ownership_event = _get_room_news_service().grant_ownership(
-            card_id=card_id,
-            to_user_id=req.buyer_user_id,
-            granter_id="system",
-            correlation_id=req.correlation_id,
-        )
-        await hub.broadcast_many(["events", str(EventType.NEWS_OWNERSHIP_GRANTED)], ownership_event.model_dump())
-    except ValueError:
-        pass
+                _delivery_id, delivered_event = _get_room_news_service().deliver_variant(
+                    variant_id=variant_id,
+                    to_player_id=req.buyer_user_id,
+                    from_actor_id="system",
+                    visibility_level="NORMAL",
+                    delivery_reason="PURCHASED",
+                    correlation_id=req.correlation_id,
+                )
+                broadcast_queue.append((EventType.NEWS_DELIVERED, delivered_event))
 
-    try:
-        _delivery_id, delivered_event = _get_room_news_service().deliver_variant(
-            variant_id=variant_id,
-            to_player_id=req.buyer_user_id,
-            from_actor_id="system",
-            visibility_level="NORMAL",
-            delivery_reason="PURCHASED",
-            correlation_id=req.correlation_id,
-        )
-        await hub.broadcast_many(["events", str(EventType.NEWS_DELIVERED)], delivered_event.model_dump())
-    except ValueError as exc:
+                response = NewsStorePurchaseResponse(
+                    kind=str(req.kind),
+                    buyer_user_id=str(req.buyer_user_id),
+                    card_id=str(card_id),
+                    variant_id=str(variant_id),
+                    chain_id=None,
+                )
+    except Exception as exc:
+        _log.warning("Purchase failed for %s: %s; rolled back", req.buyer_user_id, exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return NewsStorePurchaseResponse(
-        kind=str(req.kind),
-        buyer_user_id=str(req.buyer_user_id),
-        card_id=str(card_id),
-        variant_id=str(variant_id),
-        chain_id=None,
-    )
+    # 事务提交成功后，再广播事件；失败则已回滚，不会广播。
+    for event_type, event in broadcast_queue:
+        await hub.broadcast_many(["events", str(event_type)], event.model_dump())
+
+    return response

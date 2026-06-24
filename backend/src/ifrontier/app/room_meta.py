@@ -5,6 +5,18 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+class NewsStoreChainTreeNode(BaseModel):
+    node_id: str
+    kind: str
+    text: str = ""
+    scheduled_delay_seconds: int = 0
+    activation_prob: float = 1.0
+    symbols: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
+    truth_payload: Dict[str, Any] = Field(default_factory=dict)
+    parent_node_id: Optional[str] = None
+
+
 class RoomNewsStoreItemConfig(BaseModel):
     kind: str
     price_cash: float = 0.0
@@ -15,6 +27,7 @@ class RoomNewsStoreItemConfig(BaseModel):
     rarity: str = "COMMON"
     chain_kind: Optional[str] = None
     chain_defaults: Dict[str, Any] = Field(default_factory=dict)
+    chain_tree: List[NewsStoreChainTreeNode] = Field(default_factory=list)
     enabled: bool = True
 
 
