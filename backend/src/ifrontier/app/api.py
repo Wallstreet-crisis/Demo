@@ -163,6 +163,7 @@ def _get_room_contract_service():
 
 from ifrontier.app.room_engine import room_manager
 from ifrontier.app.room_meta import RoomGameSettings, RoomNewsStoreItemConfig, NewsStoreChainTreeNode, get_local_rooms, create_or_update_room_meta, room_exists, load_room_meta
+from ifrontier.app.news_studio_defaults import get_default_scenario_template
 
 class CreateRoomRequest(BaseModel):
     room_id: Optional[str] = None
@@ -2942,6 +2943,19 @@ class NewsScenarioPackageImportRequest(BaseModel):
     actor_id: str
     package: NewsScenarioPackage
     correlation_id: UUID | None = None
+
+
+@router.get("/global/studio/news/templates/default")
+async def global_studio_news_default_template() -> NewsScenarioPackage:
+    """返回默认世界模板（世界观、剧情树、新闻商店），可直接导入到新 scenario。"""
+    raw = get_default_scenario_template()
+    return NewsScenarioPackage(
+        scenario_id=raw["scenario_id"],
+        background_story=raw["background_story"],
+        worldview=_parse_scenario_worldview(raw.get("worldview")),
+        news_store_items=_parse_scenario_store_items(raw.get("news_store_items")),
+        cards=raw.get("cards", []),
+    )
 
 
 @router.get("/global/studio/news/scenarios/{scenario_id}/package")

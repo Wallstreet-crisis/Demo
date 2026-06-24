@@ -294,6 +294,7 @@ export const Api = {
   studioNewsScenarioCards: (scenarioId: string, actor_id: string) => api.get<any[]>(`/studio/news/scenarios/${encodeURIComponent(scenarioId)}/cards`, { actor_id }, roomRequest),
 
   globalStudioNewsScenarios: () => api.get<any[]>('/global/studio/news/scenarios'),
+  globalStudioNewsDefaultTemplate: () => api.get<NewsScenarioPackage>('/global/studio/news/templates/default'),
   globalStudioNewsScenarioCards: (scenarioId: string) => api.get<any[]>(`/global/studio/news/scenarios/${encodeURIComponent(scenarioId)}/cards`),
   globalStudioNewsScenarioMeta: (scenarioId: string) => api.get<NewsScenarioMetaResponse>(`/global/studio/news/scenarios/${encodeURIComponent(scenarioId)}/meta`),
   globalStudioNewsCreateCard: (req: any) => api.post<any>('/global/studio/news/cards', req),

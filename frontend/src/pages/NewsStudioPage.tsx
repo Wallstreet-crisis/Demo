@@ -9,7 +9,12 @@ import {
   Settings,
   GitBranch,
   Book,
-  ArrowRight
+  ArrowRight,
+  Download,
+  Upload,
+  Trash2,
+  GripVertical,
+  Sparkles
 } from 'lucide-react';
 import { 
   ReactFlow, 
@@ -206,26 +211,32 @@ const CyberNewsNode = ({ data, selected }: any) => {
   const isSelected = selected;
   
   const kindColors: Record<string, string> = {
-    EARNINGS: '#10b981', // green
-    MILITARY: '#ef4444', // red
-    DEFAULT: '#3b82f6'  // blue
+    RUMOR: '#64748b',      // slate
+    LEAK: '#ef4444',       // red
+    REPORT: '#f59e0b',     // amber
+    MAJOR_EVENT: '#a855f7', // purple
+    WORLD_EVENT: '#ec4899', // pink
+    EARNINGS: '#10b981',   // green
+    MILITARY: '#ef4444',   // red
+    DEFAULT: '#3b82f6'     // blue
   };
   const color = kindColors[card.kind] || kindColors.DEFAULT;
 
   return (
     <div style={{
-      padding: '12px',
-      borderRadius: '2px',
+      padding: '12px 12px 12px 14px',
+      borderRadius: '4px',
       background: isSelected ? '#1e293b' : '#0f172a',
       border: `1px solid ${isSelected ? '#3b82f6' : '#334155'}`,
-      boxShadow: isSelected ? '0 0 10px rgba(59, 130, 246, 0.3)' : 'none',
+      borderLeft: `3px solid ${color}`,
+      boxShadow: isSelected ? '0 0 12px rgba(59, 130, 246, 0.35)' : 'none',
       color: '#f1f5f9',
-      width: '180px',
+      width: '200px',
       fontFamily: 'inherit',
       position: 'relative'
     }}>
-      <Handle type="target" position={Position.Left} style={{ background: '#3b82f6', width: 6, height: 6, borderRadius: 0 }} />
-      
+      <Handle type="target" position={Position.Left} style={{ background: color, width: 8, height: 8, borderRadius: '50%' }} />
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
         <span style={{
           fontSize: '9px',
@@ -260,7 +271,7 @@ const CyberNewsNode = ({ data, selected }: any) => {
         {card.symbols?.join(', ') || 'NO_SYMBOLS'}
       </div>
 
-      <Handle type="source" position={Position.Right} style={{ background: '#3b82f6', width: 6, height: 6, borderRadius: 0 }} />
+      <Handle type="source" position={Position.Right} style={{ background: color, width: 8, height: 8, borderRadius: '50%' }} />
     </div>
   );
 };
@@ -524,6 +535,31 @@ const NewsStudioPage: React.FC = () => {
     }
   };
 
+  const handleCreateScenarioFromTemplate = async () => {
+    const name = prompt('NEW SCENARIO IDENTIFIER:');
+    if (!name) return;
+    const scenarioId = name.toUpperCase().trim();
+    if (!scenarioId) return;
+
+    try {
+      setLoading(true);
+      const template = await Api.globalStudioNewsDefaultTemplate();
+      await Api.globalStudioNewsImportPackage(scenarioId, {
+        actor_id: 'author',
+        package: {
+          ...template,
+          scenario_id: scenarioId,
+        },
+      });
+      await loadScenarios();
+      setSelectedScenarioId(scenarioId);
+    } catch (err) {
+      alert('从模板创建 scenario 失败: ' + err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadAllCards = async () => {
     setLoading(true);
     try {
@@ -743,13 +779,12 @@ const NewsStudioPage: React.FC = () => {
                 <Book size={20} style={{ color: '#3b82f6' }} /> Scenarios
               </h2>
             </div>
-            <button 
-              onClick={() => {
-                const name = prompt('NEW SCENARIO IDENTIFIER:');
-                if (name) setSelectedScenarioId(name.toUpperCase());
-              }}
+            <button
+              onClick={handleCreateScenarioFromTemplate}
+              disabled={loading}
               className="cyber-button"
               style={{ padding: '6px' }}
+              title="从默认模板创建新 scenario"
             >
               <Plus size={18} />
             </button>
@@ -818,25 +853,29 @@ const NewsStudioPage: React.FC = () => {
         <div style={{ padding: '16px 24px', borderBottom: '1px solid #334155', background: '#111827', zIndex: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div>
-              <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', marginBottom: '4px' }}>SCENARIO STUDIO</div>
+              <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Sparkles size={10} /> SCENARIO STUDIO
+              </div>
               <h3 style={{ margin: 0, color: '#f1f5f9', fontSize: '16px' }}>{selectedScenarioId ? selectedScenarioId : 'NO_SCENARIO_SELECTED'}</h3>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button
                 onClick={handleExportPackage}
                 disabled={!selectedScenarioId || loading}
                 className="cyber-button"
-                style={{ padding: '8px 14px' }}
+                style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                title="导出世界包"
               >
-                EXPORT_WORLD
+                <Download size={14} /> EXPORT
               </button>
               <button
                 onClick={() => importFileRef.current?.click()}
                 disabled={!selectedScenarioId || loading}
                 className="cyber-button"
-                style={{ padding: '8px 14px' }}
+                style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                title="导入世界包"
               >
-                IMPORT_WORLD
+                <Upload size={14} /> IMPORT
               </button>
               <input
                 ref={importFileRef}
@@ -853,30 +892,69 @@ const NewsStudioPage: React.FC = () => {
                 onClick={handleSaveScenarioMeta}
                 disabled={!selectedScenarioId || loading}
                 className="cyber-button active"
-                style={{ padding: '8px 14px' }}
+                style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                <Save size={14} /> SAVE_SCENARIO_SETTINGS
+                <Save size={14} /> SAVE
               </button>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', gap: '16px' }}>
-            <div className="cyber-card" style={{ margin: 0 }}>
-              <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Book size={14} /> WORLDVIEW & BACKGROUND STORY
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }}>
+            <div className="cyber-card" style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #334155', paddingBottom: '10px' }}>
+                <Book size={16} style={{ color: '#3b82f6' }} />
+                <h3 style={{ fontSize: '12px', fontWeight: 'bold', color: '#94a3b8', margin: 0, letterSpacing: '1px' }}>
+                  WORLDVIEW & BACKGROUND
+                </h3>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>featured_symbols (comma separated)</span>
+                  <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', letterSpacing: '0.5px' }}>FEATURED SYMBOLS</span>
                   <input
                     className="cyber-input"
                     value={(scenarioWorldview.featured_symbols || []).join(', ')}
                     onChange={(e) => updateScenarioWorldview({ featured_symbols: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
-                    placeholder="CIVILBANK, NEURALINK"
+                    placeholder="CIVILBANK, NEURALINK, FOODMART..."
                   />
                 </label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', letterSpacing: '0.5px' }}>MARKET OPEN</span>
+                    <textarea
+                      className="cyber-input"
+                      value={scenarioWorldview.market_open_note}
+                      onChange={(e) => updateScenarioWorldview({ market_open_note: e.target.value })}
+                      placeholder="Market opens with..."
+                      style={{ width: '100%', minHeight: '72px', resize: 'vertical' }}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', letterSpacing: '0.5px' }}>MARKET CLOSE</span>
+                    <textarea
+                      className="cyber-input"
+                      value={scenarioWorldview.market_close_note}
+                      onChange={(e) => updateScenarioWorldview({ market_close_note: e.target.value })}
+                      placeholder="Market closes with..."
+                      style={{ width: '100%', minHeight: '72px', resize: 'vertical' }}
+                    />
+                  </label>
+                </div>
+
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>overview_note</span>
+                  <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', letterSpacing: '0.5px' }}>HOLIDAY NOTE</span>
+                  <textarea
+                    className="cyber-input"
+                    value={scenarioWorldview.holiday_note}
+                    onChange={(e) => updateScenarioWorldview({ holiday_note: e.target.value })}
+                    placeholder="Holiday trading rules..."
+                    style={{ width: '100%', minHeight: '60px', resize: 'vertical' }}
+                  />
+                </label>
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', letterSpacing: '0.5px' }}>OVERVIEW</span>
                   <textarea
                     className="cyber-input"
                     value={scenarioWorldview.overview_note}
@@ -885,65 +963,86 @@ const NewsStudioPage: React.FC = () => {
                     style={{ width: '100%', minHeight: '80px', resize: 'vertical' }}
                   />
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>market_open_note</span>
-                    <textarea
-                      className="cyber-input"
-                      value={scenarioWorldview.market_open_note}
-                      onChange={(e) => updateScenarioWorldview({ market_open_note: e.target.value })}
-                      style={{ width: '100%', minHeight: '72px', resize: 'vertical' }}
-                    />
-                  </label>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>market_close_note</span>
-                    <textarea
-                      className="cyber-input"
-                      value={scenarioWorldview.market_close_note}
-                      onChange={(e) => updateScenarioWorldview({ market_close_note: e.target.value })}
-                      style={{ width: '100%', minHeight: '72px', resize: 'vertical' }}
-                    />
-                  </label>
-                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid #334155', paddingTop: '12px' }}>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>holiday_note</span>
+                  <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', letterSpacing: '0.5px' }}>BACKGROUND STORY</span>
                   <textarea
                     className="cyber-input"
-                    value={scenarioWorldview.holiday_note}
-                    onChange={(e) => updateScenarioWorldview({ holiday_note: e.target.value })}
-                    style={{ width: '100%', minHeight: '72px', resize: 'vertical' }}
+                    value={scenarioBackgroundStory}
+                    onChange={(e) => setScenarioBackgroundStory(e.target.value)}
+                    placeholder="Write the scenario background story here..."
+                    style={{ width: '100%', minHeight: '120px', resize: 'vertical' }}
                   />
                 </label>
               </div>
-              <div style={{ height: '12px' }} />
-              <textarea
-                className="cyber-input"
-                value={scenarioBackgroundStory}
-                onChange={(e) => setScenarioBackgroundStory(e.target.value)}
-                placeholder="Write the scenario background story here..."
-                style={{ width: '100%', minHeight: '120px', resize: 'vertical' }}
-              />
             </div>
 
-            <div className="cyber-card" style={{ margin: 0 }}>
-              <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <GitBranch size={14} /> SCENARIO STORE CONFIG
-              </h3>
-              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '12px' }}>
-                商店配置跟随 scenario 保存，与背景故事属于同一层元数据。
+            <div className="cyber-card" style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #334155', paddingBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <GitBranch size={16} style={{ color: '#10b981' }} />
+                  <h3 style={{ fontSize: '12px', fontWeight: 'bold', color: '#94a3b8', margin: 0, letterSpacing: '1px' }}>
+                    SCENARIO STORE
+                  </h3>
+                </div>
+                <span style={{ fontSize: '10px', color: '#64748b' }}>新闻商品 · 链式触发</span>
               </div>
-              <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px', minHeight: 0 }}>
                 {scenarioStoreItems.map((item, index) => (
-                  <div key={`${item.kind}-${index}`} style={{ border: '1px solid #334155', padding: '10px', background: 'rgba(0,0,0,0.2)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '8px', marginBottom: '8px' }}>
-                      <input className="cyber-input" value={item.kind} onChange={(e) => updateScenarioStoreItem(index, { kind: e.target.value.toUpperCase() })} />
-                      <input type="number" className="cyber-input" value={item.price_cash ?? 0} onChange={(e) => updateScenarioStoreItem(index, { price_cash: Number(e.target.value) })} />
+                  <div
+                    key={`${item.kind}-${index}`}
+                    style={{
+                      border: '1px solid #334155',
+                      borderRadius: '4px',
+                      padding: '12px',
+                      background: 'rgba(15, 23, 42, 0.6)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
+                    }}
+                  >
+                    {/* 卡片头部 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                        <div style={{ color: '#64748b' }}><GripVertical size={14} /></div>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            color: '#f1f5f9',
+                            padding: '2px 8px',
+                            borderRadius: '2px',
+                            background: item.enabled === false ? '#475569' : '#3b82f6',
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          {item.kind || 'RUMOR'}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#10b981', fontFamily: 'monospace' }}>
+                          ${Number(item.price_cash || 0).toLocaleString()}
+                        </span>
+                        <span style={{ fontSize: '10px', color: '#f59e0b' }}>{item.rarity || 'COMMON'}</span>
+                      </div>
+                      <button
+                        onClick={() => removeScenarioStoreItem(index)}
+                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px' }}
+                        title="删除商品"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                    <textarea className="cyber-input" value={item.description || ''} onChange={(e) => updateScenarioStoreItem(index, { description: e.target.value })} style={{ width: '100%', minHeight: '60px', resize: 'vertical', marginBottom: '8px' }} />
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                      <label style={{ fontSize: '11px', color: '#cbd5e1' }}><input type="checkbox" checked={!!item.requires_symbols} onChange={(e) => updateScenarioStoreItem(index, { requires_symbols: e.target.checked })} /> requires_symbols</label>
-                      <label style={{ fontSize: '11px', color: '#cbd5e1' }}><input type="checkbox" checked={item.enabled !== false} onChange={(e) => updateScenarioStoreItem(index, { enabled: e.target.checked })} /> enabled</label>
-                    </div>
+
+                    <textarea
+                      className="cyber-input"
+                      value={item.description || ''}
+                      onChange={(e) => updateScenarioStoreItem(index, { description: e.target.value })}
+                      placeholder="商品描述..."
+                      style={{ width: '100%', minHeight: '52px', resize: 'vertical' }}
+                    />
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       <select className="cyber-input" value={item.trigger_mode} onChange={(e) => updateScenarioStoreItem(index, { trigger_mode: e.target.value as any })}>
                         <option value="IMMEDIATE">IMMEDIATE</option>
@@ -958,26 +1057,70 @@ const NewsStudioPage: React.FC = () => {
                         <option value="LEGENDARY">LEGENDARY</option>
                       </select>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
+
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '11px' }}>
+                      <label style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={!!item.requires_symbols} onChange={(e) => updateScenarioStoreItem(index, { requires_symbols: e.target.checked })} /> 需要标的
+                      </label>
+                      <label style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={item.enabled !== false} onChange={(e) => updateScenarioStoreItem(index, { enabled: e.target.checked })} /> 启用
+                      </label>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       <input className="cyber-input" value={item.chain_kind || ''} onChange={(e) => updateScenarioStoreItem(index, { chain_kind: e.target.value ? e.target.value.toUpperCase() : null })} placeholder="chain_kind" />
                       <input className="cyber-input" value={(item.tags || []).join(', ')} onChange={(e) => updateScenarioStoreItem(index, { tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} placeholder="tags" />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '8px' }}>
-                      <input type="number" className="cyber-input" value={Number(item.chain_defaults?.t0_seconds ?? 0)} onChange={(e) => updateScenarioStoreItemChainDefault(index, 't0_seconds', Number(e.target.value))} placeholder="t0" />
-                      <input type="number" className="cyber-input" value={Number(item.chain_defaults?.omen_interval_seconds ?? 0)} onChange={(e) => updateScenarioStoreItemChainDefault(index, 'omen_interval_seconds', Number(e.target.value))} placeholder="omen" />
-                      <input type="number" step="0.01" className="cyber-input" value={Number(item.chain_defaults?.abort_probability ?? 0)} onChange={(e) => updateScenarioStoreItemChainDefault(index, 'abort_probability', Number(e.target.value))} placeholder="abort" />
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontSize: '9px', color: '#64748b' }}>t0(s)</span>
+                        <input type="number" className="cyber-input" value={Number(item.chain_defaults?.t0_seconds ?? 0)} onChange={(e) => updateScenarioStoreItemChainDefault(index, 't0_seconds', Number(e.target.value))} />
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontSize: '9px', color: '#64748b' }}>omen(s)</span>
+                        <input type="number" className="cyber-input" value={Number(item.chain_defaults?.omen_interval_seconds ?? 0)} onChange={(e) => updateScenarioStoreItemChainDefault(index, 'omen_interval_seconds', Number(e.target.value))} />
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontSize: '9px', color: '#64748b' }}>abort</span>
+                        <input type="number" step="0.01" className="cyber-input" value={Number(item.chain_defaults?.abort_probability ?? 0)} onChange={(e) => updateScenarioStoreItemChainDefault(index, 'abort_probability', Number(e.target.value))} />
+                      </label>
                     </div>
+
                     {item.trigger_mode === 'AUTO_CHAIN' && (
-                      <div style={{ marginTop: '8px', border: '1px dashed #334155', padding: '8px', borderRadius: '4px' }}>
-                        <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px' }}>CHAIN TREE (after purchase)</div>
-                        {(item.chain_tree || []).map((node) => (
-                          <div key={node.node_id} style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px', padding: '6px', background: 'rgba(0,0,0,0.2)' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                              <input className="cyber-input" value={node.kind} onChange={(e) => updateChainTreeNode(index, node.node_id, { kind: e.target.value.toUpperCase() })} placeholder="kind" />
-                              <input type="number" className="cyber-input" value={node.scheduled_delay_seconds} onChange={(e) => updateChainTreeNode(index, node.node_id, { scheduled_delay_seconds: Number(e.target.value) })} placeholder="delay(s)" />
+                      <div style={{ border: '1px solid #1e3a8a', borderRadius: '4px', padding: '10px', background: 'rgba(30, 58, 138, 0.15)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#60a5fa', fontWeight: 'bold', marginBottom: '8px' }}>
+                          <GitBranch size={12} /> CHAIN TREE
+                        </div>
+                        {(item.chain_tree || []).map((node, nodeIdx) => (
+                          <div
+                            key={node.node_id}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
+                              marginBottom: '8px',
+                              padding: '8px',
+                              background: 'rgba(0,0,0,0.25)',
+                              borderRadius: '3px',
+                              borderLeft: '3px solid #3b82f6'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '10px', color: '#94a3b8', fontFamily: 'monospace' }}>#{nodeIdx + 1} · {node.node_id.slice(-6)}</span>
+                              <button
+                                onClick={() => removeChainTreeNode(index, node.node_id)}
+                                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '10px', padding: '0' }}
+                              >
+                                REMOVE
+                              </button>
                             </div>
-                            <textarea className="cyber-input" value={node.text || ''} onChange={(e) => updateChainTreeNode(index, node.node_id, { text: e.target.value })} placeholder="text" style={{ width: '100%', minHeight: '40px', resize: 'vertical' }} />
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: '6px' }}>
+                              <input className="cyber-input" value={node.kind} onChange={(e) => updateChainTreeNode(index, node.node_id, { kind: e.target.value.toUpperCase() })} placeholder="kind" />
+                              <input type="number" className="cyber-input" value={node.scheduled_delay_seconds} onChange={(e) => updateChainTreeNode(index, node.node_id, { scheduled_delay_seconds: Number(e.target.value) })} placeholder="delay" />
+                            </div>
+                            <textarea className="cyber-input" value={node.text || ''} onChange={(e) => updateChainTreeNode(index, node.node_id, { text: e.target.value })} placeholder="node text" style={{ width: '100%', minHeight: '40px', resize: 'vertical' }} />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                               <input type="number" step="0.01" className="cyber-input" value={node.activation_prob} onChange={(e) => updateChainTreeNode(index, node.node_id, { activation_prob: Number(e.target.value) })} placeholder="prob" />
                               <select className="cyber-input" value={node.parent_node_id || ''} onChange={(e) => updateChainTreeNode(index, node.node_id, { parent_node_id: e.target.value || null })}>
                                 <option value="">-- root --</option>
@@ -986,17 +1129,37 @@ const NewsStudioPage: React.FC = () => {
                                 ))}
                               </select>
                             </div>
-                            <button onClick={() => removeChainTreeNode(index, node.node_id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '10px' }}>REMOVE NODE</button>
                           </div>
                         ))}
-                        <button onClick={() => addChainTreeNode(index, (item.chain_tree || [])[(item.chain_tree || []).length - 1]?.node_id || null)} type="button" style={{ width: '100%', background: 'transparent', border: '1px solid #334155', color: '#cbd5e1', padding: '4px', cursor: 'pointer', fontSize: '11px' }}>+ ADD CHAIN NODE</button>
+                        <button
+                          onClick={() => addChainTreeNode(index, (item.chain_tree || [])[(item.chain_tree || []).length - 1]?.node_id || null)}
+                          type="button"
+                          style={{
+                            width: '100%',
+                            background: 'transparent',
+                            border: '1px dashed #3b82f6',
+                            color: '#93c5fd',
+                            padding: '6px',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            borderRadius: '3px'
+                          }}
+                        >
+                          + ADD CHAIN NODE
+                        </button>
                       </div>
                     )}
-                    <button onClick={() => removeScenarioStoreItem(index)} style={{ marginTop: '8px', background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '11px' }}>REMOVE</button>
                   </div>
                 ))}
               </div>
-              <button onClick={addScenarioStoreItem} type="button" className="cyber-button" style={{ marginTop: '10px', width: '100%' }}>+ ADD_STORE_ITEM</button>
+              <button
+                onClick={addScenarioStoreItem}
+                type="button"
+                className="cyber-button"
+                style={{ marginTop: '4px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              >
+                <Plus size={14} /> ADD STORE ITEM
+              </button>
             </div>
           </div>
         </div>
@@ -1008,7 +1171,16 @@ const NewsStudioPage: React.FC = () => {
               <GitBranch size={18} style={{ color: '#3b82f6' }} />
               <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#f1f5f9' }}>BACKGROUND NEWS TREE</span>
             </div>
-            
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', color: '#64748b' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: '#64748b', borderRadius: '1px' }} />RUMOR</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: '#ef4444', borderRadius: '1px' }} />LEAK</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: '#f59e0b', borderRadius: '1px' }} />REPORT</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: '#a855f7', borderRadius: '1px' }} />MAJOR</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: '#ec4899', borderRadius: '1px' }} />WORLD</span>
+              </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '11px', color: '#64748b' }}>Zoom:</span>
               <input 
@@ -1020,6 +1192,7 @@ const NewsStudioPage: React.FC = () => {
               <span style={{ fontSize: '11px', color: '#3b82f6', fontWeight: 'bold', width: '30px' }}>x{Number(timeScale || 0).toFixed(1)}</span>
             </div>
           </div>
+        </div>
 
           <button
             onClick={handleCreateNewNode}

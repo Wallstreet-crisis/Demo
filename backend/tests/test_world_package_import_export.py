@@ -98,3 +98,51 @@ def test_export_and_import_world_package() -> None:
     new_cards_body = new_cards.json()
     assert len(new_cards_body) == 1
     assert new_cards_body[0]["text"] == "pkg card"
+
+
+def test_default_template_renders_in_frontend_shape() -> None:
+    # 1. 拉取默认模板
+    template_resp = client.get("/global/studio/news/templates/default")
+    assert template_resp.status_code == 200, template_resp.text
+    template = template_resp.json()
+
+    # 2. 验证模板结构完整
+    assert template["scenario_id"] == "DEFAULT_TEMPLATE"
+    assert template["background_story"]
+    assert template["worldview"]["featured_symbols"]
+    assert len(template["news_store_items"]) >= 5
+    assert len(template["cards"]) >= 5
+
+    # 3. 验证剧情树存在父子关系
+    cards = template["cards"]
+    root = next((c for c in cards if c.get("parent_card_id") is None), None)
+    assert root is not None
+    children = [c for c in cards if c.get("parent_card_id") == root["card_id"]]
+    assert len(children) >= 3
+
+    # 4. 验证商店链树存在
+    auto_chain_items = [i for i in template["news_store_items"] if i.get("trigger_mode") == "AUTO_CHAIN"]
+    assert len(auto_chain_items) >= 1
+    for item in auto_chain_items:
+        assert len(item.get("chain_tree") or []) >= 1
+
+    # 5. 导入到一个新 scenario，确保前端能真正加载渲染
+    target_id = f"scenario_default_template_{uuid4().hex}"
+    import_resp = client.post(
+        f"/global/studio/news/scenarios/{target_id}/package",
+        json={
+            "actor_id": "author",
+            "package": {**template, "scenario_id": target_id},
+        },
+    )
+    assert import_resp.status_code == 200, import_resp.text
+
+    cards_resp = client.get(f"/global/studio/news/scenarios/{target_id}/cards")
+    assert cards_resp.status_code == 200, cards_resp.text
+    assert len(cards_resp.json()) == len(template["cards"])
+
+    meta_resp = client.get(f"/global/studio/news/scenarios/{target_id}/meta")
+    assert meta_resp.status_code == 200, meta_resp.text
+    meta = meta_resp.json()
+    assert len(meta["news_store_items"]) == len(template["news_store_items"])
+    assert meta["background_story"] == template["background_story"]
