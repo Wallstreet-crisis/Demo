@@ -2852,6 +2852,16 @@ async def global_studio_news_scenarios() -> List[Dict[str, Any]]:
     return [{"id": r["scenario_id"], "name": r["scenario_id"]} for r in rows]
 
 
+@router.delete("/global/studio/news/scenarios/{scenario_id}")
+async def global_studio_news_delete_scenario(scenario_id: str) -> Dict[str, Any]:
+    """删除整个场景：包括所有卡片和元数据。"""
+    conn = _get_global_news_db_conn()
+    with conn:
+        conn.execute("DELETE FROM news WHERE scenario_id = ?", (scenario_id,))
+        conn.execute("DELETE FROM news_scenario_meta WHERE scenario_id = ?", (scenario_id,))
+    return {"deleted": scenario_id}
+
+
 @router.get("/global/studio/news/scenarios/{scenario_id}/cards")
 async def global_studio_news_scenario_cards(scenario_id: str) -> List[Dict[str, Any]]:
     # 彻底开放，不再校验身份

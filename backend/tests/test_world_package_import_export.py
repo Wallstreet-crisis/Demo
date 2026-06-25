@@ -113,12 +113,19 @@ def test_default_template_renders_in_frontend_shape() -> None:
     assert len(template["news_store_items"]) >= 5
     assert len(template["cards"]) >= 5
 
-    # 3. 验证剧情树存在父子关系
+    # 3. 验证剧情树存在父子关系且至少有两层
     cards = template["cards"]
     root = next((c for c in cards if c.get("parent_card_id") is None), None)
     assert root is not None
     children = [c for c in cards if c.get("parent_card_id") == root["card_id"]]
     assert len(children) >= 3
+    child_ids = {c["card_id"] for c in children}
+    grandchildren = [c for c in cards if c.get("parent_card_id") in child_ids]
+    assert len(grandchildren) >= 1, "默认剧情树应至少包含孙节点（两层以上）"
+
+    # 验证存在概率触发节点，体现剧情随机性
+    probabilistic_cards = [c for c in cards if c.get("activation_prob", 1.0) < 1.0]
+    assert len(probabilistic_cards) >= 1, "默认剧情树应包含概率触发事件"
 
     # 4. 验证商店链树存在
     auto_chain_items = [i for i in template["news_store_items"] if i.get("trigger_mode") == "AUTO_CHAIN"]
