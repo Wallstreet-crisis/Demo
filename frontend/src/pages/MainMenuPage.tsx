@@ -787,7 +787,6 @@ export default function MainMenuPage() {
           </div>
         )}
 
-        {/* 装饰性背景，当没有窗口打开时显示 */}
         {activeLocalView === 'IDLE' && (
           <div style={{ 
             textAlign: 'center', 
@@ -795,8 +794,7 @@ export default function MainMenuPage() {
             pointerEvents: 'none',
             userSelect: 'none'
           }}>
-            <div style={{ fontSize: '180px', color: 'var(--terminal-info)', textShadow: '0 0 30px rgba(59, 130, 246, 0.3)' }}>❂</div>
-            <div style={{ fontSize: '16px', fontFamily: 'monospace', marginTop: '30px', letterSpacing: '8px', color: 'var(--terminal-info)' }}>
+            <div style={{ fontSize: '16px', fontFamily: 'monospace', letterSpacing: '8px', color: 'var(--terminal-info)' }}>
               AWAITING_COMMAND_INPUT
             </div>
           </div>
