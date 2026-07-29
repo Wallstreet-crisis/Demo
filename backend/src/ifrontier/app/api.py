@@ -785,7 +785,7 @@ async def news_store_catalog(user_id: str, force_refresh: bool = False) -> NewsS
     # 1. 获取玩家资产水平
     try:
         snapshot = get_snapshot(user_id)
-        player_net_worth = float(snapshot.get("net_worth", 0.0))
+        player_net_worth = float(snapshot.total_valuation)
     except Exception:
         player_net_worth = 0.0
 
@@ -824,12 +824,7 @@ async def news_store_catalog(user_id: str, force_refresh: bool = False) -> NewsS
             catalog_item = bp.resolve_store_catalog_item(price_cash=float(price), symbol=assigned_symbol)
             catalog_item["preview_text"] = str(preview)
 
-            out.append(
-                NewsStoreCatalogItem(
-                    **catalog_item,
-                    preview_text=str(preview),
-                )
-            )
+            out.append(NewsStoreCatalogItem(**catalog_item))
 
         return NewsStoreCatalogResponse(items=out, expires_at=expires_at)
 

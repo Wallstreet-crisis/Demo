@@ -160,7 +160,7 @@ def init_news_schema(conn: Optional[sqlite3.Connection] = None) -> None:
         CREATE UNIQUE INDEX IF NOT EXISTS idx_news_main_card_unique ON news(card_id) WHERE variant_id IS NULL;
 
         CREATE TABLE IF NOT EXISTS news_market_shelves (
-            player_id TEXT PRIMARY KEY,
+            user_id TEXT PRIMARY KEY,
             items_json TEXT NOT NULL,
             expires_at TEXT NOT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
