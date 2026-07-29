@@ -23,6 +23,7 @@ class HostingScheduler:
         get_channel_size: Callable[[str], Awaitable[int]],
         broadcaster: Callable[[Dict[str, Any]], Awaitable[None]],
         make_facade: Callable[[str], UserCapabilityFacade],
+        bypass_human_gate: bool = False,
     ) -> None:
         self._min_players = int(min_players)
         self._tick_interval_seconds = float(tick_interval_seconds)
@@ -31,6 +32,7 @@ class HostingScheduler:
         self._get_channel_size = get_channel_size
         self._broadcaster = broadcaster
         self._make_facade = make_facade
+        self._bypass_human_gate = bool(bypass_human_gate)
 
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task[None]] = None
@@ -52,9 +54,8 @@ class HostingScheduler:
     async def _run_loop(self) -> None:
         while not self._stop.is_set():
             try:
-                await self.tick_once()
+                await self.tick_once(bypass_human_gate=self._bypass_human_gate)
             except Exception as exc:
-                # 必须异常隔离：任何一次 tick 失败不影响调度循环
                 _log.warning("Hosting tick error: %s", exc, exc_info=True)
 
             try:
@@ -63,13 +64,14 @@ class HostingScheduler:
                 pass
 
     async def tick_once(self, *, bypass_human_gate: bool = False) -> None:
-        humans = int(await self._get_channel_size(self._channel_for_online_stats))
+        try:
+            humans = int(await self._get_channel_size(self._channel_for_online_stats))
+        except Exception:
+            humans = 0
 
         if humans <= 0 and not bypass_human_gate:
             return
         
-        # 允许一定比例或固定数量的 AI 始终在线，不受人类数量干扰（除非人类真的非常多）
-        # 目标：保持世界活跃，陪玩 bot 和 玩家托管应该平衡分配 quota
         enabled = await asyncio.to_thread(list_enabled_hosting_users, limit=200)
         if not enabled:
             return
@@ -91,17 +93,18 @@ class HostingScheduler:
                 humans, missing, total_quota, len(bot_candidates), len(human_candidates),
             )
 
-        # 混合采样：优先保证机器人，剩余给人类托管
         picked_sts = []
-        
-        # 尽量保证机器人（陪玩）的参与度，占 quota 的 70%
-        bot_quota = max(1, int(total_quota * 0.7))
-        picked_sts.extend(bot_candidates[:bot_quota])
-        
-        # 剩余 quota 给人类托管
-        rem_quota = total_quota - len(picked_sts)
-        if rem_quota > 0:
-            picked_sts.extend(human_candidates[:rem_quota])
+
+        if bypass_human_gate and human_candidates:
+            # AI 模拟模式：只托管人类玩家，不碰陪玩机器人
+            picked_sts = list(human_candidates[:total_quota])
+        else:
+            # 混合采样：优先保证机器人，剩余给人类托管
+            bot_quota = max(1, int(total_quota * 0.7))
+            picked_sts.extend(bot_candidates[:bot_quota])
+            rem_quota = total_quota - len(picked_sts)
+            if rem_quota > 0:
+                picked_sts.extend(human_candidates[:rem_quota])
 
         # 关键保护：每轮最多激活 max_per_tick 个托管代理，防止线程/LLM/DB 负载爆炸
         picked_sts = picked_sts[: self._max_per_tick]

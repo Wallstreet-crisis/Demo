@@ -4,8 +4,12 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from ifrontier.infra.sqlite.ledger import AccountSnapshot, get_snapshot
-from ifrontier.infra.sqlite.market import get_price_series, list_active_symbols
+from ifrontier.infra.sqlite.market import get_price_series, list_active_symbols, list_trades
+from ifrontier.infra.sqlite.orders import cancel_order, list_open_orders_by_account
+from ifrontier.infra.sqlite import news as news_db
+from ifrontier.infra.sqlite.event_store import SqliteEventStore
 from ifrontier.services.chat import ChatService
+from ifrontier.services.news import NewsService
 from ifrontier.services.contract_agent import ContractAgent, ContractDraftResult
 from ifrontier.services.contracts import ContractService
 from ifrontier.services.market_analytics import MarketQuote, get_quote
@@ -28,14 +32,33 @@ class UserCapabilityFacade:
     contract_service: ContractService
     contract_agent: ContractAgent
     chat_service: ChatService
+    news_service: NewsService | None = None
+    event_store: SqliteEventStore | None = None
+
+    # --- Internal: resolve the correct account_id for DB lookups ---
+
+    def _account_id(self) -> str:
+        """Resolve the real DB account_id for this user.
+
+        Bootstrap always creates accounts with a 'user:' prefix.
+        Raw user_id accounts only exist if hosting_enable created them (legacy).
+        Check 'user:' prefix first; fall back to raw.
+        """
+        raw = self.user_id.lower()
+        prefixed = f"user:{raw}" if not raw.startswith("user:") else raw
+        try:
+            get_snapshot(prefixed)
+            return prefixed
+        except Exception:
+            return raw
 
     # --- Read-only observations (user-visible) ---
 
     def get_account_snapshot(self) -> AccountSnapshot:
-        return get_snapshot(self.user_id)
+        return get_snapshot(self._account_id())
 
     def get_account_valuation(self) -> AccountValuation:
-        return value_account(account_id=self.user_id)
+        return value_account(account_id=self._account_id())
 
     def get_market_quote(self, *, symbol: str) -> MarketQuote:
         return get_quote(str(symbol))
@@ -178,7 +201,7 @@ class UserCapabilityFacade:
 
     def submit_limit_order(self, *, symbol: str, side: str, price: float, quantity: float):
         return submit_limit_order(
-            account_id=self.user_id,
+            account_id=self._account_id(),
             symbol=symbol,
             side=side,
             price=float(price),
@@ -187,8 +210,60 @@ class UserCapabilityFacade:
 
     def submit_market_order(self, *, symbol: str, side: str, quantity: float):
         return submit_market_order(
-            account_id=self.user_id,
+            account_id=self._account_id(),
             symbol=symbol,
             side=side,
             quantity=float(quantity),
         )
+
+    # --- Order management (missing but critical for AI) ---
+
+    def cancel_limit_order(self, *, order_id: str):
+        cancel_order(order_id=order_id, account_id=self._account_id())
+
+    def list_my_open_orders(self, *, symbol: str | None = None, limit: int = 50):
+        return list_open_orders_by_account(self._account_id(), symbol=symbol, limit=limit)
+
+    # --- News intelligence (missing but critical for AI) ---
+
+    def get_news_inbox(self, *, limit: int = 20):
+        return news_db.list_user_inbox_news(self.user_id, limit=limit)
+
+    def get_news_public_feed(self, *, limit: int = 20):
+        return news_db.list_news(limit=limit)
+
+    # --- News write operations (requires news_service to be injected) ---
+
+    def create_news_card(
+        self,
+        *,
+        kind: str,
+        text: str = "",
+        symbols: list[str] | None = None,
+        truth_payload: dict | None = None,
+    ):
+        if self.news_service is None:
+            raise RuntimeError("news_service not available on this facade instance")
+        card_id, _ = self.news_service.create_card(
+            actor_id=self._account_id(),
+            kind=kind,
+            text=text,
+            symbols=symbols or [],
+            truth_payload=truth_payload or {},
+        )
+        return card_id
+
+    def emit_news_variant(self, *, card_id: str, text: str):
+        if self.news_service is None:
+            raise RuntimeError("news_service not available on this facade instance")
+        return self.news_service.emit_variant(card_id=card_id, author_id=self._account_id(), text=text)
+
+    def propagate_news(self, *, variant_id: str, limit: int = 10):
+        if self.news_service is None:
+            raise RuntimeError("news_service not available on this facade instance")
+        return self.news_service.deliver_variant(variant_id=variant_id, from_actor_id=self._account_id(), limit=limit)
+
+    def broadcast_news(self, *, variant_id: str, channel: str = "GLOBAL"):
+        if self.news_service is None:
+            raise RuntimeError("news_service not available on this facade instance")
+        return self.news_service.broadcast_variant(variant_id=variant_id, actor_id=self._account_id(), channel=channel)

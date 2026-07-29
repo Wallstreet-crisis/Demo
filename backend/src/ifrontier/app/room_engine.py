@@ -8,6 +8,7 @@ from ifrontier.infra.sqlite.schema import init_schema
 from ifrontier.app.ws import hub
 from ifrontier.app.room_meta import load_room_meta
 
+from ifrontier.services.contract_agent import ContractAgent
 from ifrontier.services.rule_scheduler import ContractRuleScheduler
 from ifrontier.services.news_tick_scheduler import NewsTickScheduler
 from ifrontier.services.market_session_scheduler import MarketSessionScheduler
@@ -138,10 +139,6 @@ class RoomEngine:
         from ifrontier.services.contracts import ContractService
         from ifrontier.services.market_analytics import get_market_trends
 
-        # 延迟导入 make_user_facade，避免循环依赖
-        import ifrontier.app.api as api_module
-        make_user_facade = api_module.make_user_facade
-
         # 为每个房间创建独立的事件存储和服务实例，确保房间隔离
         room_event_store = SqliteEventStore()
         room_contract_service = ContractService(room_event_store)
@@ -154,13 +151,29 @@ class RoomEngine:
             market_data_provider=lambda symbols: get_market_trends(symbols=symbols),
             broadcaster=broadcaster,
         )
-        
+
+        # 房间级别的 make_user_facade，注入本房间的服务实例
+        def _room_make_user_facade(user_id: str):
+            from ifrontier.services.user_capabilities import UserCapabilityFacade
+            return UserCapabilityFacade(
+                user_id=user_id,
+                contract_service=room_contract_service,
+                contract_agent=ContractAgent(),
+                chat_service=room_chat_service,
+                news_service=room_news_service,
+                event_store=room_event_store,
+            )
+
         # 保存房间级服务实例，供 API 层访问
         self.contract_service = room_contract_service
         self.news_service = room_news_service
         self.chat_service = room_chat_service
         self.news_tick_engine = room_news_tick_engine
         self.commonbot_emergency_runner = room_commonbot_emergency_runner
+
+        ai_mode = bool(game_settings.get("ai_simulation_mode", False))
+        news_interval = int(game_settings.get("small_news_interval_seconds", 60))
+        chain_interval = int(game_settings.get("chain_interval_seconds", 600))
 
         self.contract_scheduler = ContractRuleScheduler(
             contract_service=room_contract_service,
@@ -169,6 +182,7 @@ class RoomEngine:
             max_concurrency=5,
             channel_for_online_stats="presence",
             get_channel_size=get_size,
+            bypass_human_gate=ai_mode,
         )
 
         self.news_scheduler = NewsTickScheduler(
@@ -178,6 +192,7 @@ class RoomEngine:
             broadcaster=broadcaster,
             channel_for_online_stats="presence",
             get_channel_size=get_size,
+            bypass_human_gate=ai_mode,
         )
 
         self.market_session_scheduler = MarketSessionScheduler(
@@ -186,6 +201,7 @@ class RoomEngine:
             broadcaster=broadcaster,
             channel_for_online_stats="presence",
             get_channel_size=get_size,
+            bypass_human_gate=ai_mode,
         )
 
         self.market_maker_scheduler = MarketMakerScheduler(
@@ -193,16 +209,18 @@ class RoomEngine:
             broadcaster=broadcaster,
             channel_for_online_stats="presence",
             get_channel_size=get_size,
+            bypass_human_gate=ai_mode,
         )
 
         self.hosting_scheduler = HostingScheduler(
             min_players=8,
             tick_interval_seconds=1.0,
-            max_per_tick=2,
+            max_per_tick=20 if ai_mode else 2,
             channel_for_online_stats="presence",
             get_channel_size=get_size,
             broadcaster=broadcaster,
-            make_facade=make_user_facade,
+            make_facade=_room_make_user_facade,
+            bypass_human_gate=ai_mode,
         )
 
         self.victory_scheduler = VictoryScheduler(
@@ -211,7 +229,13 @@ class RoomEngine:
             get_channel_size=get_size,
             room_settings=game_settings,
             news_service=room_news_service,
+            bypass_human_gate=ai_mode,
         )
+
+        # AI 模拟模式：加快新闻生成节奏
+        if ai_mode:
+            room_news_tick_engine._small_news_interval_seconds = news_interval
+            room_news_tick_engine._chain_interval_seconds = chain_interval
 
         token = room_id_var.set(self.room_id)
         try:

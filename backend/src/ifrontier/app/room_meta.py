@@ -37,6 +37,9 @@ class RoomGameSettings(BaseModel):
     mass_bankruptcy_mode: Optional[bool] = None
     min_active_players: Optional[int] = None
     scenario_id: Optional[str] = None
+    ai_simulation_mode: Optional[bool] = None
+    small_news_interval_seconds: Optional[int] = None
+    chain_interval_seconds: Optional[int] = None
     news_store_items: List[RoomNewsStoreItemConfig] = Field(default_factory=list)
 
 

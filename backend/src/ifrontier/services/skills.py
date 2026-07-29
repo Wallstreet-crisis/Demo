@@ -322,4 +322,123 @@ def default_skills_registry() -> SkillsRegistry:
         ),
     )
 
+    reg.register(
+        name="trading.cancel_order",
+        description="Cancel an open limit order by order_id as the user.",
+        input_schema={
+            "type": "object",
+            "properties": {"order_id": {"type": "string"}},
+            "required": ["order_id"],
+        },
+        handler=lambda f, a: f.cancel_limit_order(order_id=str(a.get("order_id") or "")),
+    )
+
+    reg.register(
+        name="trading.list_my_open_orders",
+        description="List open orders for the user, optionally filtered by symbol.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "symbol": {"type": ["string", "null"]},
+                "limit": {"type": "number"},
+            },
+        },
+        handler=lambda f, a: f.list_my_open_orders(
+            symbol=a.get("symbol"),
+            limit=int(a.get("limit") or 50),
+        ),
+    )
+
+    reg.register(
+        name="news.list_inbox",
+        description="List news in the user's inbox.",
+        input_schema={
+            "type": "object",
+            "properties": {"limit": {"type": "number"}},
+        },
+        handler=lambda f, a: f.get_news_inbox(limit=int(a.get("limit") or 20)),
+    )
+
+    reg.register(
+        name="news.list_public_feed",
+        description="List public news feed.",
+        input_schema={
+            "type": "object",
+            "properties": {"limit": {"type": "number"}},
+        },
+        handler=lambda f, a: f.get_news_public_feed(limit=int(a.get("limit") or 20)),
+    )
+
+    reg.register(
+        name="news.create_card",
+        description="Create a new news card as the user.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string"},
+                "text": {"type": "string"},
+                "symbols": {"type": "array", "items": {"type": "string"}},
+                "truth_payload": {"type": "object"},
+            },
+            "required": ["kind"],
+        },
+        handler=lambda f, a: f.create_news_card(
+            kind=str(a.get("kind") or ""),
+            text=str(a.get("text") or ""),
+            symbols=a.get("symbols"),
+            truth_payload=a.get("truth_payload"),
+        ),
+    )
+
+    reg.register(
+        name="news.emit_variant",
+        description="Emit a variant of a news card as the user.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "card_id": {"type": "string"},
+                "text": {"type": "string"},
+            },
+            "required": ["card_id", "text"],
+        },
+        handler=lambda f, a: f.emit_news_variant(
+            card_id=str(a.get("card_id") or ""),
+            text=str(a.get("text") or ""),
+        ),
+    )
+
+    reg.register(
+        name="news.propagate",
+        description="Propagate a news variant to other users as the user.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "variant_id": {"type": "string"},
+                "limit": {"type": "number"},
+            },
+            "required": ["variant_id"],
+        },
+        handler=lambda f, a: f.propagate_news(
+            variant_id=str(a.get("variant_id") or ""),
+            limit=int(a.get("limit") or 10),
+        ),
+    )
+
+    reg.register(
+        name="news.broadcast",
+        description="Broadcast a news variant to all users or a channel as the user.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "variant_id": {"type": "string"},
+                "channel": {"type": "string"},
+            },
+            "required": ["variant_id"],
+        },
+        handler=lambda f, a: f.broadcast_news(
+            variant_id=str(a.get("variant_id") or ""),
+            channel=str(a.get("channel") or "GLOBAL"),
+        ),
+    )
+
     return reg

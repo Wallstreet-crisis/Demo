@@ -18,6 +18,7 @@ class VictoryScheduler:
         get_channel_size: Optional[Callable[[str], Awaitable[int]]] = None,
         room_settings: Optional[Dict[str, Any]] = None,
         news_service: Optional[NewsService] = None,
+        bypass_human_gate: bool = False,
     ) -> None:
         self._tick_interval_seconds = float(tick_interval_seconds)
         self._broadcaster = broadcaster
@@ -28,6 +29,7 @@ class VictoryScheduler:
         self._victory_service = VictoryService()
         self._news_service = news_service
         self._victory_announced = False
+        self._bypass_human_gate = bool(bypass_human_gate)
         
         # 默认设置，房间级配置会在这里覆盖，避免影响全局默认值
         self.settings = {
@@ -58,7 +60,7 @@ class VictoryScheduler:
         while not self._stop.is_set():
             has_time_limit = bool(self.settings.get("time_limit_seconds"))
             # 检查是否有在线玩家，如果没有则跳过以节省 CPU
-            if self._get_channel_size:
+            if not self._bypass_human_gate and self._get_channel_size:
                 try:
                     online = await self._get_channel_size("presence")
                 except Exception:

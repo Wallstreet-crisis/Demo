@@ -1017,10 +1017,11 @@ class HostingDisableResponse(BaseModel):
 
 @router.post("/hosting/{user_id}/enable")
 async def hosting_enable(user_id: str) -> HostingEnableResponse:
+    prefixed = f"user:{user_id}" if not user_id.startswith("user:") else user_id
     try:
-        _ = get_snapshot(user_id)
+        get_snapshot(prefixed)
     except Exception:
-        create_account(user_id, owner_type="user", initial_cash=0.0)
+        create_account(prefixed, owner_type="user", initial_cash=0.0)
     st = upsert_hosting_state(user_id=user_id, enabled=True, status="ON_IDLE")
     from ifrontier.domain.events.payloads import AiHostingStateChangedPayload
     
@@ -1136,6 +1137,8 @@ def make_user_facade(user_id: str) -> UserCapabilityFacade:
         contract_service=_contract_service,
         contract_agent=_contract_agent,
         chat_service=_chat_service,
+        news_service=_news_service,
+        event_store=_event_store,
     )
 
 class DebugEarningsNewsRequest(BaseModel):

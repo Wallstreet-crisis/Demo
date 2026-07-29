@@ -18,6 +18,7 @@ class MarketMakerScheduler:
         broadcaster: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
         channel_for_online_stats: Optional[str] = None,
         get_channel_size: Optional[Callable[[str], Awaitable[int]]] = None,
+        bypass_human_gate: bool = False,
     ) -> None:
         self._tick_interval_seconds = float(tick_interval_seconds)
         self._broadcaster = broadcaster
@@ -28,6 +29,7 @@ class MarketMakerScheduler:
         self._task: Optional[asyncio.Task[None]] = None
         self._last_regen_day: Optional[int] = None  # 上次恢复的游戏日编号
         self._last_health_broadcast: Optional[str] = None  # 上次广播的健康等级
+        self._bypass_human_gate = bool(bypass_human_gate)
 
         cfg = MarketMakerConfig(
             account_id=str(os.getenv("IF_MARKET_MAKER_ACCOUNT_ID") or "mm:1"),
@@ -55,7 +57,7 @@ class MarketMakerScheduler:
         from ifrontier.services.market_session import get_market_session, MarketPhase
 
         while not self._stop.is_set():
-            if self._get_channel_size and self._channel_for_online_stats:
+            if not self._bypass_human_gate and self._get_channel_size and self._channel_for_online_stats:
                 try:
                     online = int(await self._get_channel_size(self._channel_for_online_stats))
                 except Exception:

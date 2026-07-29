@@ -19,6 +19,7 @@ from ifrontier.domain.events.envelope import EventEnvelopeJson
 from ifrontier.domain.events.types import EventType
 
 _log = get_logger(__name__)
+from ifrontier.infra.sqlite.db import transaction
 from ifrontier.infra.sqlite.event_store import SqliteEventStore
 from ifrontier.infra.sqlite.ledger import apply_trade_executed
 from ifrontier.infra.sqlite.market import record_trade
@@ -57,94 +58,95 @@ def submit_limit_order(
 
     assert_symbol_tradable(symbol)
 
-    # 先插入订单
-    order = insert_limit_order(account_id, symbol, side, price, quantity)
+    with transaction():
+        # 先插入订单
+        order = insert_limit_order(account_id, symbol, side, price, quantity)
 
-    remaining = order.quantity_remaining
-    matches: List[MatchResult] = []
+        remaining = order.quantity_remaining
+        matches: List[MatchResult] = []
 
-    # 尝试撮合
-    for opp in fetch_best_opposite_orders(symbol, side):
+        # 尝试撮合
+        for opp in fetch_best_opposite_orders(symbol, side):
+            if remaining <= 0:
+                break
+
+            # 价格条件：买价 >= 卖价
+            if side == "BUY" and price < opp.price:
+                break
+            if side == "SELL" and price > opp.price:
+                break
+
+            trade_qty = min(remaining, opp.quantity_remaining)
+            if trade_qty <= 0:
+                continue
+
+            trade_price = opp.price  # 吃对手价
+
+            # 构造 trade.executed 事件
+            payload = {
+                "buy_account_id": account_id if side == "BUY" else opp.account_id,
+                "sell_account_id": opp.account_id if side == "BUY" else account_id,
+                "symbol": symbol,
+                "price": trade_price,
+                "quantity": trade_qty,
+            }
+
+            event_json = EventEnvelopeJson(
+                event_id=uuid4(),
+                event_type=str(EventType.TRADE_EXECUTED),
+                occurred_at=datetime.now(timezone.utc),
+                correlation_id=None,
+                causation_id=None,
+                actor={"agent_id": "matching-engine"},
+                payload=payload,
+            )
+
+            event_dict = event_json.model_dump()
+            # 确保 UUID 在广播前序列化为字符串，防止 WebSocket 广播 500 错误
+            if isinstance(event_dict.get("event_id"), UUID):
+                event_dict["event_id"] = str(event_dict["event_id"])
+
+            _log.debug("TRADE_EXECUTED: %s %s @ %s (%s <- %s)", symbol, trade_qty, trade_price, payload['buy_account_id'], payload['sell_account_id'])
+
+            # 账本记账
+            apply_trade_executed(
+                buy_account_id=payload["buy_account_id"],
+                sell_account_id=payload["sell_account_id"],
+                symbol=symbol,
+                price=trade_price,
+                quantity=trade_qty,
+                event_id=str(event_json.event_id),
+            )
+
+            record_trade(
+                symbol=symbol,
+                price=float(trade_price),
+                quantity=float(trade_qty),
+                occurred_at=event_json.occurred_at,
+                event_id=str(event_json.event_id),
+            )
+
+            # 写入事件存储
+            _event_store.append(event_json)
+            matches.append(MatchResult(executed_event=EventEnvelopeJson(**event_dict)))
+
+            # 更新订单剩余数量和状态
+            remaining -= trade_qty
+            new_opp_qty = opp.quantity_remaining - trade_qty
+            update_order_quantity_and_status(
+                opp.order_id,
+                new_opp_qty,
+                "FILLED" if new_opp_qty <= 0 else "PARTIAL_FILLED",
+            )
+
+        # 更新本单状态
         if remaining <= 0:
-            break
-
-        # 价格条件：买价 >= 卖价
-        if side == "BUY" and price < opp.price:
-            break
-        if side == "SELL" and price > opp.price:
-            break
-
-        trade_qty = min(remaining, opp.quantity_remaining)
-        if trade_qty <= 0:
-            continue
-
-        trade_price = opp.price  # 吃对手价
-
-        # 构造 trade.executed 事件
-        payload = {
-            "buy_account_id": account_id if side == "BUY" else opp.account_id,
-            "sell_account_id": opp.account_id if side == "BUY" else account_id,
-            "symbol": symbol,
-            "price": trade_price,
-            "quantity": trade_qty,
-        }
-
-        event_json = EventEnvelopeJson(
-            event_id=uuid4(),
-            event_type=str(EventType.TRADE_EXECUTED),
-            occurred_at=datetime.now(timezone.utc),
-            correlation_id=None,
-            causation_id=None,
-            actor={"agent_id": "matching-engine"},
-            payload=payload,
-        )
-
-        event_dict = event_json.model_dump()
-        # 确保 UUID 在广播前序列化为字符串，防止 WebSocket 广播 500 错误
-        if isinstance(event_dict.get("event_id"), UUID):
-            event_dict["event_id"] = str(event_dict["event_id"])
-
-        _log.debug("TRADE_EXECUTED: %s %s @ %s (%s <- %s)", symbol, trade_qty, trade_price, payload['buy_account_id'], payload['sell_account_id'])
-
-        # 账本记账
-        apply_trade_executed(
-            buy_account_id=payload["buy_account_id"],
-            sell_account_id=payload["sell_account_id"],
-            symbol=symbol,
-            price=trade_price,
-            quantity=trade_qty,
-            event_id=str(event_json.event_id),
-        )
-
-        record_trade(
-            symbol=symbol,
-            price=float(trade_price),
-            quantity=float(trade_qty),
-            occurred_at=event_json.occurred_at,
-            event_id=str(event_json.event_id),
-        )
-
-        # 写入事件存储
-        _event_store.append(event_json)
-        matches.append(MatchResult(executed_event=EventEnvelopeJson(**event_dict)))
-
-        # 更新订单剩余数量和状态
-        remaining -= trade_qty
-        new_opp_qty = opp.quantity_remaining - trade_qty
-        update_order_quantity_and_status(
-            opp.order_id,
-            new_opp_qty,
-            "FILLED" if new_opp_qty <= 0 else "PARTIAL_FILLED",
-        )
-
-    # 更新本单状态
-    if remaining <= 0:
-        update_order_quantity_and_status(order.order_id, 0.0, "FILLED")
-    elif remaining < order.quantity_remaining:
-        update_order_quantity_and_status(order.order_id, remaining, "PARTIAL_FILLED")
-    else:
-        # 无成交
-        pass
+            update_order_quantity_and_status(order.order_id, 0.0, "FILLED")
+        elif remaining < order.quantity_remaining:
+            update_order_quantity_and_status(order.order_id, remaining, "PARTIAL_FILLED")
+        else:
+            # 无成交
+            pass
 
     return order.order_id, matches
 
@@ -172,70 +174,71 @@ def submit_market_order(
     if quantity <= 0:
         raise ValueError("quantity must be positive")
 
-    remaining = quantity
-    matches: List[MatchResult] = []
+    with transaction():
+        remaining = quantity
+        matches: List[MatchResult] = []
 
-    for opp in fetch_best_opposite_orders(symbol, side):
-        if remaining <= 0:
-            break
+        for opp in fetch_best_opposite_orders(symbol, side):
+            if remaining <= 0:
+                break
 
-        trade_qty = min(remaining, opp.quantity_remaining)
-        if trade_qty <= 0:
-            continue
+            trade_qty = min(remaining, opp.quantity_remaining)
+            if trade_qty <= 0:
+                continue
 
-        trade_price = opp.price
-        payload = {
-            "buy_account_id": account_id if side == "BUY" else opp.account_id,
-            "sell_account_id": opp.account_id if side == "BUY" else account_id,
-            "symbol": symbol,
-            "price": trade_price,
-            "quantity": trade_qty,
-            "order_type": "MARKET",
-        }
+            trade_price = opp.price
+            payload = {
+                "buy_account_id": account_id if side == "BUY" else opp.account_id,
+                "sell_account_id": opp.account_id if side == "BUY" else account_id,
+                "symbol": symbol,
+                "price": trade_price,
+                "quantity": trade_qty,
+                "order_type": "MARKET",
+            }
 
-        event_json = EventEnvelopeJson(
-            event_id=uuid4(),
-            event_type=str(EventType.TRADE_EXECUTED),
-            occurred_at=datetime.now(timezone.utc),
-            correlation_id=None,
-            causation_id=None,
-            actor={"agent_id": "matching-engine"},
-            payload=payload,
-        )
+            event_json = EventEnvelopeJson(
+                event_id=uuid4(),
+                event_type=str(EventType.TRADE_EXECUTED),
+                occurred_at=datetime.now(timezone.utc),
+                correlation_id=None,
+                causation_id=None,
+                actor={"agent_id": "matching-engine"},
+                payload=payload,
+            )
 
-        event_dict = event_json.model_dump()
-        # 确保 UUID 序列化
-        if isinstance(event_dict.get("event_id"), UUID):
-            event_dict["event_id"] = str(event_dict["event_id"])
+            event_dict = event_json.model_dump()
+            # 确保 UUID 序列化
+            if isinstance(event_dict.get("event_id"), UUID):
+                event_dict["event_id"] = str(event_dict["event_id"])
 
-        apply_trade_executed(
-            buy_account_id=payload["buy_account_id"],
-            sell_account_id=payload["sell_account_id"],
-            symbol=symbol,
-            price=trade_price,
-            quantity=trade_qty,
-            event_id=str(event_json.event_id),
-        )
+            apply_trade_executed(
+                buy_account_id=payload["buy_account_id"],
+                sell_account_id=payload["sell_account_id"],
+                symbol=symbol,
+                price=trade_price,
+                quantity=trade_qty,
+                event_id=str(event_json.event_id),
+            )
 
-        record_trade(
-            symbol=symbol,
-            price=float(trade_price),
-            quantity=float(trade_qty),
-            occurred_at=event_json.occurred_at,
-            event_id=str(event_json.event_id),
-        )
+            record_trade(
+                symbol=symbol,
+                price=float(trade_price),
+                quantity=float(trade_qty),
+                occurred_at=event_json.occurred_at,
+                event_id=str(event_json.event_id),
+            )
 
-        # 写入事件存储
-        _event_store.append(event_json)
-        matches.append(MatchResult(executed_event=EventEnvelopeJson(**event_dict)))
+            # 写入事件存储
+            _event_store.append(event_json)
+            matches.append(MatchResult(executed_event=EventEnvelopeJson(**event_dict)))
 
-        new_opp_qty = opp.quantity_remaining - trade_qty
-        update_order_quantity_and_status(
-            opp.order_id,
-            new_opp_qty,
-            "FILLED" if new_opp_qty <= 0 else "PARTIAL_FILLED",
-        )
+            new_opp_qty = opp.quantity_remaining - trade_qty
+            update_order_quantity_and_status(
+                opp.order_id,
+                new_opp_qty,
+                "FILLED" if new_opp_qty <= 0 else "PARTIAL_FILLED",
+            )
 
-        remaining -= trade_qty
+            remaining -= trade_qty
 
     return matches

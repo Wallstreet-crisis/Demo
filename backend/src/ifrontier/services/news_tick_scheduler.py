@@ -20,6 +20,7 @@ class NewsTickScheduler:
         broadcaster: Callable[[Dict[str, Any]], Awaitable[None]],
         channel_for_online_stats: Optional[str] = None,
         get_channel_size: Optional[Callable[[str], Awaitable[int]]] = None,
+        bypass_human_gate: bool = False,
     ) -> None:
         self._tick_engine = tick_engine
         self._tick_interval_seconds = float(tick_interval_seconds)
@@ -31,6 +32,7 @@ class NewsTickScheduler:
 
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task[None]] = None
+        self._bypass_human_gate = bool(bypass_human_gate)
 
     def start(self) -> None:
         if self._task is not None:
@@ -51,7 +53,7 @@ class NewsTickScheduler:
         if verbose:
             _log.info("Starting loop (interval=%ss)", self._tick_interval_seconds)
         while not self._stop.is_set():
-            if self._get_channel_size and self._channel_for_online_stats:
+            if not self._bypass_human_gate and self._get_channel_size and self._channel_for_online_stats:
                 try:
                     online = int(await self._get_channel_size(self._channel_for_online_stats))
                 except Exception:

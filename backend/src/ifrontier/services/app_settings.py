@@ -265,7 +265,7 @@ def save_llm_settings_layered(
 
 def get_runtime_llm_config() -> Dict[str, Any]:
     cfg = load_secure_llm_config()
-    provider = _normalize_provider(cfg.get("provider") or DEFAULT_LLM_PROVIDER)
+    provider = _normalize_provider(cfg.get("provider") or os.getenv("OPENROUTER_PROVIDER") or DEFAULT_LLM_PROVIDER)
     api_key = _resolve_api_key(cfg, provider)
     if not api_key:
         return {}
@@ -289,7 +289,7 @@ def get_runtime_llm_profile(*, profile: str | None = None, task: str | None = No
     routing = _normalize_routing(runtime.get("routing"))
     selected = str(profile or routing.get(str(task or "")) or routing.get("default") or "standard")
     prof = dict(profiles.get(selected) or profiles.get("standard") or DEFAULT_LLM_PROFILES["standard"])
-    provider = _normalize_provider(prof.get("provider") or runtime.get("provider") or DEFAULT_LLM_PROVIDER)
+    provider = _normalize_provider(runtime.get("provider") or prof.get("provider") or DEFAULT_LLM_PROVIDER)
     api_key = str((runtime.get("api_keys") or {}).get(provider) or runtime.get("api_key") or _provider_env_api_key(provider) or "")
     if not api_key:
         return {}
@@ -298,9 +298,9 @@ def get_runtime_llm_profile(*, profile: str | None = None, task: str | None = No
         "api_key": api_key,
         "profile": selected,
         "task": str(task or "default"),
-        "model": str(prof.get("model") or DEFAULT_LLM_MODEL),
-        "base_url": str(prof.get("base_url") or _default_base_url_for_provider(provider)),
-        "timeout_seconds": float(prof.get("timeout_seconds") or 20.0),
+        "model": str(runtime.get("model") or prof.get("model") or DEFAULT_LLM_MODEL),
+        "base_url": str(runtime.get("base_url") or prof.get("base_url") or _default_base_url_for_provider(provider)),
+        "timeout_seconds": float(runtime.get("timeout_seconds") or prof.get("timeout_seconds") or 20.0),
     }
 
 

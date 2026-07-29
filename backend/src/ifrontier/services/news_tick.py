@@ -44,11 +44,16 @@ class NewsTickEngine:
         event_store: SqliteEventStore,
         news_service: NewsService,
         broadcaster: Callable[[Dict[str, Any]], Awaitable[None]] | None = None,
+        *,
+        small_news_interval_seconds: int = 60,
+        chain_interval_seconds: int = 600,
     ) -> None:
         from ifrontier.services.market_analytics import get_market_trends
         self._event_store = event_store
         self._news = news_service
         self._broadcaster = broadcaster
+        self._small_news_interval_seconds = int(small_news_interval_seconds)
+        self._chain_interval_seconds = int(chain_interval_seconds)
         self._commonbot_emergency_runner = CommonBotEmergencyRunner(
             news=self._news,
             event_store=self._event_store,
@@ -236,8 +241,8 @@ class NewsTickEngine:
         spawned_events: List[Dict[str, Any]] = []
         verbose = str(os.getenv("IF_SCHEDULER_VERBOSE") or "").strip().lower() in {"1", "true", "yes", "on"}
         
-        # 1) 小新闻投放 (每 60s 触发)
-        if self._last_small_news_at is None or (now - self._last_small_news_at).total_seconds() >= 60:
+        # 1) 小新闻投放 (可配置间隔)
+        if self._last_small_news_at is None or (now - self._last_small_news_at).total_seconds() >= self._small_news_interval_seconds:
             self._last_small_news_at = now
             kind = py_random.choices(["RUMOR", "LEAK", "ANALYST_REPORT"], weights=[0.34, 0.28, 0.38], k=1)[0]
             from ifrontier.infra.sqlite.securities import list_securities
@@ -312,7 +317,7 @@ class NewsTickEngine:
                         _log.info("Spawned %s for %s to %d users. Bias: %s", kind, target_symbol, len(lucky_ones), impact_direction)
 
         # 2) 重大事件链投放 (每 600s 触发)
-        if self._last_chain_at is None or (now - self._last_chain_at).total_seconds() >= 600:
+        if self._last_chain_at is None or (now - self._last_chain_at).total_seconds() >= self._chain_interval_seconds:
             self._last_chain_at = now
             kind = py_random.choice(["MAJOR_EVENT", "WORLD_EVENT"])
             from ifrontier.infra.sqlite.securities import list_securities
