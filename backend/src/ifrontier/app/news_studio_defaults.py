@@ -11,7 +11,7 @@ def _iso(offset_seconds: int) -> str:
 def get_default_scenario_template() -> Dict[str, Any]:
     """返回默认世界模板（世界观、剧情树、新闻商店），可在前端直接渲染。"""
     return {
-        "scenario_id": "DEFAULT_TEMPLATE",
+        "scenario_id": "IFRONTIER_DEFAULT",
         "background_story": """这是 IFRONTIER 默认世界剧本，也是大多数玩家进入的第一条剧情线。
 
 新能源巨头 BLUEGOLD 刚刚完成一笔神秘并购，市场传闻四起。传统金融巨头 CIVILBANK 试图稳住阵脚，脑机科技巨头 NEURALINK 在暗处积蓄力量，而被忽视的消费板块 FOODMART 却在某个假日季隐藏着反转线索。

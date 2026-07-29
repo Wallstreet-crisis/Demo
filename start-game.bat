@@ -5,7 +5,7 @@ echo Information Frontier Launcher
 echo ========================================
 echo.
 echo Starting backend and frontend...
-echo Backend port: 8472
+echo Backend port: 8010
 echo Conda env: ifrontier
 echo.
 echo Close this window to stop all services

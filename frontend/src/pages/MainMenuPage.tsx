@@ -328,7 +328,9 @@ export default function MainMenuPage() {
               fontSize: '13px'
             }}
           >
-            <option value="">DEFAULT_SIMULATION (SEED DATA)</option>
+            {availableScenarios.length === 0 && (
+              <option value="" disabled>Loading scenarios...</option>
+            )}
             {availableScenarios.map(s => (
               <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>
             ))}

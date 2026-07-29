@@ -11,4 +11,7 @@ logs/ai_behavior.log
 backend/src/logs/ai_behavior.log
 backend/src/logs/ai_behavior.log
 backend/src/global_studio.db
+backend/global_studio.db
+frontend/global_studio.db
+global_studio.db
 *.log

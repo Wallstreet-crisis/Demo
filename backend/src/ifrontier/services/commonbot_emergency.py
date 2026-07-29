@@ -538,8 +538,14 @@ class CommonBotEmergencyRunner:
 
             for m in matches:
                 ev = m.executed_event.model_dump()
-                task = asyncio.create_task(self._broadcast_event(ev))
-                task.add_done_callback(lambda t: t.exception() if t.done() and t.exception() else None)
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+                if loop is not None:
+                    loop.create_task(self._broadcast_event(ev))
+                else:
+                    asyncio.run(self._broadcast_event(ev))
         except Exception as exc:
             _log.warning("%s: Order failed for %s: %s", log_prefix, account_id, exc)
 

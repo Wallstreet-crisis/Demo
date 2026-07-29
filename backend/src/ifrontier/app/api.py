@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import asyncio
 import json
@@ -2794,12 +2794,62 @@ def _get_global_news_db_conn():
     
     global _global_news_db_initialized
     if not _global_news_db_initialized:
-        # 初始化表结构（如果不存在）
         from ifrontier.infra.sqlite.news import init_news_schema
         init_news_schema(conn)
+        _seed_default_scenario_if_empty(conn)
         _global_news_db_initialized = True
         
     return conn
+
+
+def _seed_default_scenario_if_empty(conn: sqlite3.Connection) -> None:
+    existing = conn.execute(
+        "SELECT COUNT(*) AS cnt FROM (SELECT scenario_id FROM news WHERE scenario_id IS NOT NULL UNION SELECT scenario_id FROM news_scenario_meta WHERE scenario_id IS NOT NULL)"
+    ).fetchone()
+    if existing and existing["cnt"] > 0:
+        return
+
+    from ifrontier.app.news_studio_defaults import get_default_scenario_template
+    import json
+    from datetime import datetime, timezone
+    from uuid import uuid4
+
+    raw = get_default_scenario_template()
+    scenario_id = raw["scenario_id"]
+    now = datetime.now(timezone.utc).isoformat()
+
+    world_json = json.dumps(raw.get("worldview") or {}, ensure_ascii=False)
+    store_json = json.dumps(raw.get("news_store_items") or [], ensure_ascii=False)
+
+    with conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO news_scenario_meta (scenario_id, background_story, worldview_json, news_store_items_json, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (scenario_id, raw.get("background_story", ""), world_json, store_json, now, now),
+        )
+
+        for card in raw.get("cards", []):
+            card_id = card.get("card_id") or str(uuid4())
+            conn.execute(
+                """INSERT OR REPLACE INTO news (
+                    card_id, variant_id, kind, text, symbols_json, tags_json,
+                    publisher_id, published_at, is_suppressed, suppression_reason,
+                    truth_payload_json, image_uri, image_anchor_id, preset_id, rarity, created_at,
+                    author_id, parent_variant_id, mutation_depth, influence_cost,
+                    parent_card_id, activation_prob, scheduled_at, success_criteria_json, failure_outcome_json,
+                    scenario_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    card_id, None, str(card.get("kind") or "RUMOR"), card.get("text"),
+                    json.dumps(list(card.get("symbols") or [])), json.dumps(list(card.get("tags") or [])),
+                    "system", None, 0, None, json.dumps(card.get("truth_payload") or {}),
+                    card.get("image_uri"), card.get("image_anchor_id"), None, "COMMON", now,
+                    "system", None, 0, 0.0,
+                    card.get("parent_card_id"), float(card.get("activation_prob", 1.0)), card.get("scheduled_at"),
+                    json.dumps(card.get("success_criteria") or {}), json.dumps(card.get("failure_outcome") or {}),
+                    scenario_id
+                ),
+            )
 
 
 class NewsScenarioWorldviewConfig(BaseModel):
@@ -2836,20 +2886,29 @@ def _parse_scenario_store_items(raw: Any) -> List[RoomNewsStoreItemConfig]:
 
 @router.get("/global/studio/news/scenarios")
 async def global_studio_news_scenarios() -> List[Dict[str, Any]]:
-    # 彻底开放，不再校验身份
     conn = _get_global_news_db_conn()
     rows = conn.execute(
         """
-        SELECT DISTINCT scenario_id
+        SELECT s.scenario_id,
+               COALESCE(m.background_story, '') AS background_story
         FROM (
             SELECT scenario_id FROM news WHERE scenario_id IS NOT NULL
             UNION
             SELECT scenario_id FROM news_scenario_meta WHERE scenario_id IS NOT NULL
-        )
-        ORDER BY scenario_id
+        ) s
+        LEFT JOIN news_scenario_meta m ON m.scenario_id = s.scenario_id
+        ORDER BY s.scenario_id
         """
     ).fetchall()
-    return [{"id": r["scenario_id"], "name": r["scenario_id"]} for r in rows]
+    results = []
+    for r in rows:
+        sid = r["scenario_id"]
+        story = r["background_story"] or ""
+        name = story.split("\n")[0].strip()[:60] if story else sid
+        if name == sid:
+            name = sid.replace("_", " ").title()
+        results.append({"id": sid, "name": name})
+    return results
 
 
 @router.delete("/global/studio/news/scenarios/{scenario_id}")

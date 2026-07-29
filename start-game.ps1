@@ -4,11 +4,11 @@
 $ErrorActionPreference = "Stop"
 
 # Config
-$BackendPort = 8472
-$FrontendPort = 5175
+$BackendPort = 8010
+$FrontendPort = 5173
 $CondaEnv = "ifrontier"
-$BackendDir = "e:\GitClone\Demo\backend\src"
-$FrontendDir = "e:\GitClone\Demo\frontend"
+$BackendDir = "D:\project\Demo\backend"
+$FrontendDir = "D:\project\Demo\frontend"
 
 # Store child processes for cleanup
 $global:ChildProcesses = @()
@@ -68,7 +68,7 @@ function Kill-OldGameProcesses {
 function Start-Backend {
     Write-Info "Starting backend (Port: $BackendPort)..."
     
-    $procArgs = @("-NoExit", "-Command", "cd '$BackendDir'; `$env:PYTHONPATH='$BackendDir'; conda activate $CondaEnv; Write-Host 'Backend starting...' -ForegroundColor Green; uvicorn ifrontier.app.main:app --reload --port $BackendPort --app-dir .")
+    $procArgs = @("-NoExit", "-Command", "cd '$BackendDir'; .\.venv\Scripts\uvicorn ifrontier.app.main:app --reload --port $BackendPort --app-dir src")
     
     try {
         $proc = Start-Process -FilePath "powershell" -ArgumentList $procArgs -PassThru
@@ -85,7 +85,7 @@ function Start-Backend {
 function Start-Frontend {
     Write-Info "Starting frontend..."
     
-    $procArgs = @("-NoExit", "-Command", "cd '$FrontendDir'; npm run dev")
+    $procArgs = @("-NoExit", "-Command", "cd '$FrontendDir'; `$env:VITE_PROXY_TARGET='http://127.0.0.1:$BackendPort'; npm run dev")
     
     try {
         $proc = Start-Process -FilePath "powershell" -ArgumentList $procArgs -PassThru
